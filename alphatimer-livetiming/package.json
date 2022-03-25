@@ -117,7 +117,7 @@
     "@webcomponents/shadycss": "1.9.6",
     "construct-style-sheets-polyfill": "3.0.4",
     "date-fns": "2.23.0",
-    "lit": "2.1.4",
+    "lit": "2.2.0",
     "lumo-css-framework": "^4.0.10"
   },
   "devDependencies": {
