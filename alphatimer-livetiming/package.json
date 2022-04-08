@@ -8,7 +8,7 @@
     "@polymer/iron-meta": "3.0.1",
     "@polymer/iron-resizable-behavior": "3.0.1",
     "@polymer/polymer": "3.4.1",
-    "@vaadin/accordion": "23.0.1",
+    "@vaadin/accordion": "23.0.2",
     "@vaadin/app-layout": "23.0.1",
     "@vaadin/avatar": "23.0.1",
     "@vaadin/avatar-group": "23.0.1",
