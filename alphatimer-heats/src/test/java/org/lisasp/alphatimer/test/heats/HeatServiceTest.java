@@ -12,7 +12,6 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedKindOfTime;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
-import org.lisasp.alphatimer.heats.HeatListener;
 import org.lisasp.alphatimer.heats.api.HeatDto;
 import org.lisasp.alphatimer.heats.api.LaneDto;
 import org.lisasp.alphatimer.heats.api.enums.HeatStatus;
@@ -22,15 +21,15 @@ import org.lisasp.alphatimer.heats.entity.HeatEntity;
 import org.lisasp.alphatimer.heats.service.DataRepository;
 import org.lisasp.alphatimer.heats.service.HeatRepository;
 import org.lisasp.alphatimer.heats.service.HeatService;
-import org.mockito.Mockito;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.*;
 
 class HeatServiceTest {
 
@@ -245,14 +244,14 @@ class HeatServiceTest {
             new LaneDto(8, 111180, LaneStatus.Used, Penalty.None, 1)
     };
 
-    private HeatListener listener;
+    private TestHeatListener listener;
 
     @BeforeEach
     void prepare() {
         heatEntities = new TestHeatRepository();
         heatsService = new HeatService(new DataRepository(heatEntities), () -> TIMESTAMP1);
 
-        listener = Mockito.mock(HeatListener.class);
+        listener = new TestHeatListener();
         heatsService.register(listener);
     }
 
@@ -260,8 +259,7 @@ class HeatServiceTest {
     void startMessage() {
         heatsService.accept(startMessage);
 
-        verify(listener, times(1)).accept(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, emptyLanes));
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, emptyLanes)), listener.received);
 
         Optional<HeatEntity> entity = heatEntities.findByCompetitionAndEventAndHeat(COMPETITION, EVENT, HEAT);
         assertTrue(entity.isPresent());
@@ -272,8 +270,7 @@ class HeatServiceTest {
     void unusedTimeLane1Message() {
         heatsService.accept(timeLane1Message);
 
-        verify(listener, times(1)).accept(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP3, 1, emptyLanes));
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP3, 1, emptyLanes)), listener.received);
 
         Optional<HeatEntity> entity = heatEntities.findByCompetitionAndEventAndHeat(COMPETITION, EVENT, HEAT);
         assertTrue(entity.isPresent());
@@ -285,8 +282,7 @@ class HeatServiceTest {
         heatsService.accept(usedLanesMessage);
         heatsService.accept(timeLane1Message);
 
-        verify(listener, times(1)).accept(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP3, 1, lane1Lanes));
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP3, 1, lane1Lanes)), listener.received);
 
         Optional<HeatEntity> entity = heatEntities.findByCompetitionAndEventAndHeat(COMPETITION, EVENT, HEAT);
         assertTrue(entity.isPresent());
@@ -297,8 +293,7 @@ class HeatServiceTest {
     void officialEndMessage() {
         heatsService.accept(officialEndMessage);
 
-        verify(listener, times(1)).accept(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Finished, TIMESTAMP4, 1, emptyLanes));
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Finished, TIMESTAMP4, 1, emptyLanes)), listener.received);
 
         Optional<HeatEntity> entity = heatEntities.findByCompetitionAndEventAndHeat(COMPETITION, EVENT, HEAT);
         assertTrue(entity.isPresent());
@@ -310,9 +305,8 @@ class HeatServiceTest {
         heatsService.accept(startMessage);
         heatsService.accept(officialEndMessage);
 
-        verify(listener, times(1)).accept(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, emptyLanesWithLapCount));
-        verify(listener, times(1)).accept(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Finished, TIMESTAMP1, 1, emptyLanesWithLapCount));
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, emptyLanesWithLapCount),
+                              new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Finished, TIMESTAMP1, 1, emptyLanesWithLapCount)), listener.received);
 
         Optional<HeatEntity> entity = heatEntities.findByCompetitionAndEventAndHeat(COMPETITION, EVENT, HEAT);
         assertTrue(entity.isPresent());
@@ -328,9 +322,9 @@ class HeatServiceTest {
         LaneDto[] lanes = createLanes(LaneStatus.NotUsed);
         lanes[0] = new LaneDto(1, 0, LaneStatus.Used, Penalty.None, 0);
 
-        verify(listener, times(2)).accept(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, emptyLanesWithLapCount));
-        verify(listener, times(1)).accept(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, usedLanes));
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, emptyLanesWithLapCount),
+                              new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, usedLanes),
+                              new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, emptyLanesWithLapCount)), listener.received);
 
         Optional<HeatEntity> entity = heatEntities.findByCompetitionAndEventAndHeat(COMPETITION, EVENT, HEAT);
         assertTrue(entity.isPresent());
@@ -352,13 +346,15 @@ class HeatServiceTest {
         heatsService.accept(timeLane8Message);
         heatsService.accept(officialEndMessage);
 
-        verify(listener, times(1)).accept(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, emptyLanesWithLapCount));
-        verify(listener, times(1)).accept(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, usedLanes));
+        List<HeatDto> expected = new ArrayList<>();
+        expected.add(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, emptyLanesWithLapCount));
+        expected.add(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, usedLanes));
         for (int x = 1; x <= 8; x++) {
-            verify(listener, times(1)).accept(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, createPartiallyStartedLanes(x)));
+            expected.add(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, createPartiallyStartedLanes(x)));
         }
-        verify(listener, times(1)).accept(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Finished, TIMESTAMP1, 1, completeLanes));
-        verifyNoMoreInteractions(listener);
+        expected.add(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Finished, TIMESTAMP1, 1, completeLanes));
+
+        assertEquals(expected, listener.received);
 
         Optional<HeatEntity> entity = heatEntities.findByCompetitionAndEventAndHeat(COMPETITION, EVENT, HEAT);
         assertTrue(entity.isPresent());
@@ -370,7 +366,7 @@ class HeatServiceTest {
     void invalidEventNumber() {
         heatsService.accept(startMessageEvent0Heat1);
 
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(), listener.received);
 
         assertEquals(0, heatEntities.count());
     }
@@ -379,7 +375,7 @@ class HeatServiceTest {
     void invalidHeatNumber() {
         heatsService.accept(startMessageEvent1Heat0);
 
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(), listener.received);
 
         assertEquals(0, heatEntities.count());
     }
@@ -389,8 +385,7 @@ class HeatServiceTest {
         heatsService.accept(startMessage);
         Assertions.assertThrows(NoSuchElementException.class, () -> heatsService.accept(timeLane9Message), "TestWK 1 2: Lane 9 not found.");
 
-        verify(listener, times(1)).accept(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, emptyLanesWithLapCount));
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new HeatDto(COMPETITION, EVENT, HEAT, HeatStatus.Started, TIMESTAMP1, 1, emptyLanesWithLapCount)), listener.received);
 
         Optional<HeatEntity> entity = heatEntities.findByCompetitionAndEventAndHeat(COMPETITION, EVENT, HEAT);
         assertTrue(entity.isPresent());

@@ -46,7 +46,9 @@ public class SerialInterpreter {
         aggregator.register(messageRefiner);
 
         messageConverter.register(event -> {
-            if (!(event instanceof Ping)) {
+            if (event instanceof Ping) {
+                log.debug("Received message: '{}'", event);
+            } else {
                 log.info("Received message: '{}'", event);
             }
             aggregator.accept(event);

@@ -5,6 +5,7 @@
     <ignoreVersion type="regex">.*-preview</ignoreVersion>
     <ignoreVersion type="regex">.*-beta</ignoreVersion>
     <ignoreVersion type="regex">.*-beta.?+</ignoreVersion>
+    <ignoreVersion type="regex">.*-beta-.+</ignoreVersion>
     <ignoreVersion type="regex">.*-alpha.?+</ignoreVersion>
     <ignoreVersion type="regex">.*-rc.?+</ignoreVersion>
     <ignoreVersion type="regex">.*-M\d+</ignoreVersion>

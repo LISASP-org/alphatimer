@@ -4,18 +4,16 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.lisasp.alphatimer.api.ares.serial.events.BytesInputEvent;
-import org.lisasp.alphatimer.api.ares.serial.events.DataInputEvent;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage1;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage2;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.*;
 import org.lisasp.basics.jre.date.DateTimeFacade;
 import org.lisasp.alphatimer.ares.serial.MessageConverter;
-import org.mockito.Mockito;
 
 import java.time.LocalDateTime;
-import java.util.function.Consumer;
+import java.util.List;
 
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Corresponds to chapter 2
@@ -48,15 +46,18 @@ class MessageConverterTest {
             TimeMarker.Empty);
 
     private MessageConverter messageConverter;
-    private Consumer<DataInputEvent> listener;
+    private TestDataInputEventListener listener;
 
     @BeforeEach
-    @SuppressWarnings("unchecked")
     void prepare() {
-        DateTimeFacade datetime = Mockito.mock(DateTimeFacade.class);
-        Mockito.when(datetime.now()).thenReturn(LocalDateTime.of(2021, 6, 1, 10, 0));
+        DateTimeFacade dateTimeFacade = new DateTimeFacade() {
+            @Override
+            public LocalDateTime now() {
+                return TIMESTAMP;
+            }
+        };
 
-        listener = Mockito.mock(Consumer.class);
+        listener = new TestDataInputEventListener();
         messageConverter = new MessageConverter();
         messageConverter.register(listener);
     }
@@ -72,18 +73,13 @@ class MessageConverterTest {
         messageConverter.accept(new BytesInputEvent(TIMESTAMP, "TestWK", DataHandlingMessageTestData.message1));
         messageConverter.accept(new BytesInputEvent(TIMESTAMP, "TestWK", DataHandlingMessageTestData.message2));
 
-        verify(listener, times(1)).accept(TestDataHandlingMessage1);
-        verify(listener, times(1)).accept(TestDataHandlingMessage2);
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(TestDataHandlingMessage1, TestDataHandlingMessage2), listener.received);
     }
 
     @Test
     void sendMessage1AndPing() {
         messageConverter.accept(new BytesInputEvent(TIMESTAMP, "TestWK", DataHandlingMessageTestData.message1));
 
-        verify(listener, times(1)).accept(TestDataHandlingMessage1);
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(TestDataHandlingMessage1), listener.received);
     }
 }

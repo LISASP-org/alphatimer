@@ -13,13 +13,13 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.Ping;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.*;
 import org.lisasp.basics.jre.date.DateTimeFacade;
 import org.lisasp.alphatimer.ares.serial.MessageAggregator;
-import org.mockito.Mockito;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.lisasp.alphatimer.test.ares.serial.DataHandlingMessageTestData.bogus;
 import static org.lisasp.alphatimer.test.ares.serial.DataHandlingMessageTestData.createUsedLanes;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Corresponds to chapter 2
@@ -29,14 +29,18 @@ class MessageAggregatorTest {
     private static final LocalDateTime TIMESTAMP = LocalDateTime.of(2021, 6, 1, 10, 0);
 
     private DataHandlingMessageAggregator aggregator;
-    private DataHandlingMessageListener listener;
+    private TestDataHandlingMessageListener listener;
 
     @BeforeEach
     void prepare() {
-        DateTimeFacade datetime = Mockito.mock(DateTimeFacade.class);
-        Mockito.when(datetime.now()).thenReturn(LocalDateTime.of(2021, 6, 1, 10, 0));
+        DateTimeFacade dateTimeFacade = new DateTimeFacade() {
+            @Override
+            public LocalDateTime now() {
+                return TIMESTAMP;
+            }
+        };
 
-        listener = Mockito.mock(DataHandlingMessageListener.class);
+        listener = new TestDataHandlingMessageListener();
         aggregator = new MessageAggregator();
         aggregator.register(listener);
     }
@@ -72,8 +76,7 @@ class MessageAggregatorTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(new DataHandlingMessage(
+        assertEquals(List.of(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1",
@@ -91,9 +94,7 @@ class MessageAggregatorTest {
                 (byte) 0,
                 112853930,
                 TimeInfo.Normal,
-                TimeMarker.Empty));
-
-        verifyNoMoreInteractions(listener);
+                TimeMarker.Empty)), listener.received);
     }
 
     @Test
@@ -121,8 +122,7 @@ class MessageAggregatorTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(new DataHandlingMessage(
+        assertEquals(List.of(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1",
@@ -140,9 +140,7 @@ class MessageAggregatorTest {
                 (byte) 0,
                 112853930,
                 TimeInfo.Normal,
-                TimeMarker.Empty));
-
-        verifyNoMoreInteractions(listener);
+                TimeMarker.Empty)), listener.received);
     }
 
     @Test
@@ -162,9 +160,7 @@ class MessageAggregatorTest {
                 RankInfo.Normal));
         aggregator.accept(new Ping(TIMESTAMP, "TestWK", new byte[]{0x12, 0x39}));
 
-        verify(listener, times(0)).accept(Mockito.any());
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(), listener.received);
     }
 
     @Test
@@ -180,9 +176,7 @@ class MessageAggregatorTest {
                 TimeMarker.Empty));
         aggregator.accept(new Ping(TIMESTAMP, "TestWK", new byte[]{0x12, 0x39}));
 
-        verify(listener, times(0)).accept(Mockito.any());
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(), listener.received);
     }
 
     @Test
@@ -211,8 +205,7 @@ class MessageAggregatorTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(new DataHandlingMessage(
+        assertEquals(List.of(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1",
@@ -230,9 +223,7 @@ class MessageAggregatorTest {
                 (byte) 0,
                 112853930,
                 TimeInfo.Normal,
-                TimeMarker.Empty));
-
-        verifyNoMoreInteractions(listener);
+                TimeMarker.Empty)), listener.received);
     }
 
     @Test
@@ -262,14 +253,12 @@ class MessageAggregatorTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        verify(listener, times(0)).accept(Mockito.any());
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(), listener.received);
     }
 
     @Test
     void convenienceConstructorTest() {
-        listener = Mockito.mock(DataHandlingMessageListener.class);
+        listener = new TestDataHandlingMessageListener();
         aggregator = new MessageAggregator();
         aggregator.register(listener);
 
@@ -296,8 +285,24 @@ class MessageAggregatorTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        verify(listener, times(1)).accept(Mockito.any());
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new DataHandlingMessage(
+                TIMESTAMP,
+                "TestWK",
+                "1",
+                "2",
+                MessageType.OnLineTime,
+                KindOfTime.Start,
+                TimeType.Empty,
+                createUsedLanes(),
+                (byte) 2,
+                (short) 1,
+                (byte) 1,
+                (byte) 0,
+                RankInfo.Normal,
+                (byte) 1,
+                (byte) 0,
+                112853930,
+                TimeInfo.Normal,
+                TimeMarker.Empty)), listener.received);
     }
 }

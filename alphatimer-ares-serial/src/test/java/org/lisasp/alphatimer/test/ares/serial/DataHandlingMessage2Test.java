@@ -3,7 +3,6 @@ package org.lisasp.alphatimer.test.ares.serial;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.lisasp.alphatimer.api.ares.serial.DataInputEventListener;
 import org.lisasp.alphatimer.api.ares.serial.events.dropped.UnstructuredInputDroppedEvent;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage2;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeInfo;
@@ -11,14 +10,14 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeMarker;
 import org.lisasp.basics.jre.date.DateTimeFacade;
 import org.lisasp.alphatimer.ares.serial.InputCollector;
 import org.lisasp.alphatimer.ares.serial.MessageConverter;
-import org.mockito.Mockito;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 
 import static org.lisasp.alphatimer.test.ares.serial.DataHandlingMessageTestData.bogus;
 import static org.lisasp.alphatimer.test.ares.serial.DataHandlingMessageTestData.message2;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Corresponds to chapter 2
@@ -28,14 +27,18 @@ class DataHandlingMessage2Test {
     private static final LocalDateTime TIMESTAMP = LocalDateTime.of(2021, 6, 21, 15, 52);
 
     private InputCollector inputCollector;
-    private DataInputEventListener listener;
+    private TestDataInputEventListener listener;
 
     @BeforeEach
     void prepare() {
-        DateTimeFacade dateTimeFacade = mock(DateTimeFacade.class);
-        when(dateTimeFacade.now()).thenReturn(TIMESTAMP);
+        DateTimeFacade dateTimeFacade = new DateTimeFacade() {
+            @Override
+            public LocalDateTime now() {
+                return TIMESTAMP;
+            }
+        };
 
-        listener = mock(DataInputEventListener.class);
+        listener = new TestDataInputEventListener();
 
         MessageConverter messageConverter = new MessageConverter();
         messageConverter.register(listener);
@@ -56,20 +59,15 @@ class DataHandlingMessage2Test {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage2.class));
-        verify(listener, times(1)).accept(
-                new DataHandlingMessage2(
-                        TIMESTAMP,
-                        "TestWK",
-                        new String(message2),
-                        (byte) 1,
-                        (byte) 0,
-                        112853930,
-                        TimeInfo.Normal,
-                        TimeMarker.Empty));
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new DataHandlingMessage2(
+                TIMESTAMP,
+                "TestWK",
+                new String(message2),
+                (byte) 1,
+                (byte) 0,
+                112853930,
+                TimeInfo.Normal,
+                TimeMarker.Empty)), listener.received);
     }
 
     @Test
@@ -82,9 +80,7 @@ class DataHandlingMessage2Test {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage2.class));
-        verify(listener, times(1)).accept(new DataHandlingMessage2(
+        assertEquals(List.of(new DataHandlingMessage2(
                 TIMESTAMP,
                 "TestWK",
                 new String(message2modified),
@@ -92,9 +88,7 @@ class DataHandlingMessage2Test {
                 (byte) 1,
                 112853930,
                 TimeInfo.Normal,
-                TimeMarker.Empty));
-
-        verifyNoMoreInteractions(listener);
+                TimeMarker.Empty)), listener.received);
     }
 
     @Test
@@ -106,19 +100,16 @@ class DataHandlingMessage2Test {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(2)).accept(Mockito.any());
-        verify(listener, times(1)).accept(new UnstructuredInputDroppedEvent(TIMESTAMP, "TestWK", bogus));
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage2.class));
-        verify(listener, times(1)).accept(new DataHandlingMessage2(
-                TIMESTAMP,
-                "TestWK",
-                new String(message2),
-                (byte) 1,
-                (byte) 0,
-                112853930,
-                TimeInfo.Normal,
-                TimeMarker.Empty));
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(
+                new UnstructuredInputDroppedEvent(TIMESTAMP, "TestWK", bogus),
+                new DataHandlingMessage2(
+                        TIMESTAMP,
+                        "TestWK",
+                        new String(message2),
+                        (byte) 1,
+                        (byte) 0,
+                        112853930,
+                        TimeInfo.Normal,
+                        TimeMarker.Empty)), listener.received);
     }
 }

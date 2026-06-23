@@ -5,30 +5,35 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.lisasp.alphatimer.api.ares.serial.DataInputEventListener;
 import org.lisasp.alphatimer.api.ares.serial.events.dropped.DataHandlingMessage2DroppedEvent;
 import org.lisasp.alphatimer.api.ares.serial.events.dropped.UnknownMessageDroppedEvent;
 import org.lisasp.basics.jre.date.DateTimeFacade;
 import org.lisasp.alphatimer.ares.serial.InputCollector;
 import org.lisasp.alphatimer.ares.serial.MessageConverter;
-import org.mockito.Mockito;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class DataHandlingMessage2InvalidTest {
 
+    private static final LocalDateTime TIMESTAMP = LocalDateTime.of(2021, 6, 21, 14, 53);
+
     private InputCollector inputCollector;
-    private DataInputEventListener listener;
+    private TestDataInputEventListener listener;
 
     @BeforeEach
     void prepare() {
-        DateTimeFacade dateTimeFacade = mock(DateTimeFacade.class);
-        when(dateTimeFacade.now()).thenReturn(LocalDateTime.of(2021, 6, 21, 14, 53));
+        DateTimeFacade dateTimeFacade = new DateTimeFacade() {
+            @Override
+            public LocalDateTime now() {
+                return TIMESTAMP;
+            }
+        };
 
-        listener = mock(DataInputEventListener.class);
+        listener = new TestDataInputEventListener();
 
         MessageConverter messageConverter = new MessageConverter();
         messageConverter.register(listener);
@@ -53,10 +58,7 @@ class DataHandlingMessage2InvalidTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(UnknownMessageDroppedEvent.class));
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new UnknownMessageDroppedEvent(TIMESTAMP, "Test", message2modified)), listener.received);
     }
 
     @Test
@@ -69,10 +71,7 @@ class DataHandlingMessage2InvalidTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(UnknownMessageDroppedEvent.class));
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new UnknownMessageDroppedEvent(TIMESTAMP, "Test", message2modified)), listener.received);
     }
 
     @ParameterizedTest
@@ -85,10 +84,7 @@ class DataHandlingMessage2InvalidTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage2DroppedEvent.class));
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new DataHandlingMessage2DroppedEvent(TIMESTAMP, "Test", expectedMessage(message2modified, byteIndex), message2modified)), listener.received);
     }
 
     @ParameterizedTest
@@ -101,9 +97,25 @@ class DataHandlingMessage2InvalidTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage2DroppedEvent.class));
+        assertEquals(List.of(new DataHandlingMessage2DroppedEvent(TIMESTAMP, "Test", expectedMessage(message2modified, byteIndex), message2modified)), listener.received);
+    }
 
-        verifyNoMoreInteractions(listener);
+    /**
+     * Mirrors the exact message-building logic of DataHandlingMessage2Parser / ByteArrayUtils
+     * for the field that contains byteIndex, so the expected message does not need to be
+     * hand-transcribed (it would otherwise need to embed raw control bytes such as 0x00).
+     */
+    private static String expectedMessage(byte[] data, int byteIndex) {
+        if (byteIndex == 4) {
+            return String.format("%d must be the ascii-representation of a digit.", data[4]);
+        }
+        if (byteIndex == 5 || byteIndex == 6) {
+            return String.format("%d, %d must be the ascii-representation of a one or two digits number.", data[5], data[6]);
+        }
+        if (byteIndex == 19) {
+            return String.format("%d must be the ascii-representation of a 'time info'.", data[19]);
+        }
+        // indices 8-18: time field, raw (untrimmed) 11-byte slice at data[8..18]
+        return String.format("Data at indices 8-18 must contain a valid time: '%s'", new String(data, 8, 11));
     }
 }

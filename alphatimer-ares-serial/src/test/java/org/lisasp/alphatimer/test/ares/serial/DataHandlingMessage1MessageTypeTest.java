@@ -12,13 +12,13 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeType;
 import org.lisasp.basics.jre.date.DateTimeFacade;
 import org.lisasp.alphatimer.ares.serial.InputCollector;
 import org.lisasp.alphatimer.ares.serial.MessageConverter;
-import org.mockito.Mockito;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.lisasp.alphatimer.test.ares.serial.DataHandlingMessageTestData.createUsedLanes;
-import static org.mockito.Mockito.*;
 
 /**
  * Corresponds to chapter 2
@@ -28,14 +28,18 @@ class DataHandlingMessage1MessageTypeTest {
     private static final LocalDateTime TIMESTAMP = LocalDateTime.of(2021, 6, 21, 14, 52);
 
     private InputCollector inputCollector;
-    private DataInputEventListener listener;
+    private TestDataInputEventListener listener;
 
     @BeforeEach
     void prepare() {
-        DateTimeFacade dateTimeFacade = mock(DateTimeFacade.class);
-        when(dateTimeFacade.now()).thenReturn(TIMESTAMP);
+        DateTimeFacade dateTimeFacade = new DateTimeFacade() {
+            @Override
+            public LocalDateTime now() {
+                return TIMESTAMP;
+            }
+        };
 
-        listener = mock(DataInputEventListener.class);
+        listener = new TestDataInputEventListener();
 
         MessageConverter messageConverter = new MessageConverter();
         messageConverter.register(listener);
@@ -60,9 +64,7 @@ class DataHandlingMessage1MessageTypeTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage1.class));
-        verify(listener, times(1)).accept(new DataHandlingMessage1(
+        assertEquals(List.of(new DataHandlingMessage1(
                 TIMESTAMP,
                 "TestWK",
                 new String(message1modified),
@@ -74,9 +76,7 @@ class DataHandlingMessage1MessageTypeTest {
                 (short) 1,
                 (byte) 1,
                 (byte) 0,
-                RankInfo.Normal));
-
-        verifyNoMoreInteractions(listener);
+                RankInfo.Normal)), listener.received);
     }
 
     @Test
@@ -89,9 +89,7 @@ class DataHandlingMessage1MessageTypeTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage1.class));
-        verify(listener, times(1)).accept(new DataHandlingMessage1(
+        assertEquals(List.of(new DataHandlingMessage1(
                 TIMESTAMP,
                 "TestWK",
                 new String(message1modified),
@@ -103,9 +101,7 @@ class DataHandlingMessage1MessageTypeTest {
                 (short) 1,
                 (byte) 1,
                 (byte) 0,
-                RankInfo.Normal));
-
-        verifyNoMoreInteractions(listener);
+                RankInfo.Normal)), listener.received);
     }
 
     @Test
@@ -118,9 +114,7 @@ class DataHandlingMessage1MessageTypeTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage1.class));
-        verify(listener, times(1)).accept(new DataHandlingMessage1(
+        assertEquals(List.of(new DataHandlingMessage1(
                 TIMESTAMP,
                 "TestWK",
                 new String(message1modified),
@@ -132,9 +126,7 @@ class DataHandlingMessage1MessageTypeTest {
                 (short) 1,
                 (byte) 1,
                 (byte) 0,
-                RankInfo.Normal));
-
-        verifyNoMoreInteractions(listener);
+                RankInfo.Normal)), listener.received);
     }
 
     @Test
@@ -147,9 +139,7 @@ class DataHandlingMessage1MessageTypeTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage1.class));
-        verify(listener, times(1)).accept(new DataHandlingMessage1(
+        assertEquals(List.of(new DataHandlingMessage1(
                 TIMESTAMP,
                 "TestWK",
                 new String(message1modified),
@@ -161,9 +151,7 @@ class DataHandlingMessage1MessageTypeTest {
                 (short) 1,
                 (byte) 1,
                 (byte) 0,
-                RankInfo.Normal));
-
-        verifyNoMoreInteractions(listener);
+                RankInfo.Normal)), listener.received);
     }
 
     @Test
@@ -176,9 +164,7 @@ class DataHandlingMessage1MessageTypeTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage1.class));
-        verify(listener, times(1)).accept(new DataHandlingMessage1(
+        assertEquals(List.of(new DataHandlingMessage1(
                 TIMESTAMP,
                 "TestWK",
                 new String(message1modified),
@@ -190,9 +176,7 @@ class DataHandlingMessage1MessageTypeTest {
                 (short) 1,
                 (byte) 1,
                 (byte) 0,
-                RankInfo.Normal));
-
-        verifyNoMoreInteractions(listener);
+                RankInfo.Normal)), listener.received);
     }
 
     @Test
@@ -205,9 +189,7 @@ class DataHandlingMessage1MessageTypeTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage1.class));
-        verify(listener, times(1)).accept(new DataHandlingMessage1(
+        assertEquals(List.of(new DataHandlingMessage1(
                 TIMESTAMP,
                 "TestWK",
                 new String(message1modified),
@@ -219,9 +201,7 @@ class DataHandlingMessage1MessageTypeTest {
                 (short) 1,
                 (byte) 1,
                 (byte) 0,
-                RankInfo.Normal));
-
-        verifyNoMoreInteractions(listener);
+                RankInfo.Normal)), listener.received);
     }
 
     @Test
@@ -234,9 +214,7 @@ class DataHandlingMessage1MessageTypeTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage1.class));
-        verify(listener, times(1)).accept(new DataHandlingMessage1(
+        assertEquals(List.of(new DataHandlingMessage1(
                 TIMESTAMP,
                 "TestWK",
                 new String(message1modified),
@@ -248,9 +226,7 @@ class DataHandlingMessage1MessageTypeTest {
                 (short) 1,
                 (byte) 1,
                 (byte) 0,
-                RankInfo.Normal));
-
-        verifyNoMoreInteractions(listener);
+                RankInfo.Normal)), listener.received);
     }
 
     @Test
@@ -263,9 +239,7 @@ class DataHandlingMessage1MessageTypeTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage1.class));
-        verify(listener, times(1)).accept(new DataHandlingMessage1(
+        assertEquals(List.of(new DataHandlingMessage1(
                 TIMESTAMP,
                 "TestWK",
                 new String(message1modified),
@@ -277,8 +251,6 @@ class DataHandlingMessage1MessageTypeTest {
                 (short) 1,
                 (byte) 1,
                 (byte) 0,
-                RankInfo.Normal));
-
-        verifyNoMoreInteractions(listener);
+                RankInfo.Normal)), listener.received);
     }
 }

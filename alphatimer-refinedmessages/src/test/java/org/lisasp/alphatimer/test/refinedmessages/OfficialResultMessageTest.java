@@ -9,22 +9,22 @@ import org.lisasp.alphatimer.api.refinedmessages.RefinedMessageListener;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
 import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedOfficialEndMessage;
 import org.lisasp.alphatimer.refinedmessages.DataHandlingMessageRefiner;
-import org.mockito.Mockito;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class OfficialResultMessageTest {
 
     private static final LocalDateTime TIMESTAMP = LocalDateTime.of(2021, 6, 1, 10, 0);
 
     private DataHandlingMessageRefiner refiner;
-    private RefinedMessageListener listener;
+    private TestRefinedMessageListener listener;
 
     @BeforeEach
     void prepare() {
-        listener = Mockito.mock(RefinedMessageListener.class);
+        listener = new TestRefinedMessageListener();
 
         refiner = new DataHandlingMessageRefiner();
         refiner.register(listener);
@@ -55,8 +55,7 @@ class OfficialResultMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        verify(listener, times(1)).accept(new OfficialEndMessage(TIMESTAMP, "TestWK", event, heat, lapCount));
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new OfficialEndMessage(TIMESTAMP, "TestWK", event, heat, lapCount)), listener.received);
     }
 
     @Test
@@ -84,7 +83,7 @@ class OfficialResultMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        verify(listener, times(1)).accept(new DroppedOfficialEndMessage(new DataHandlingMessage(
+        assertEquals(List.of(new DroppedOfficialEndMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -101,8 +100,7 @@ class OfficialResultMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.Empty)));
-        verifyNoMoreInteractions(listener);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -130,7 +128,7 @@ class OfficialResultMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        verify(listener, times(1)).accept(new DroppedOfficialEndMessage(new DataHandlingMessage(
+        assertEquals(List.of(new DroppedOfficialEndMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -147,8 +145,7 @@ class OfficialResultMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.Empty)));
-        verifyNoMoreInteractions(listener);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -176,7 +173,7 @@ class OfficialResultMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        verify(listener, times(1)).accept(new DroppedOfficialEndMessage(new DataHandlingMessage(
+        assertEquals(List.of(new DroppedOfficialEndMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -193,8 +190,7 @@ class OfficialResultMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.Empty)));
-        verifyNoMoreInteractions(listener);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -222,7 +218,7 @@ class OfficialResultMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        verify(listener, times(1)).accept(new DroppedOfficialEndMessage(new DataHandlingMessage(
+        assertEquals(List.of(new DroppedOfficialEndMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -239,8 +235,7 @@ class OfficialResultMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.Empty)));
-        verifyNoMoreInteractions(listener);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -268,7 +263,7 @@ class OfficialResultMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        verify(listener, times(1)).accept(new DroppedOfficialEndMessage(new DataHandlingMessage(
+        assertEquals(List.of(new DroppedOfficialEndMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -285,8 +280,7 @@ class OfficialResultMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.Empty)));
-        verifyNoMoreInteractions(listener);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -314,7 +308,7 @@ class OfficialResultMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        verify(listener, times(1)).accept(new DroppedOfficialEndMessage(new DataHandlingMessage(
+        assertEquals(List.of(new DroppedOfficialEndMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -331,8 +325,7 @@ class OfficialResultMessageTest {
                 (byte) 1,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.Empty)));
-        verifyNoMoreInteractions(listener);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -360,7 +353,7 @@ class OfficialResultMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        verify(listener, times(1)).accept(new DroppedOfficialEndMessage(new DataHandlingMessage(
+        assertEquals(List.of(new DroppedOfficialEndMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -377,8 +370,7 @@ class OfficialResultMessageTest {
                 (byte) 1,
                 12345,
                 TimeInfo.Normal,
-                TimeMarker.Empty)));
-        verifyNoMoreInteractions(listener);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -406,7 +398,7 @@ class OfficialResultMessageTest {
                 TimeInfo.Backup,
                 TimeMarker.Empty));
 
-        verify(listener, times(1)).accept(new DroppedOfficialEndMessage(new DataHandlingMessage(
+        assertEquals(List.of(new DroppedOfficialEndMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -423,8 +415,7 @@ class OfficialResultMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Backup,
-                TimeMarker.Empty)));
-        verifyNoMoreInteractions(listener);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -452,7 +443,7 @@ class OfficialResultMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.DidNotStart));
 
-        verify(listener, times(1)).accept(new DroppedOfficialEndMessage(new DataHandlingMessage(
+        assertEquals(List.of(new DroppedOfficialEndMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -469,7 +460,6 @@ class OfficialResultMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.DidNotStart)));
-        verifyNoMoreInteractions(listener);
+                TimeMarker.DidNotStart))), listener.received);
     }
 }

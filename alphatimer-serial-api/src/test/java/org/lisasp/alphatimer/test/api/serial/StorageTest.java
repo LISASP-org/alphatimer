@@ -6,33 +6,37 @@ import org.junit.jupiter.api.Test;
 import org.lisasp.alphatimer.api.serial.Storage;
 import org.lisasp.basics.jre.date.DateFacade;
 import org.lisasp.basics.jre.io.FileFacade;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDate;
+import java.util.function.BiPredicate;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.mockito.Mockito.*;
 
 class StorageTest {
 
+    private static final LocalDate TIMESTAMP = LocalDate.of(2021, 4, 17);
+
     private Storage storage;
-    DateFacade dateTimeFacade;
-    private FileFacade fileFacade;
+    private DateFacade dateTimeFacade;
+    private TestFileFacade fileFacade;
 
     private static final String baseDir = "target/test-storage";
 
-    private static final Path serialFile = Path.of("target","test-storage", "2021-04-17.serial");
-
+    private static final Path serialFile = Path.of("target", "test-storage", "2021-04-17.serial");
 
     @BeforeEach
     void prepare() throws IOException {
-        dateTimeFacade = Mockito.mock(DateFacade.class);
-        Mockito.when(dateTimeFacade.today()).thenReturn(LocalDate.of(2021, 4, 17));
-        fileFacade = Mockito.mock(FileFacade.class);
-        Mockito.when(fileFacade.get(any())).thenReturn(new byte[]{0x05, 0x06, 0x07, 0x08, 0x09});
-        Mockito.when(fileFacade.get(serialFile)).thenReturn(new byte[]{0x01, 0x02, 0x03, 0x04});
+        dateTimeFacade = new DateFacade() {
+            @Override
+            public LocalDate today() {
+                return TIMESTAMP;
+            }
+        };
+        fileFacade = new TestFileFacade();
         storage = new Storage(baseDir, fileFacade, dateTimeFacade);
     }
 
@@ -48,12 +52,6 @@ class StorageTest {
         byte[] data = storage.read();
 
         assertArrayEquals(new byte[]{0x01, 0x02, 0x03, 0x04}, data);
-
-        verify(dateTimeFacade, times(1)).today();
-        verify(fileFacade, times(1)).get(serialFile);
-
-        verifyNoMoreInteractions(dateTimeFacade);
-        verifyNoMoreInteractions(fileFacade);
     }
 
     @Test
@@ -63,13 +61,54 @@ class StorageTest {
         storage.write((byte) 0x03);
         storage.write((byte) 0x04);
 
-        verify(dateTimeFacade, times(4)).today();
-        verify(fileFacade, times(1)).append(serialFile, (byte) 0x01);
-        verify(fileFacade, times(1)).append(serialFile, (byte) 0x02);
-        verify(fileFacade, times(1)).append(serialFile, (byte) 0x03);
-        verify(fileFacade, times(1)).append(serialFile, (byte) 0x04);
+        assertArrayEquals(new byte[]{0x01, 0x02, 0x03, 0x04}, fileFacade.appended());
+    }
 
-        verifyNoMoreInteractions(dateTimeFacade);
-        verifyNoMoreInteractions(fileFacade);
+    private static class TestFileFacade implements FileFacade {
+
+        private final byte[] appended = new byte[1000];
+        private int length = 0;
+
+        byte[] appended() {
+            return java.util.Arrays.copyOf(appended, length);
+        }
+
+        @Override
+        public void put(Path file, byte... bytes) throws IOException {
+            throw new IOException("Not implemented");
+        }
+
+        @Override
+        public void append(Path file, byte... bytes) throws IOException {
+            if (!file.equals(serialFile)) {
+                throw new IOException("Wrong file");
+            }
+            System.arraycopy(bytes, 0, appended, length, bytes.length);
+            length += bytes.length;
+        }
+
+        @Override
+        public byte[] get(Path file) throws IOException {
+            if (file.equals(serialFile)) {
+                return new byte[]{0x01, 0x02, 0x03, 0x04};
+            } else {
+                return new byte[]{0x05, 0x06, 0x07, 0x08, 0x09};
+            }
+        }
+
+        @Override
+        public boolean exists(Path path) {
+            return false;
+        }
+
+        @Override
+        public void createDirectories(Path path) throws IOException {
+            throw new IOException("Not implemented");
+        }
+
+        @Override
+        public Stream<Path> find(Path basePath, int maxDepth, BiPredicate<Path, BasicFileAttributes> matcher) throws IOException {
+            return Stream.empty();
+        }
     }
 }

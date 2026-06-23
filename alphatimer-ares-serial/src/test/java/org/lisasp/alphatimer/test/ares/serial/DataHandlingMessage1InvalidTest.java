@@ -8,28 +8,32 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.lisasp.alphatimer.api.ares.serial.DataInputEventListener;
 import org.lisasp.alphatimer.api.ares.serial.events.dropped.DataHandlingMessage1DroppedEvent;
 import org.lisasp.alphatimer.api.ares.serial.events.dropped.UnknownMessageDroppedEvent;
-import org.lisasp.basics.jre.date.DateTimeFacade;
 import org.lisasp.alphatimer.ares.serial.InputCollector;
 import org.lisasp.alphatimer.ares.serial.MessageConverter;
-import org.mockito.Mockito;
+import org.lisasp.basics.jre.date.DateTimeFacade;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.lisasp.alphatimer.test.ares.serial.DataHandlingMessageTestData.message1;
-import static org.mockito.Mockito.*;
 
 class DataHandlingMessage1InvalidTest {
 
     private InputCollector inputCollector;
-    private DataInputEventListener listener;
+    private TestDataInputEventListener listener;
 
     @BeforeEach
     void prepare() {
-        DateTimeFacade dateTimeFacade = mock(DateTimeFacade.class);
-        when(dateTimeFacade.now()).thenReturn(LocalDateTime.of(2021, 6, 21, 14, 53));
+        DateTimeFacade dateTimeFacade = new DateTimeFacade() {
+            @Override
+            public LocalDateTime now() {
+                return LocalDateTime.of(2021, 6, 21, 14, 53);
+            }
+        };
 
-        listener = mock(DataInputEventListener.class);
+        listener = new TestDataInputEventListener();
 
         MessageConverter messageConverter = new MessageConverter();
         messageConverter.register(listener);
@@ -54,10 +58,10 @@ class DataHandlingMessage1InvalidTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(UnknownMessageDroppedEvent.class));
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new UnknownMessageDroppedEvent(
+                LocalDateTime.of(2021, 6, 21, 14, 53),
+                "Test",
+                message1modified)), listener.received);
     }
 
     @Test
@@ -70,10 +74,10 @@ class DataHandlingMessage1InvalidTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(UnknownMessageDroppedEvent.class));
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(List.of(new UnknownMessageDroppedEvent(
+                LocalDateTime.of(2021, 6, 21, 14, 53),
+                "Test",
+                message1modified)), listener.received);
     }
 
     @ParameterizedTest
@@ -86,10 +90,14 @@ class DataHandlingMessage1InvalidTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage1DroppedEvent.class));
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(1, listener.received.size());
+        assertEquals(DataHandlingMessage1DroppedEvent.class, listener.received.get(0).getClass());
+        DataHandlingMessage1DroppedEvent droppedEvent = (DataHandlingMessage1DroppedEvent) listener.received.get(0);
+        assertEquals(List.of(new DataHandlingMessage1DroppedEvent(
+                LocalDateTime.of(2021, 6, 21, 14, 53),
+                "Test",
+                droppedEvent.getMessage(),
+                message1modified)), listener.received);
     }
 
     @ParameterizedTest
@@ -102,10 +110,14 @@ class DataHandlingMessage1InvalidTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage1DroppedEvent.class));
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(1, listener.received.size());
+        assertEquals(DataHandlingMessage1DroppedEvent.class, listener.received.get(0).getClass());
+        DataHandlingMessage1DroppedEvent droppedEvent = (DataHandlingMessage1DroppedEvent) listener.received.get(0);
+        assertEquals(List.of(new DataHandlingMessage1DroppedEvent(
+                LocalDateTime.of(2021, 6, 21, 14, 53),
+                "Test",
+                droppedEvent.getMessage(),
+                message1modified)), listener.received);
     }
 
     @ParameterizedTest
@@ -118,9 +130,13 @@ class DataHandlingMessage1InvalidTest {
             inputCollector.accept(b);
         }
 
-        verify(listener, times(1)).accept(Mockito.any());
-        verify(listener, times(1)).accept(Mockito.any(DataHandlingMessage1DroppedEvent.class));
-
-        verifyNoMoreInteractions(listener);
+        assertEquals(1, listener.received.size());
+        assertEquals(DataHandlingMessage1DroppedEvent.class, listener.received.get(0).getClass());
+        DataHandlingMessage1DroppedEvent droppedEvent = (DataHandlingMessage1DroppedEvent) listener.received.get(0);
+        assertEquals(List.of(new DataHandlingMessage1DroppedEvent(
+                LocalDateTime.of(2021, 6, 21, 14, 53),
+                "Test",
+                droppedEvent.getMessage(),
+                message1modified)), listener.received);
     }
 }
