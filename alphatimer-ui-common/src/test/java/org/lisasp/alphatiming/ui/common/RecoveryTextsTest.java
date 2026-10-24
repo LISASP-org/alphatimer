@@ -3,7 +3,7 @@ package org.lisasp.alphatiming.ui.common;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
+import org.lisasp.alphatiming.project.db.CrashLeftover;
 
 import java.nio.file.Path;
 import java.time.Instant;

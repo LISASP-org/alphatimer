@@ -1,6 +1,6 @@
 package org.lisasp.alphatiming.ui.common;
 
-import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
+import org.lisasp.alphatiming.project.db.CrashLeftover;
 
 import java.nio.file.Path;
 import java.util.Optional;

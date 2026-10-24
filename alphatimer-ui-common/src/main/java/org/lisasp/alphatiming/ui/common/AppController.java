@@ -8,7 +8,8 @@ import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.ui.core.project.AutoSaver;
-import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
+import org.lisasp.alphatiming.project.db.CrashLeftover;
+import org.lisasp.alphatiming.project.db.TimingWorkFolder;
 import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.recording.RecordedData;
 import org.lisasp.alphatiming.ui.core.recording.RecordingSession;
@@ -58,7 +59,7 @@ public final class AppController implements AutoCloseable {
     }
 
     public void init() {
-        for (CrashLeftover leftover : TimingDocument.findRecoverable(workDir)) {
+        for (CrashLeftover leftover : TimingWorkFolder.findLeftovers(workDir)) {
             if (document != null) {
                 break; // keep the remaining leftovers for the next start
             }
@@ -83,7 +84,7 @@ public final class AppController implements AutoCloseable {
                 }
                 case DISCARD -> {
                     if (prompt.confirmDiscard(leftover)) {
-                        TimingDocument.discard(leftover.workFile());
+                        TimingWorkFolder.discard(leftover.workFile());
                         return;
                     }
                 }

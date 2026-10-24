@@ -7,11 +7,11 @@ import org.lisasp.alphatimer.api.serial.SerialPortReader;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.project.db.HeatStore;
-import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.project.db.TimingFileWriter;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.heats.LiveHeats;
-import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
+import org.lisasp.alphatiming.project.db.CrashLeftover;
+import org.lisasp.alphatiming.project.db.TimingWorkFolder;
 import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.recording.RecordingState;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
@@ -441,7 +441,7 @@ class AppControllerTest {
 
     @Test
     void aLeftoverThatCannotBeRecoveredIsOfferedAgain() throws Exception {
-        Path leftover = Files.writeString(work.resolve("heat-broken" + TimingDatabase.WORK_FILE_SUFFIX), "not a database");
+        Path leftover = Files.writeString(work.resolve("heat-broken" + TimingWorkFolder.WORK_FILE_SUFFIX), "not a database");
         prompt.recoveries.add(SavePrompt.RecoveryChoice.RECOVER);
         prompt.recoveries.add(SavePrompt.RecoveryChoice.DISCARD);
         prompt.discards.add(true);

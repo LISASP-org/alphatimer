@@ -1,4 +1,4 @@
-package org.lisasp.alphatiming.ui.core.project;
+package org.lisasp.alphatiming.project.db;
 
 import java.nio.file.Path;
 import java.time.Instant;

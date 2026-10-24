@@ -7,10 +7,12 @@ import org.lisasp.alphatiming.project.db.InvalidProjectFileException;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.project.db.TimingFileWriter;
+import org.lisasp.alphatiming.project.db.TimingWorkFolder;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.HeatService;
 import org.lisasp.alphatiming.heats.HeatStatus;
 import org.lisasp.alphatiming.heats.TestMessageCreator;
+import org.lisasp.alphatiming.project.db.CrashLeftover;
 import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.heats.LaneStatus;
 import org.lisasp.alphatiming.project.db.MessageStore;
@@ -153,14 +155,14 @@ class TimingDocumentTest {
     void crashLeftoversCanBeFoundAndRecovered() throws Exception {
         TimingDocument doc = TimingDocument.create(work(), SETTINGS);
         doc.database().close(); // simulate a crash: the work file stays
-        var found = TimingDocument.findRecoverable(work());
+        var found = TimingWorkFolder.findLeftovers(work());
         assertThat(found).hasSize(1);
         try (TimingDocument recovered = TimingDocument.recover(found.get(0).workFile())) {
             assertThat(recovered.settings()).isEqualTo(SETTINGS);
             assertThat(recovered.isDirty()).isTrue();
             assertThat(recovered.file()).isEmpty();
         }
-        assertThat(TimingDocument.findRecoverable(work())).isEmpty();
+        assertThat(TimingWorkFolder.findLeftovers(work())).isEmpty();
     }
 
     @Test
@@ -169,7 +171,7 @@ class TimingDocumentTest {
         try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
             doc.saveAs(file);
             doc.database().close();
-            var found = TimingDocument.findRecoverable(work());
+            var found = TimingWorkFolder.findLeftovers(work());
             assertThat(found).hasSize(1);
             CrashLeftover leftover = found.get(0);
             assertThat(leftover.projectFile()).contains(file);
@@ -180,7 +182,7 @@ class TimingDocumentTest {
     private Path leftoverOf(Path projectFile) throws IOException {
         TimingDocument crashed = TimingDocument.create(work(), SETTINGS);
         Path workFile = crashed.database().workFile();
-        WorkFileOrigin.record(workFile, projectFile);
+        TimingWorkFolder.recordOrigin(workFile, projectFile);
         crashed.database().close();
         return workFile;
     }
@@ -223,11 +225,11 @@ class TimingDocumentTest {
         Path leftover = leftoverOf(file);
         corruptSettingsTable(leftover);
         assertThatThrownBy(() -> TimingDocument.recover(leftover)).isInstanceOf(RuntimeException.class);
-        assertThat(TimingDocument.findRecoverable(work())).singleElement()
+        assertThat(TimingWorkFolder.findLeftovers(work())).singleElement()
                                                            .satisfies(l -> assertThat(l.workFile()).isEqualTo(leftover))
                                                            .satisfies(l -> assertThat(l.projectFile()).contains(file));
         TimingDocument.open(file, work()).close();
-        TimingDocument.discard(leftover);
+        TimingWorkFolder.discard(leftover);
         assertThat(workFiles()).isZero();
     }
 
@@ -243,30 +245,6 @@ class TimingDocumentTest {
             java.util.Arrays.fill(garbage, (byte) 0x7f);
             channel.write(java.nio.ByteBuffer.wrap(garbage), offset);
         }
-    }
-
-    @Test
-    void workFilesOfOpenDocumentsAreNotOfferedForRecovery() throws Exception {
-        try (TimingDocument live = TimingDocument.create(work(), SETTINGS)) {
-            assertThat(TimingDocument.findRecoverable(work())).isEmpty();
-            live.database().close();
-            assertThat(TimingDocument.findRecoverable(work())).hasSize(1);
-        }
-    }
-
-    @Test
-    void discardRemovesWorkFileAndItsLock() throws Exception {
-        TimingDocument doc = TimingDocument.create(work(), SETTINGS);
-        doc.database().close();
-        TimingDocument.discard(TimingDocument.findRecoverable(work()).get(0).workFile());
-        assertThat(workFiles()).isZero();
-    }
-
-    @Test
-    void discardRemovesTheNoteOfTheProjectFile() throws Exception {
-        Path leftover = leftoverOf(savedProject("x.timing"));
-        TimingDocument.discard(leftover);
-        assertThat(workFiles()).isZero();
     }
 
     @Test
@@ -614,7 +592,7 @@ class TimingDocumentTest {
 
         assertThat(closeWaited).isTrue();
         assertThat(saveFailure.get()).isNull();
-        assertThat(WorkFileOrigin.read(doc.database().workFile())).isEmpty();
+        assertThat(TimingWorkFolder.origin(doc.database().workFile())).isEmpty();
         assertThat(doc.database().workFile()).doesNotExist();
     }
 
@@ -659,7 +637,7 @@ class TimingDocumentTest {
             assertThat(failures).isEmpty();
             assertThat(TimingFileWriter.previousVersionOf(a)).doesNotExist();
             assertThat(TimingFileWriter.previousVersionOf(b)).exists();
-            assertThat(WorkFileOrigin.read(doc.database().workFile())).map(WorkFileOrigin::projectFile).contains(b.toAbsolutePath());
+            assertThat(TimingWorkFolder.origin(doc.database().workFile())).map(TimingWorkFolder.Origin::projectFile).contains(b.toAbsolutePath());
         }
     }
 

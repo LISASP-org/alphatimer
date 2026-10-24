@@ -3,23 +3,21 @@ package org.lisasp.alphatiming.ui.core.project;
 import lombok.extern.slf4j.Slf4j;
 import org.lisasp.alphatiming.project.db.InvalidProjectFileException;
 import org.lisasp.alphatiming.project.db.LockFile;
-import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.project.db.SettingsEntity;
+import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.project.db.TimingFileWriter;
+import org.lisasp.alphatiming.project.db.TimingWorkFolder;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 @Slf4j
 public final class TimingDocument implements AutoCloseable {
@@ -89,35 +87,8 @@ public final class TimingDocument implements AutoCloseable {
             db.closeAndDelete();
             throw new InvalidProjectFileException(file, ex);
         }
-        WorkFileOrigin.record(db.workFile(), file);
+        TimingWorkFolder.recordOrigin(db.workFile(), file);
         return doc;
-    }
-
-    public static List<CrashLeftover> findRecoverable(Path workDir) {
-        if (!Files.isDirectory(workDir)) {
-            return List.of();
-        }
-        try (Stream<Path> files = Files.list(workDir)) {
-            return files.filter(p -> p.getFileName().toString().endsWith(TimingDatabase.WORK_FILE_SUFFIX))
-                        .filter(p -> !TimingDatabase.isInUse(p))
-                        .sorted()
-                        .map(TimingDocument::describeLeftover)
-                        .flatMap(Optional::stream)
-                        .toList();
-        } catch (IOException ex) {
-            log.warn("Could not look for recoverable work files in {}", workDir, ex);
-            return List.of();
-        }
-    }
-
-    private static Optional<CrashLeftover> describeLeftover(Path workFile) {
-        try {
-            return Optional.of(new CrashLeftover(workFile, Files.getLastModifiedTime(workFile).toInstant(),
-                                                 WorkFileOrigin.read(workFile).map(WorkFileOrigin::projectFile)));
-        } catch (IOException ex) {
-            log.warn("Could not read the work file {}", workFile.getFileName(), ex);
-            return Optional.empty();
-        }
     }
 
     /**
@@ -126,7 +97,7 @@ public final class TimingDocument implements AutoCloseable {
      * If recovering fails, the work file stays a leftover that can be recovered or discarded later.
      */
     public static TimingDocument recover(Path workFile) throws IOException {
-        Optional<WorkFileOrigin> origin = WorkFileOrigin.read(workFile).filter(WorkFileOrigin::isUnchanged);
+        Optional<TimingWorkFolder.Origin> origin = TimingWorkFolder.origin(workFile).filter(TimingWorkFolder.Origin::isUnchanged);
         Optional<LockFile> lock = origin.isPresent() ? LockFile.tryAcquire(LockFile.besides(origin.get().projectFile())) : Optional.empty();
         Path file = lock.isPresent() ? origin.get().projectFile() : null;
         TimingDatabase db = null;
@@ -142,11 +113,6 @@ public final class TimingDocument implements AutoCloseable {
             lock.ifPresent(LockFile::closeAndDelete);
             throw ex;
         }
-    }
-
-    public static void discard(Path workFile) {
-        TimingDatabase.discard(workFile);
-        WorkFileOrigin.delete(workFile);
     }
 
     private void touch() {
@@ -274,8 +240,7 @@ public final class TimingDocument implements AutoCloseable {
     }
 
     private void snapshot(Path target) throws IOException {
-        Path workFile = database.workFile();
-        Path snapshot = workFile.resolveSibling(workFile.getFileName() + "." + UUID.randomUUID() + ".tmp");
+        Path snapshot = TimingWorkFolder.newSnapshotFile(database.workFile());
         long savedWriteCount;
         try {
             savedWriteCount = database.snapshotTo(snapshot);
@@ -284,7 +249,7 @@ public final class TimingDocument implements AutoCloseable {
             throw new IOException("Could not save project file " + target, ex);
         }
         log.info("Saved project {}", target.getFileName());
-        WorkFileOrigin.record(database.workFile(), target);
+        TimingWorkFolder.recordOrigin(database.workFile(), target);
         database.markCleanIfUnchangedSince(savedWriteCount);
     }
 
@@ -297,7 +262,6 @@ public final class TimingDocument implements AutoCloseable {
             }
             closed = true;
             database.closeAndDelete();
-            WorkFileOrigin.delete(database.workFile());
             LockFile lock = fileLock;
             fileLock = null;
             if (lock != null) {

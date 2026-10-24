@@ -1,7 +1,7 @@
 package org.lisasp.alphatiming.cli;
 
 import org.lisasp.alphatiming.ui.common.SavePrompt;
-import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
+import org.lisasp.alphatiming.project.db.CrashLeftover;
 
 import java.io.PrintStream;
 import java.nio.file.Path;

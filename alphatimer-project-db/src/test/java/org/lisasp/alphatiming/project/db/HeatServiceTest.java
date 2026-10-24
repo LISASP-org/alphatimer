@@ -185,7 +185,7 @@ class HeatServiceTest {
         db.close();
         service.accept(TestMessageCreator.used(1, 1, "1100000000"));
         assertThat(errors).hasSize(1);
-        TimingDatabase.discard(db.workFile());
+        TimingWorkFolder.discard(db.workFile());
     }
 
     @Test

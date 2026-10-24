@@ -20,7 +20,7 @@ import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.heats.Penalty;
 import org.lisasp.alphatiming.ui.common.AppController;
 import org.lisasp.alphatiming.ui.common.SavePrompt;
-import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
+import org.lisasp.alphatiming.project.db.CrashLeftover;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
 import org.lisasp.basics.notification.primitive.ByteConsumer;

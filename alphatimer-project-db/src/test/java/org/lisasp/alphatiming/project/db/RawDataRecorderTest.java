@@ -48,7 +48,7 @@ class RawDataRecorderTest {
         rec.close();
         assertThat(errors).hasSize(1);
         assertThat(rec.bufferedBytes()).isEqualTo(1);
-        TimingDatabase.discard(db.workFile());
+        TimingWorkFolder.discard(db.workFile());
     }
 
     @Test

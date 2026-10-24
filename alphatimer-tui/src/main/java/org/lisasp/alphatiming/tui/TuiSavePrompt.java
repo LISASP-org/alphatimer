@@ -9,7 +9,7 @@ import org.lisasp.alphatiming.ui.common.I18n;
 import org.lisasp.alphatiming.ui.common.ProjectFiles;
 import org.lisasp.alphatiming.ui.common.RecoveryTexts;
 import org.lisasp.alphatiming.ui.common.SavePrompt;
-import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
+import org.lisasp.alphatiming.project.db.CrashLeftover;
 
 import java.io.File;
 import java.nio.file.Path;

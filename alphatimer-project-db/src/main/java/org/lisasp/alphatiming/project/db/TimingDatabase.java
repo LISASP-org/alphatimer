@@ -2,7 +2,6 @@ package org.lisasp.alphatiming.project.db;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
-import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
@@ -16,7 +15,6 @@ import java.nio.file.StandardCopyOption;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -28,10 +26,7 @@ import java.util.function.Function;
  * All access is serialized by one lock because SQLite allows a single writer and there is a single connection. Saves are
  * additionally serialized by a save lock ({@link #runWithSaveLock}), taken before the database lock.
  */
-@Slf4j
 public final class TimingDatabase implements AutoCloseable {
-
-    public static final String WORK_FILE_SUFFIX = ".work.sqlite";
 
     private static final byte[] SQLITE_HEADER = "SQLite format 3\0".getBytes(StandardCharsets.US_ASCII);
 
@@ -50,7 +45,7 @@ public final class TimingDatabase implements AutoCloseable {
 
     private TimingDatabase(Path workFile, boolean isNew) throws IOException {
         this.workFile = workFile;
-        acquireLock();
+        workLock = TimingWorkFolder.lock(workFile);
         try {
             if (isNew) {
                 SchemaMigrations.initialize(workFile);
@@ -68,11 +63,6 @@ public final class TimingDatabase implements AutoCloseable {
         }
     }
 
-    /** The lock tells other instances that the work file belongs to a running program, so it is not a crash leftover. */
-    private void acquireLock() throws IOException {
-        workLock = LockFile.tryAcquire(LockFile.besides(workFile)).orElseThrow(() -> new IOException("Work file is in use: " + workFile));
-    }
-
     private void releaseLock() {
         if (workLock != null) {
             workLock.close();
@@ -80,45 +70,25 @@ public final class TimingDatabase implements AutoCloseable {
         }
     }
 
-    /** True when a running program (this or another one) still owns the work file. */
-    public static boolean isInUse(Path workFile) {
-        return LockFile.isHeld(LockFile.besides(workFile));
-    }
-
-    public static void discard(Path workFile) {
-        try {
-            Files.deleteIfExists(workFile);
-            Files.deleteIfExists(LockFile.besides(workFile));
-        } catch (IOException ex) {
-            log.warn("Could not delete {}", workFile, ex);
-        }
-    }
-
     public static TimingDatabase createNew(Path workDir) throws IOException {
-        Files.createDirectories(workDir);
-        return new TimingDatabase(newWorkFile(workDir), true);
+        return new TimingDatabase(TimingWorkFolder.newWorkFile(workDir), true);
     }
 
     public static TimingDatabase openCopy(Path projectFile, Path workDir) throws IOException {
         checkIsSqlite(projectFile);
-        Files.createDirectories(workDir);
-        Path work = newWorkFile(workDir);
+        Path work = TimingWorkFolder.newWorkFile(workDir);
         try {
             Files.copy(projectFile, work, StandardCopyOption.REPLACE_EXISTING);
             checkIsTimingDatabase(work, projectFile);
             return new TimingDatabase(work, false);
         } catch (IOException | RuntimeException ex) {
-            discard(work);
+            TimingWorkFolder.discard(work);
             throw ex instanceof IOException io ? io : new InvalidProjectFileException(projectFile, ex);
         }
     }
 
     public static TimingDatabase adopt(Path workFile) throws IOException {
         return new TimingDatabase(workFile, false);
-    }
-
-    private static Path newWorkFile(Path workDir) {
-        return workDir.resolve("heat-" + UUID.randomUUID() + WORK_FILE_SUFFIX);
     }
 
     private static void checkIsSqlite(Path file) throws IOException {
@@ -296,6 +266,6 @@ public final class TimingDatabase implements AutoCloseable {
 
     public void closeAndDelete() {
         close();
-        discard(workFile);
+        TimingWorkFolder.discard(workFile);
     }
 }
