@@ -22,6 +22,7 @@
         <module>alphatimer-project-db</module>
         <module>alphatimer-ui-core</module>
         <module>alphatimer-ui-common</module>
+        <module>alphatimer-ui</module>
     </modules>
 
     <properties>
