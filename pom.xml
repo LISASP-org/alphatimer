@@ -16,7 +16,7 @@
         <module>alphatimer-refinedmessages-api</module>
         <module>alphatimer-refinedmessages</module>
         <module>alphatimer-serial-api</module>
-        <module>alphatimer-serial-tcp</module>
+        <module>alphatimer-serial-core</module>
     </modules>
 
     <properties>
