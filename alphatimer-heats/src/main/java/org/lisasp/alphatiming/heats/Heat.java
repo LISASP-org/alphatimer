@@ -9,6 +9,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -44,14 +45,25 @@ final class Heat {
         return new HeatDto(competition, event, heat, status, started, ended, lapCount, lanes.stream().map(Lane::createDto).toList(), lastMessage);
     }
 
-    /** A start signal always (re)starts the heat: the clock restarts and the lanes are reset (false start, repeated start). */
+    /**
+     * A live start (re)starts the heat: the clock restarts and the lanes are reset (false start, repeated start). Repeats
+     * of the results and corrected or deleted starts arrive after the race and must not reset a heat that has started.
+     */
     void start(StartMessage message) {
+        if (status != HeatStatus.Open && !isLiveStart(message)) {
+            return;
+        }
         status = HeatStatus.Started;
         started = message.getTimestamp();
         lastMessage = message.getTimestamp();
         ended = null;
         lapCount = message.getLapCount();
         lanes.forEach(Lane::start);
+    }
+
+    private static boolean isLiveStart(StartMessage message) {
+        return message.getMessageType() == RefinedMessageType.Live
+                && (message.getTimeType() == RefinedTimeType.Normal || message.getTimeType() == RefinedTimeType.ManualTime);
     }
 
     void usedLanes(UsedLanesMessage message) {

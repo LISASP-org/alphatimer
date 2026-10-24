@@ -1,6 +1,8 @@
 package org.lisasp.alphatiming.heats;
 
 import org.junit.jupiter.api.Test;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -117,6 +119,57 @@ class HeatTest {
         assertThat(heat.createDto().started()).isEqualTo(T0.plusSeconds(60));
         assertThat(heat.createDto().ended()).isNull();
         assertThat(heat.createDto().status()).isEqualTo(HeatStatus.Started);
+    }
+
+    private static Heat finishedHeat() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 25_000, T0.plus(java.time.Duration.ofMillis(25_500))));
+        heat.didNotStart(TestMessageCreator.dns(1, 1, 2));
+        heat.finish(TestMessageCreator.end(1, 1, T0.plusSeconds(30)));
+        return heat;
+    }
+
+    @Test
+    void aRepeatedStartWithTheResultsKeepsAFinishedHeat() {
+        Heat heat = finishedHeat();
+        HeatDto before = heat.createDto();
+
+        heat.start(TestMessageCreator.start(1, 1, T0.plusSeconds(120), RefinedMessageType.CurrentRaceResult, RefinedTimeType.Normal));
+
+        assertThat(heat.createDto()).isEqualTo(before);
+    }
+
+    @Test
+    void aCorrectedStartKeepsAFinishedHeat() {
+        Heat heat = finishedHeat();
+        HeatDto before = heat.createDto();
+
+        heat.start(TestMessageCreator.start(1, 1, T0.plusSeconds(120), RefinedMessageType.Live, RefinedTimeType.CorrectedTime));
+
+        assertThat(heat.createDto()).isEqualTo(before);
+    }
+
+    @Test
+    void aManualLiveStartRestartsTheHeat() {
+        Heat heat = finishedHeat();
+
+        heat.start(TestMessageCreator.start(1, 1, T0.plusSeconds(120), RefinedMessageType.Live, RefinedTimeType.ManualTime));
+
+        HeatDto dto = heat.createDto();
+        assertThat(dto.started()).isEqualTo(T0.plusSeconds(120));
+        assertThat(dto.ended()).isNull();
+        assertThat(lane(heat, 1).timeInMillis()).isZero();
+        assertThat(lane(heat, 2).penalty()).isEqualTo(Penalty.None);
+    }
+
+    @Test
+    void aRepeatedStartStartsAHeatThatHasNotStartedYet() {
+        Heat heat = new Heat(emptyHeat());
+
+        heat.start(TestMessageCreator.start(1, 1, T0, RefinedMessageType.CurrentRaceResult, RefinedTimeType.Normal));
+
+        assertThat(heat.createDto().status()).isEqualTo(HeatStatus.Started);
+        assertThat(heat.createDto().started()).isEqualTo(T0);
     }
 
     @Test

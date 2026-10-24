@@ -89,7 +89,7 @@ Open…, Save, Save As…, Exit) and Recording (Start, Stop). Panel switching do
 panel keeps updating while hidden.
 
 **Running time**: alphatimer does not interpret the device's running-time messages, so the clock is computed locally
-from the heat start timestamp (UI timer, ~100 ms repaint). Every start signal restarts it; it is frozen at the official end or as soon as every used lane has a final time or a penalty (captured data often lacks the official end). It can differ slightly from the
+from the heat start timestamp (UI timer, ~100 ms repaint). Every live start signal restarts it (repeated results and corrected or deleted starts do not); it is frozen at the official end or as soon as every used lane has a final time or a penalty (captured data often lacks the official end). It can differ slightly from the
 device clock; the final time from the device is authoritative.
 
 All UI updates run on the EDT; pipeline callbacks marshal via `SwingUtilities.invokeLater`.
