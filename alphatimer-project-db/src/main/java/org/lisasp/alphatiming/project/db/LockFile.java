@@ -3,12 +3,14 @@ package org.lisasp.alphatiming.project.db;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.Optional;
 
 /**
@@ -51,6 +53,41 @@ public final class LockFile implements AutoCloseable {
         return Optional.of(new LockFile(path, channel, lock));
     }
 
+    static final int OWN_ATTEMPTS = 5;
+    private static final Duration OWN_PAUSE = Duration.ofMillis(50);
+
+    interface Pause {
+        void await() throws IOException;
+    }
+
+    /**
+     * For a lock that only this program can rightfully take, such as the one of its own new work file: {@link #isHeld}
+     * of another instance holds the lock for a moment, so a failed attempt is retried for about 200 ms before giving up.
+     */
+    public static Optional<LockFile> acquireOwn(Path path) throws IOException {
+        return acquireOwn(path, LockFile::pause);
+    }
+
+    static Optional<LockFile> acquireOwn(Path path, Pause pause) throws IOException {
+        for (int attempt = 1; ; attempt++) {
+            Optional<LockFile> lock = tryAcquire(path);
+            if (lock.isPresent() || attempt == OWN_ATTEMPTS) {
+                return lock;
+            }
+            pause.await();
+        }
+    }
+
+    private static void pause() throws InterruptedIOException {
+        try {
+            Thread.sleep(OWN_PAUSE);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new InterruptedIOException("Interrupted while waiting for a lock");
+        }
+    }
+
+    /** Takes the lock for a moment to probe it, so a program acquiring it at that instant can miss it. */
     public static boolean isHeld(Path path) {
         if (!Files.exists(path)) {
             return false;

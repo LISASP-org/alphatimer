@@ -89,7 +89,9 @@ that solve problems this application does not have:
   Open copies the file to `~/.alphatiming/work/` and rejects files that are not AlphaTiming projects.
 - Work files are protected by an OS lock (`.lock` next to them); only unlocked ones are offered for crash recovery. The
   same scan deletes the snapshot temp files of a save that crashed (`<work file>.<uuid>.tmp` whose work file is unlocked
-  or gone); a snapshot of a locked work file stays, its program may be saving. A
+  or gone); a snapshot of a locked work file stays, its program may be saving. The scan probes a lock by taking it for
+  a moment, so a program locking its own work file retries briefly (`LockFile.acquireOwn`); project-file locks are never
+  probed, so Open and Save As learn at once that another instance holds one. A
   `.project` note next to a work file names the project file it was last opened from or saved to, with that file's
   modification time (`TimingWorkFolder.Origin`). A recovered document keeps that project file only if it is unchanged since and
   its lock can be taken; otherwise Save would overwrite newer data, so it has no file.

@@ -51,7 +51,7 @@ public final class TimingWorkFolder {
 
     /** The lock tells other instances that the work file belongs to a running program, so it is not a crash leftover. */
     public static LockFile lock(Path workFile) throws IOException {
-        return LockFile.tryAcquire(LockFile.besides(workFile)).orElseThrow(() -> new IOException("Work file is in use: " + workFile));
+        return LockFile.acquireOwn(LockFile.besides(workFile)).orElseThrow(() -> new IOException("Work file is in use: " + workFile));
     }
 
     /** True when a running program (this or another one) still owns the work file. */
