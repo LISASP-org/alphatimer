@@ -29,9 +29,9 @@ class AutoSaverTest {
             doc.updateSettings(SETTINGS.withTcp("b", 2));
             saver.runOnce();
             assertThat(doc.isDirty()).isFalse();
-            try (ProjectDocument reopened = ProjectDocument.open(dir.resolve("x.heat"), Files.createDirectories(dir.resolve("w2")))) {
-                assertThat(reopened.settings().tcpHost()).isEqualTo("b");
-            }
+        }
+        try (ProjectDocument reopened = ProjectDocument.open(dir.resolve("x.heat"), Files.createDirectories(dir.resolve("w2")))) {
+            assertThat(reopened.settings().tcpHost()).isEqualTo("b");
         }
     }
 
@@ -75,7 +75,8 @@ class AutoSaverTest {
             doc.saveAs(target);
             doc.updateSettings(SETTINGS.withTcp("b", 2));
             Files.delete(target);
-            Files.delete(target.getParent()); // target directory vanishes
+            Files.delete(target.resolveSibling("x.heat.lock"));
+            Files.delete(target.getParent());
             saver.runOnce();
             assertThat(errors).hasSize(1);
             assertThat(doc.isDirty()).isTrue();

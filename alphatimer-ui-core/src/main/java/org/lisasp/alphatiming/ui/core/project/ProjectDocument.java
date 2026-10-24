@@ -2,7 +2,9 @@ package org.lisasp.alphatiming.ui.core.project;
 
 import lombok.extern.slf4j.Slf4j;
 import org.lisasp.alphatiming.project.db.InvalidProjectFileException;
+import org.lisasp.alphatiming.project.db.LockFile;
 import org.lisasp.alphatiming.project.db.ProjectDatabase;
+import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.project.db.SettingsEntity;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
@@ -22,25 +24,57 @@ public final class ProjectDocument implements AutoCloseable {
 
     private final ProjectDatabase database;
     private volatile Path file;
+    private volatile LockFile fileLock;
 
-    private ProjectDocument(ProjectDatabase database, Path file) {
+    private ProjectDocument(ProjectDatabase database, Path file, LockFile fileLock) {
         this.database = database;
         this.file = file;
+        this.fileLock = fileLock;
     }
 
     /** A new, never saved project; it only counts as changed once something other than its initial settings is written. */
     public static ProjectDocument create(Path workDir, Settings initial) throws IOException {
         ProjectDatabase db = ProjectDatabase.createNew(workDir);
-        ProjectDocument doc = new ProjectDocument(db, null);
+        ProjectDocument doc = new ProjectDocument(db, null, null);
         doc.updateSettings(initial);
         db.markClean();
         return doc;
     }
 
     public static ProjectDocument open(Path file, Path workDir) throws IOException {
+        LockFile lock = lockProjectFile(file);
+        try {
+            return load(file, workDir, lock);
+        } catch (IOException | RuntimeException ex) {
+            lock.closeAndDelete();
+            throw ex;
+        }
+    }
+
+    /** Opens the saved state of this document's file once more; the new document takes over the lock on the file. */
+    public ProjectDocument reopen(Path workDir) throws IOException {
+        Path current = file;
+        if (current == null) {
+            throw new IllegalStateException("The project has no file yet.");
+        }
+        ProjectDocument doc = load(current, workDir, fileLock);
+        fileLock = null;
+        return doc;
+    }
+
+    public boolean isSavedAs(Path candidate) {
+        Path current = file;
+        return current != null && current.toAbsolutePath().normalize().equals(candidate.toAbsolutePath().normalize());
+    }
+
+    private static LockFile lockProjectFile(Path file) throws IOException {
+        return LockFile.tryAcquire(LockFile.besides(file)).orElseThrow(() -> new ProjectFileInUseException(file));
+    }
+
+    private static ProjectDocument load(Path file, Path workDir, LockFile lock) throws IOException {
         ProjectDatabase db = ProjectDatabase.openCopy(file, workDir);
         log.info("Opened project {}", file.getFileName());
-        ProjectDocument doc = new ProjectDocument(db, file);
+        ProjectDocument doc = new ProjectDocument(db, file, lock);
         try {
             doc.settings();
         } catch (RuntimeException ex) {
@@ -67,7 +101,7 @@ public final class ProjectDocument implements AutoCloseable {
 
     /** Re-opens a work file left behind by a crash; the document is dirty and has no project file yet. */
     public static ProjectDocument recover(Path workFile) throws IOException {
-        ProjectDocument doc = new ProjectDocument(ProjectDatabase.adopt(workFile), null);
+        ProjectDocument doc = new ProjectDocument(ProjectDatabase.adopt(workFile), null, null);
         doc.touch();
         return doc;
     }
@@ -156,8 +190,23 @@ public final class ProjectDocument implements AutoCloseable {
     }
 
     public void saveAs(Path target) throws IOException {
-        snapshot(target);
+        if (isSavedAs(target)) {
+            snapshot(target);
+            return;
+        }
+        LockFile targetLock = lockProjectFile(target);
+        try {
+            snapshot(target);
+        } catch (IOException | RuntimeException ex) {
+            targetLock.closeAndDelete();
+            throw ex;
+        }
+        LockFile previous = fileLock;
+        fileLock = targetLock;
         file = target;
+        if (previous != null) {
+            previous.closeAndDelete();
+        }
     }
 
     private void snapshot(Path target) throws IOException {
@@ -172,5 +221,10 @@ public final class ProjectDocument implements AutoCloseable {
     @Override
     public void close() {
         database.closeAndDelete();
+        LockFile lock = fileLock;
+        fileLock = null;
+        if (lock != null) {
+            lock.closeAndDelete();
+        }
     }
 }

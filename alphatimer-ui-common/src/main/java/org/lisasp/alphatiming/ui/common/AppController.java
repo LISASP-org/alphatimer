@@ -3,6 +3,7 @@ package org.lisasp.alphatiming.ui.common;
 import lombok.extern.slf4j.Slf4j;
 import org.lisasp.basics.jre.date.DateTimeFacade;
 import org.lisasp.alphatiming.project.db.InvalidProjectFileException;
+import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.heats.LiveHeats;
@@ -90,10 +91,13 @@ public final class AppController implements AutoCloseable {
         if (!prepareToLeaveDocument()) {
             return;
         }
+        ProjectDocument current = document;
         try {
-            ProjectDocument opened = ProjectDocument.open(file, workDir);
+            ProjectDocument opened = current != null && current.isSavedAs(file) ? current.reopen(workDir) : ProjectDocument.open(file, workDir);
             defaults.save(opened.settings());
             replaceDocument(opened);
+        } catch (ProjectFileInUseException ex) {
+            prompt.showError(I18n.get("error.open.title"), I18n.get("error.open.inUse", file));
         } catch (InvalidProjectFileException ex) {
             prompt.showError(I18n.get("error.open.title"), I18n.get("error.open.invalid", file));
         } catch (IOException | RuntimeException ex) {
@@ -134,6 +138,9 @@ public final class AppController implements AutoCloseable {
             defaults.save(doc.settings());
             fireChange();
             return true;
+        } catch (ProjectFileInUseException ex) {
+            prompt.showError(I18n.get("error.save.title"), I18n.get("error.saveTo.inUse", target.get()));
+            return false;
         } catch (IOException ex) {
             prompt.showError(I18n.get("error.save.title"), I18n.get("error.saveTo.message", target.get(), describe(ex)));
             return false;

@@ -7,6 +7,7 @@ import org.lisasp.alphatimer.api.serial.SerialPortReader;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.project.db.HeatStore;
+import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
 import org.lisasp.alphatiming.ui.core.recording.RecordingState;
@@ -341,19 +342,17 @@ class AppControllerTest {
     @Test
     void latestHeatIsRestoredWhenOpeningAFile() throws Exception {
         Path file = dir.resolve("heat.heat");
+        HeatDto created;
         try (ProjectDocument other = ProjectDocument.create(work, S)) {
-            HeatStore store = new HeatStore(other.database());
-            HeatDto created = store.create("WK", 4, 2, 8);
+            created = new HeatStore(other.database()).create("WK", 4, 2, 8);
             other.saveAs(file);
-            prompt.recoveries.add(SavePrompt.RecoveryChoice.DISCARD);
-            controller.init();
-            prompt.choices.add(SavePrompt.Choice.DISCARD);
-            List<LiveHeats> seen = new ArrayList<>();
-            controller.addHeatListener(seen::add);
-            controller.open(file);
-            assertThat(controller.currentHeat()).contains(created);
-            assertThat(seen).containsExactly(new LiveHeats(created, null));
         }
+        controller.init();
+        List<LiveHeats> seen = new ArrayList<>();
+        controller.addHeatListener(seen::add);
+        controller.open(file);
+        assertThat(controller.currentHeat()).contains(created);
+        assertThat(seen).containsExactly(new LiveHeats(created, null));
     }
 
     @Test
@@ -420,5 +419,67 @@ class AppControllerTest {
         prompt.paths.add(Optional.of(dir.resolve("x.heat")));
         assertThat(controller.save()).isTrue();
         assertThat(controller.warning()).isEmpty();
+    }
+
+    private Path savedProject(String name) throws IOException {
+        Path file = dir.resolve(name);
+        try (ProjectDocument doc = ProjectDocument.create(work, S)) {
+            doc.saveAs(file);
+        }
+        return file;
+    }
+
+    private Path otherWork() throws IOException {
+        return Files.createDirectories(dir.resolve("other-work"));
+    }
+
+    @Test
+    void openingAFileThatAnotherProgramHoldsIsRefusedAndKeepsTheCurrentDocument() throws Exception {
+        Path file = savedProject("x.timing");
+        try (ProjectDocument holder = ProjectDocument.open(file, otherWork())) {
+            controller.init();
+            ProjectDocument before = controller.document();
+
+            controller.open(file);
+
+            assertThat(prompt.errors).containsExactly(I18n.get("error.open.title") + ": " + I18n.get("error.open.inUse", file));
+            assertThat(controller.document()).isSameAs(before);
+            assertThat(workFiles()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void saveAsToAFileThatAnotherProgramHoldsIsRefused() throws Exception {
+        Path file = savedProject("x.timing");
+        try (ProjectDocument holder = ProjectDocument.open(file, otherWork())) {
+            controller.init();
+            controller.applySettings(S.withTcp("changed", 1));
+            prompt.paths.add(Optional.of(file));
+
+            assertThat(controller.saveAs()).isFalse();
+
+            assertThat(prompt.errors).containsExactly(I18n.get("error.save.title") + ": " + I18n.get("error.saveTo.inUse", file));
+            assertThat(controller.document().file()).isEmpty();
+            assertThat(controller.document().isDirty()).isTrue();
+        }
+    }
+
+    @Test
+    void openingTheOwnFileAgainGoesBackToTheSavedStateAndKeepsTheLock() throws Exception {
+        controller.init();
+        controller.applySettings(S);
+        Path file = dir.resolve("x.timing");
+        prompt.paths.add(Optional.of(file));
+        assertThat(controller.save()).isTrue();
+        controller.applySettings(S.withTcp("changed", 1));
+        prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+        controller.open(file);
+
+        assertThat(prompt.errors).isEmpty();
+        assertThat(controller.document().settings()).isEqualTo(S);
+        assertThatThrownBy(() -> ProjectDocument.open(file, otherWork())).isInstanceOf(ProjectFileInUseException.class);
+        assertThat(controller.requestClose()).isTrue();
+        assertThat(dir.resolve("x.timing.lock")).doesNotExist();
     }
 }

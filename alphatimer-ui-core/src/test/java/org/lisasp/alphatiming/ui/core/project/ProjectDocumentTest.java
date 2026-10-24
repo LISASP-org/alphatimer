@@ -3,6 +3,7 @@ package org.lisasp.alphatiming.ui.core.project;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatiming.project.db.InvalidProjectFileException;
+import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.project.db.ProjectDatabase;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.HeatStatus;
@@ -280,6 +281,83 @@ class ProjectDocumentTest {
         }
         try (ProjectDocument doc = ProjectDocument.open(file, work())) {
             assertThat(doc.settings().competitionKey()).isEqualTo("DM 2026");
+        }
+    }
+
+    private Path savedProject(String name) throws IOException {
+        Path file = dir.resolve(name);
+        try (ProjectDocument doc = ProjectDocument.create(work(), SETTINGS)) {
+            doc.saveAs(file);
+        }
+        return file;
+    }
+
+    @Test
+    void aProjectFileOpenInOneDocumentIsRefusedToAnother() throws Exception {
+        Path file = savedProject("x.timing");
+        try (ProjectDocument first = ProjectDocument.open(file, work())) {
+            assertThatThrownBy(() -> ProjectDocument.open(file, work())).isInstanceOfSatisfying(ProjectFileInUseException.class, ex -> assertThat(ex.file()).isEqualTo(file));
+            assertThat(workFiles()).isEqualTo(2);
+        }
+    }
+
+    @Test
+    void closingTheDocumentReleasesTheProjectFileAndRemovesItsLockFile() throws Exception {
+        Path file = savedProject("x.timing");
+        Path lock = dir.resolve("x.timing.lock");
+        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+            assertThat(lock).exists();
+        }
+        assertThat(lock).doesNotExist();
+        try (ProjectDocument again = ProjectDocument.open(file, work())) {
+            assertThat(again.file()).contains(file);
+        }
+    }
+
+    @Test
+    void saveAsToAProjectFileOpenElsewhereIsRefusedAndLeavesItUntouched() throws Exception {
+        Path file = savedProject("x.timing");
+        byte[] before = Files.readAllBytes(file);
+        try (ProjectDocument holder = ProjectDocument.open(file, work());
+             ProjectDocument other = ProjectDocument.create(work(), SETTINGS)) {
+            other.updateSettings(SETTINGS.withTcp("changed", 1));
+            assertThatThrownBy(() -> other.saveAs(file)).isInstanceOfSatisfying(ProjectFileInUseException.class, ex -> assertThat(ex.file()).isEqualTo(file));
+            assertThat(Files.readAllBytes(file)).isEqualTo(before);
+            assertThat(other.file()).isEmpty();
+            assertThat(other.isDirty()).isTrue();
+        }
+    }
+
+    @Test
+    void saveAsMovesTheLockToTheNewFile() throws Exception {
+        Path a = savedProject("a.timing");
+        Path b = dir.resolve("b.timing");
+        try (ProjectDocument doc = ProjectDocument.open(a, work())) {
+            doc.saveAs(b);
+            assertThatThrownBy(() -> ProjectDocument.open(b, work())).isInstanceOf(ProjectFileInUseException.class);
+            assertThat(dir.resolve("a.timing.lock")).doesNotExist();
+            try (ProjectDocument other = ProjectDocument.open(a, work())) {
+                assertThat(other.file()).contains(a);
+            }
+        }
+    }
+
+    @Test
+    void saveAsToItsOwnFileKeepsTheLock() throws Exception {
+        Path file = savedProject("x.timing");
+        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+            doc.saveAs(file);
+            assertThat(doc.file()).contains(file);
+            assertThatThrownBy(() -> ProjectDocument.open(file, work())).isInstanceOf(ProjectFileInUseException.class);
+        }
+    }
+
+    @Test
+    void aLockFileLeftBehindByACrashDoesNotBlockOpening() throws Exception {
+        Path file = savedProject("x.timing");
+        Files.writeString(dir.resolve("x.timing.lock"), "");
+        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+            assertThat(doc.file()).contains(file);
         }
     }
 }

@@ -54,7 +54,8 @@ many times.
 - **`ProjectFile` / `ProjectDocument`**: owns the working database (EntityManagerFactory), the current file path
   (optional), the dirty flag and listeners. Operations: `create()`, `open(path)`, `save()`, `saveAs(path)`, `close()`.
   Any write (incoming data, settings change) sets dirty. After a crash the temp working database remains; at next start
-  the app offers to recover it.
+  the app offers to recover it. While a document has a project file, it holds an OS lock on `<file>.lock` next to it, so
+  a second program instance refuses to open the file or to save over it.
 - **`RecordingSession`**: `start()` snapshots the settings and builds a fresh pipeline (`TcpReader` → raw-data
   storage + `InputCollector` → `MessageConverter` → aggregator → message storage, refiner, heat service); `stop()`
   closes it. State: STOPPED / RUNNING / ERROR, reported to the UI via listener. Settings are read-only in the UI while

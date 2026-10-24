@@ -71,6 +71,10 @@ that solve problems this application does not have:
   (replacing an older one) and the temp file moved into place (`ProjectDatabase.snapshotTo`); a failed save keeps the old file (at worst as `-previous`) and
   the dirty flag. Open copies the file to `~/.alphatiming/work/` and rejects files that are not AlphaTiming projects.
 - Work files are protected by an OS lock (`.lock` next to them); only unlocked ones are offered for crash recovery.
+- The project file of an open document is protected the same way (`wk.timing.lock`, `LockFile`), never by a lock on the
+  file itself, which the renames of a save would break on Windows. Open and Save As refuse a file another instance holds
+  (`ProjectFileInUseException`); Save As moves the lock, closing releases it. Only a held lock counts, so a lock file left
+  behind by a crash blocks nothing.
 - **Users open files from earlier versions.** Every change to an entity (table or column) must keep older project files
   loadable; `hbm2ddl=update` only adds, it never migrates data. Renaming or removing a column or table requires an
   explicit migration. Prove compatibility with a test that opens a fixture file created by the previous version

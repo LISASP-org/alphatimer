@@ -10,8 +10,6 @@ import org.hibernate.cfg.Configuration;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
-import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,8 +44,7 @@ public final class ProjectDatabase implements AutoCloseable {
     private final Path workFile;
     private final SessionFactory factory;
 
-    private FileChannel lockChannel;
-    private FileLock fileLock;
+    private LockFile workLock;
 
     private ProjectDatabase(Path workFile) throws IOException {
         this.workFile = workFile;
@@ -60,64 +57,27 @@ public final class ProjectDatabase implements AutoCloseable {
         }
     }
 
-    private static Path lockFile(Path workFile) {
-        return workFile.resolveSibling(workFile.getFileName() + ".lock");
-    }
-
     /** The lock tells other instances that the work file belongs to a running program, so it is not a crash leftover. */
     private void acquireLock() throws IOException {
-        lockChannel = FileChannel.open(lockFile(workFile), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-        try {
-            fileLock = lockChannel.tryLock();
-        } catch (OverlappingFileLockException ex) {
-            fileLock = null;
-        }
-        if (fileLock == null) {
-            lockChannel.close();
-            throw new IOException("Work file is in use: " + workFile);
-        }
+        workLock = LockFile.tryAcquire(LockFile.besides(workFile)).orElseThrow(() -> new IOException("Work file is in use: " + workFile));
     }
 
     private void releaseLock() {
-        try {
-            if (fileLock != null) {
-                fileLock.release();
-            }
-            if (lockChannel != null) {
-                lockChannel.close();
-            }
-        } catch (IOException ex) {
-            log.warn("Could not release lock of {}", workFile, ex);
+        if (workLock != null) {
+            workLock.close();
+            workLock = null;
         }
-        fileLock = null;
-        lockChannel = null;
     }
 
     /** True when a running program (this or another one) still owns the work file. */
     public static boolean isInUse(Path workFile) {
-        Path lock = lockFile(workFile);
-        if (!Files.exists(lock)) {
-            return false;
-        }
-        try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.WRITE)) {
-            FileLock l = channel.tryLock();
-            if (l == null) {
-                return true;
-            }
-            l.release();
-            return false;
-        } catch (OverlappingFileLockException ex) {
-            return true;
-        } catch (IOException ex) {
-            log.warn("Could not probe the lock of {}; treating the work file as in use", workFile, ex);
-            return true;
-        }
+        return LockFile.isHeld(LockFile.besides(workFile));
     }
 
     public static void discard(Path workFile) {
         try {
             Files.deleteIfExists(workFile);
-            Files.deleteIfExists(lockFile(workFile));
+            Files.deleteIfExists(LockFile.besides(workFile));
         } catch (IOException ex) {
             log.warn("Could not delete {}", workFile, ex);
         }
