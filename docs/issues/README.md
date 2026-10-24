@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [The command line ends with OK after a lost serial connection](cli-lost-connection-exit-code.md) | Medium | S | Scripts cannot tell a complete recording from a lost connection |
 | [Error dialogs show raw exception texts](raw-exception-texts-in-dialogs.md) | Medium | M | Technical Hibernate/SQLite messages, untranslated in German |
 | [Temp files of a save are left behind after a crash](temp-files-left-after-crash.md) | Low | S | `*.tmp` files accumulate in the work folder |
 | [Errors of heat listeners are reported as processing errors](listener-errors-as-processing-errors.md) | Low | S | A failing UI listener looks like a data problem |

@@ -43,6 +43,7 @@ class RecordCommandTest {
     private final ByteArrayOutputStream err = new ByteArrayOutputStream();
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final ManualTrigger trigger = new ManualTrigger();
+    private volatile Runnable loseConnection;
     private Locale original;
     private Path work;
     private AppController controller;
@@ -73,6 +74,11 @@ class RecordCommandTest {
             @Override
             public void start() {
                 events.add("readerStarted");
+            }
+
+            @Override
+            public void addConnectionLostListener(Runnable listener) {
+                loseConnection = listener;
             }
 
             @Override
@@ -142,6 +148,28 @@ class RecordCommandTest {
 
         assertThat(result.get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.OK);
         assertThat(Files.getLastModifiedTime(file).toMillis()).isPositive();
+    }
+
+    @Test
+    void aLostConnectionIsReportedBeforeTheStopThenSavedAndEndsWithItsOwnExitCode() throws Exception {
+        Path file = project(VALID);
+
+        Future<ExitCode> result = executor.submit(() -> command.run(file, trigger));
+        await().atMost(Duration.ofSeconds(10)).until(() -> trigger.onStop != null);
+        controller.addStateListener(state -> giveTheCommandTimeToPrint("Stopping"));
+        loseConnection.run();
+
+        assertThat(result.get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.CONNECTION_LOST);
+        assertThat(Files.getLastModifiedTime(file).toMillis()).isPositive();
+        String printed = out.toString(StandardCharsets.UTF_8);
+        assertThat(printed).containsSubsequence("was lost", "Stopping", "Saved");
+    }
+
+    private void giveTheCommandTimeToPrint(String text) {
+        long deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos();
+        while (!out.toString(StandardCharsets.UTF_8).contains(text) && System.nanoTime() < deadline) {
+            Thread.onSpinWait();
+        }
     }
 
     @Test
