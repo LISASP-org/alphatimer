@@ -20,6 +20,7 @@
         <module>alphatimer-heats</module>
         <module>alphatimer-legacy-server</module>
         <module>alphatimer-project-db</module>
+        <module>alphatimer-ui-core</module>
     </modules>
 
     <properties>
