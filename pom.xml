@@ -23,6 +23,7 @@
         <module>alphatimer-ui-core</module>
         <module>alphatimer-ui-common</module>
         <module>alphatimer-ui</module>
+        <module>alphatimer-cli</module>
     </modules>
 
     <properties>
