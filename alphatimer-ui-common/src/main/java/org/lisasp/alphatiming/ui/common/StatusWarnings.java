@@ -9,6 +9,7 @@ public final class StatusWarnings {
 
     /** Declared from the most to the least important; the status bar shows the most important one in front. */
     public enum Kind {
+        CONNECTION_LOST,
         RECORDING_WRITE,
         AUTO_SAVE
     }

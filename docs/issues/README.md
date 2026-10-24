@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [Serial reader does not reconnect](serial-reader-no-reconnect.md) | Medium | M | After an unplugged USB adapter the recording stays running without data until it is stopped and started again |
 | [Saving also blocks the recording](save-blocks-recording.md) | Medium | M | A slow save target blocks the reader thread for the whole save |
 | [Two saves at once share one temp file](concurrent-saves-share-temp-file.md) | Low | S | A manual save during an auto-save can make the auto-save fail spuriously |
 | [Auto-save runs while the save dialog is open](autosave-during-save-dialog.md) | Low | S | Changes can reach the file although the user then chooses Discard |

@@ -186,6 +186,7 @@ public final class AppController implements AutoCloseable {
         }
         Settings settings = doc.settings();
         defaults.save(settings);
+        warnings.clear(StatusWarnings.Kind.CONNECTION_LOST);
         s.start(settings);
     }
 
@@ -242,6 +243,13 @@ public final class AppController implements AutoCloseable {
         String text = I18n.get("warn.autoSaveFailed", describe(ex));
         warnings.raise(StatusWarnings.Kind.AUTO_SAVE, new StatusWarnings.Warning(text, text));
         announce(text);
+        fireChange();
+    }
+
+    private void onConnectionLost(String port) {
+        String details = I18n.get("warn.connectionLost.detail", port);
+        warnings.raise(StatusWarnings.Kind.CONNECTION_LOST, new StatusWarnings.Warning(I18n.get("warn.connectionLost"), details));
+        announce(details);
         fireChange();
     }
 
@@ -316,6 +324,7 @@ public final class AppController implements AutoCloseable {
         });
         next.addMessageListener(message -> announce(MessageText.describe(message)));
         next.addPingListener(() -> pingListeners.forEach(Runnable::run));
+        next.addConnectionLostListener(this::onConnectionLost);
         next.addErrorListener(ex -> announce(I18n.get("log.processingError", ex.toString())));
         next.addWriteListener(new WriteListener() {
             @Override
@@ -339,6 +348,7 @@ public final class AppController implements AutoCloseable {
             fireChange();
         });
         writeFailures.reset();
+        warnings.clear(StatusWarnings.Kind.CONNECTION_LOST);
 
         document = doc;
         session = next;

@@ -40,6 +40,7 @@ class RecordingSessionTest {
 
     static final class FakeReader implements SerialPortReader {
         final List<ByteConsumer> consumers = new ArrayList<>();
+        final List<Runnable> lostListeners = new CopyOnWriteArrayList<>();
         int starts;
         int closes;
 
@@ -57,6 +58,17 @@ class RecordingSessionTest {
         @Override
         public void close() {
             closes++;
+        }
+
+        @Override
+        public void addConnectionLostListener(Runnable listener) {
+            lostListeners.add(listener);
+        }
+
+        Thread loseConnection() {
+            Thread lost = new Thread(() -> lostListeners.forEach(Runnable::run), "fake-connection-lost");
+            lost.start();
+            return lost;
         }
 
         void push(byte... data) {
@@ -346,6 +358,41 @@ class RecordingSessionTest {
         assertThat(replaying.state()).isEqualTo(RecordingState.ERROR);
         assertThat(replaying.error().kind()).isEqualTo(RecordingError.Kind.REPLAY_FILE_NOT_FOUND);
         assertThat(replaying.error().detail()).endsWith("nope.serial");
+    }
+
+    private static Settings serial(String port) {
+        return new Settings(ConnectionType.SERIAL, "", 1, port, SerialMode.ARES21, 60, 0, false).withCompetitionKey("WK");
+    }
+
+    @Test
+    void aLostConnectionStopsTheRecordingKeepsWhatWasRecordedAndIsReportedWithThePort() {
+        List<String> lost = new CopyOnWriteArrayList<>();
+        session.addConnectionLostListener(lost::add);
+        session.start(serial("/dev/ttyUSB0"));
+        reader().push(DataHandlingMessageTestData.message1);
+
+        reader().loseConnection();
+
+        await().atMost(10, TimeUnit.SECONDS).until(() -> session.state() == RecordingState.STOPPED);
+        assertThat(session.error()).isNull();
+        assertThat(lost).containsExactly("/dev/ttyUSB0");
+        assertThat(reader().closes).isEqualTo(1);
+        assertThat(RawDataRecorder.readAll(db).stream().mapToInt(c -> c.length).sum()).isEqualTo(DataHandlingMessageTestData.message1.length);
+    }
+
+    @Test
+    void aLossReportedLateByAnEarlierRecordingDoesNotStopTheCurrentOne() throws Exception {
+        List<String> lost = new CopyOnWriteArrayList<>();
+        session.addConnectionLostListener(lost::add);
+        session.start(serial("/dev/ttyUSB0"));
+        FakeReader first = reader();
+        session.stop();
+        session.start(serial("/dev/ttyUSB0"));
+
+        first.loseConnection().join(10_000);
+
+        assertThat(session.state()).isEqualTo(RecordingState.RUNNING);
+        assertThat(lost).isEmpty();
     }
 
     @Test

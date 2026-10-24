@@ -60,6 +60,7 @@ public final class RecordingSession implements AutoCloseable {
     private final List<Consumer<DataHandlingMessage>> messageListeners = new CopyOnWriteArrayList<>();
     private final List<Runnable> pingListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<Exception>> errorListeners = new CopyOnWriteArrayList<>();
+    private final List<Consumer<String>> connectionLostListeners = new CopyOnWriteArrayList<>();
     private final List<WriteListener> writeListeners = new CopyOnWriteArrayList<>();
     private final WriteMonitor writes = new WriteMonitor(writeListeners);
 
@@ -156,8 +157,10 @@ public final class RecordingSession implements AutoCloseable {
         });
         collector.register(converter);
 
-        reader = readers.create(s);
+        SerialPortReader created = readers.create(s);
+        reader = created;
         reader.register(safe(rawRecorder)).register(safe(collector));
+        reader.addConnectionLostListener(() -> connectionLost(created, s.serialPort()));
         if (reader instanceof FileReplayReader replay) {
             replay.addFinishedListener(this::stop);
         }
@@ -239,6 +242,20 @@ public final class RecordingSession implements AutoCloseable {
         setState(RecordingState.STOPPED, null);
     }
 
+    private synchronized void connectionLost(SerialPortReader lost, String port) {
+        if (lost != reader || state != RecordingState.RUNNING) {
+            return;
+        }
+        stop();
+        for (Consumer<String> listener : connectionLostListeners) {
+            try {
+                listener.accept(port);
+            } catch (RuntimeException ex) {
+                log.warn("Connection lost listener failed", ex);
+            }
+        }
+    }
+
     private void teardown() {
         try {
             if (reader != null) {
@@ -314,6 +331,11 @@ public final class RecordingSession implements AutoCloseable {
     /** Called for every ping the device sends. */
     public void addPingListener(Runnable listener) {
         pingListeners.add(listener);
+    }
+
+    /** Called with the serial port after a lost connection has stopped the recording. */
+    public void addConnectionLostListener(Consumer<String> listener) {
+        connectionLostListeners.add(listener);
     }
 
     public Heat[] legacyHeats() {

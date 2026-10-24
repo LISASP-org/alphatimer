@@ -12,7 +12,9 @@ import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
 import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
 import org.lisasp.alphatiming.ui.core.recording.RecordingState;
+import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
+import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
 import java.io.IOException;
@@ -26,9 +28,11 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 class AppControllerTest {
 
@@ -566,6 +570,72 @@ class AppControllerTest {
             execute(recording, "CREATE TRIGGER block_rawdata BEFORE INSERT ON rawdata BEGIN SELECT RAISE(ABORT, 'disk full'); END");
             recordPing(recording, consumers);
             assertThat(recording.warnings()).hasSize(1);
+
+            prompt.choices.add(SavePrompt.Choice.DISCARD);
+            recording.newProject();
+            assertThat(recording.warnings()).isEmpty();
+        }
+    }
+
+    private static final Settings SERIAL = new Settings(ConnectionType.SERIAL, "", 1, "/dev/ttyUSB0", SerialMode.ARES21, 60, 0, false).withCompetitionKey("WK");
+
+    private AppController losingController(List<Runnable> loseConnection) {
+        return new AppController(work, defaults, prompt, () -> s -> new SerialPortReader() {
+            @Override
+            public SerialPortReader register(ByteConsumer listener) {
+                return this;
+            }
+
+            @Override
+            public void addConnectionLostListener(Runnable listener) {
+                loseConnection.add(() -> new Thread(listener, "fake-connection-lost").start());
+            }
+
+            @Override
+            public void close() {
+            }
+        }, LocalDateTime::now);
+    }
+
+    @Test
+    void aLostSerialConnectionStopsTheRecordingAndWarnsUntilTheRecordingIsStartedAgain() {
+        Locale original = Locale.getDefault();
+        Locale.setDefault(Locale.ENGLISH);
+        List<Runnable> loseConnection = new CopyOnWriteArrayList<>();
+        try (AppController recording = losingController(loseConnection)) {
+            recording.init();
+            recording.applySettings(SERIAL);
+            List<String> log = new CopyOnWriteArrayList<>();
+            recording.addMessageListener(log::add);
+            recording.startRecording();
+
+            loseConnection.getLast().run();
+
+            await().atMost(10, TimeUnit.SECONDS).until(() -> !recording.warnings().isEmpty());
+            assertThat(recording.isRecording()).isFalse();
+            assertThat(recording.warnings()).singleElement().satisfies(w -> {
+                assertThat(w.text()).isEqualTo("Serial connection lost, recording stopped");
+                assertThat(w.details()).startsWith("The connection to serial port /dev/ttyUSB0 was lost");
+                assertThat(log).contains(w.details());
+            });
+
+            recording.startRecording();
+            assertThat(recording.isRecording()).isTrue();
+            assertThat(recording.warnings()).isEmpty();
+        } finally {
+            Locale.setDefault(original);
+        }
+    }
+
+    @Test
+    void aLostConnectionOfTheClosedProjectIsNotShownForTheNextOne() {
+        List<Runnable> loseConnection = new CopyOnWriteArrayList<>();
+        try (AppController recording = losingController(loseConnection)) {
+            recording.init();
+            recording.applySettings(SERIAL);
+            recording.startRecording();
+            loseConnection.getLast().run();
+            await().atMost(10, TimeUnit.SECONDS).until(() -> !recording.warnings().isEmpty());
 
             prompt.choices.add(SavePrompt.Choice.DISCARD);
             recording.newProject();

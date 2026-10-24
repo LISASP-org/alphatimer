@@ -105,7 +105,10 @@ All UI updates run on the EDT; pipeline callbacks marshal via `SwingUtilities.in
 ## Error handling
 
 - Invalid/garbled device data: handled by the copied parsers (dropped messages are logged, never fatal).
-- Connection loss: reader reconnects with back-off; the state shows "disconnected"; recording remains RUNNING.
+- Connection loss over TCP: reader reconnects with back-off; the state shows "disconnected"; recording remains RUNNING.
+- Connection loss of a serial port (read error, port vanished): the reader closes the port and the recording stops
+  (STOPPED, everything recorded is kept); a status-bar warning stays until the recording is started again. No automatic
+  reconnect.
 - Save failures (disk full, permissions): error dialog, document stays dirty, previous file untouched (atomic rename).
 - Corrupt/unknown project file on Open: error dialog, current document unchanged.
 - Auto-save failure: status-bar warning, retried at the next interval.

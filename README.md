@@ -28,7 +28,8 @@ java -jar alphatimer-ui/target/alphatiming.jar
 1. **Settings & Recording** panel: choose the input in the *Connection type* list:
    - **TCP** (host/port of the timekeeping system),
    - **Serial port** (port from the list or typed, protocol ARES21 = 9600 baud 7E1 or Quantum = 9600 baud 8N1, as in
-     AlphaServer),
+     AlphaServer). If the port is lost (e.g. the USB adapter is unplugged), the recording stops, keeps what it recorded
+     and the status bar warns until the recording is started again by hand; TCP reconnects by itself instead,
    - **File replay**: a pure binary data file (e.g. a recorded `.serial` file) or another AlphaTiming project (`.timing`,
      its stored raw data is used). The data is replayed at 9600 baud (960 bytes per second) and the recording stops by
      itself at the end of the file.
@@ -88,6 +89,7 @@ ARES messages and the heats. While a project is open, the app works on a tempora
   a red warning in the status bar; with several, the most important one and the number of the others. Its tooltip (in the
   text UI: the message log on *Settings & Recording*) names what failed and why. An auto-save warning disappears with the
   next successful save; a recording warning once that data has been stored again and the project saved afterwards.
+  A lost serial connection shows such a warning too, until the recording is started again.
 - After a crash the next start offers to recover the leftover work file and names its project file and the time it was
   last changed. A recovered project keeps its project file unless that file was saved since or is open elsewhere (then
   use Save As). Discard asks a second time before it deletes the data; Back returns to the recovery question.
