@@ -94,6 +94,9 @@ when reporting a problem. Old log files are not deleted automatically.
 While recording (server toggle on): `GET /legacy/heats.xml` and `GET /legacy/heats.json` — the same data as alphatimer
 (finish times per heat and lane).
 
+The endpoints have no authentication on purpose: they serve read-only data to JAuswertung on the local network, as
+alphatimer did. Enable the server only on a network you trust.
+
 ## Modules
 
 See `AGENTS.md`.

@@ -93,6 +93,8 @@ untrusted input:
 - A serial port that is missing or in use ends the start in the ERROR state (`SerialConnectionException`), never in a crash.
 - Bytes from the device are validated by the copied parsers; unknown or garbled data is dropped and logged, never fatal.
 - Files from disk are checked before use (`ProjectDatabase.openCopy`, `DefaultSettingsStore.load`).
+- The REST server is intentionally without authentication: it serves read-only heat data to JAuswertung on the local
+  network, as alphatimer did. Do not add authentication unless JAuswertung supports it.
 
 ## Internationalisation
 
