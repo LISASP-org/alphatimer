@@ -212,6 +212,7 @@ public final class AppController implements AutoCloseable {
         TimingDocument doc = document;
         document = null;
         session = null;
+        clearWarningsOfTheDocument();
         if (doc != null) {
             doc.close();
         }
@@ -374,6 +375,12 @@ public final class AppController implements AutoCloseable {
         }
     }
 
+    private void clearWarningsOfTheDocument() {
+        writeFailures.reset();
+        warnings.clear(StatusWarnings.Kind.CONNECTION_LOST);
+        warnings.clear(StatusWarnings.Kind.AUTO_SAVE);
+    }
+
     private void install(TimingDocument doc) {
         RecordingSession next = new RecordingSession(doc.database(), readers.get(), time);
         next.addHeatListener(h -> {
@@ -416,8 +423,7 @@ public final class AppController implements AutoCloseable {
             }
             fireChange();
         });
-        writeFailures.reset();
-        warnings.clear(StatusWarnings.Kind.CONNECTION_LOST);
+        clearWarningsOfTheDocument();
 
         document = doc;
         session = next;

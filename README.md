@@ -93,7 +93,8 @@ ARES messages and the heats. While a project is open, the app works on a tempora
   text UI: the message log on *Settings & Recording*) names what failed and why. An auto-save warning disappears with the
   next successful save; a recording warning once that data has been stored again and the project saved afterwards.
   Raw data that still cannot be stored when the recording stops is lost; the details say how many bytes.
-  A lost serial connection shows such a warning too, until the recording is started again.
+  A lost serial connection shows such a warning too, until the recording is started again. Opening or creating another
+  project clears all of these warnings, as they belong to the project they were raised for.
 - After a crash the next start offers to recover the leftover work file and names its project file and the time it was
   last changed. A recovered project keeps its project file unless that file was saved since or is open elsewhere (then
   use Save As). Discard asks a second time before it deletes the data; Back returns to the recovery question. If the

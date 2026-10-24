@@ -537,6 +537,45 @@ class AppControllerTest {
         assertThat(controller.warnings()).isEmpty();
     }
 
+    private void failAutoSaveOfAChangedProject() {
+        controller.init();
+        controller.applySettings(S);
+        controller.onAutoSaveError(new IOException("disk full"));
+        assertThat(controller.warnings()).hasSize(1);
+        prompt.choices.add(SavePrompt.Choice.DISCARD);
+    }
+
+    @Test
+    void anAutoSaveFailureOfTheDiscardedProjectIsNotShownForANewOne() {
+        failAutoSaveOfAChangedProject();
+
+        controller.newProject();
+
+        assertThat(controller.warnings()).isEmpty();
+    }
+
+    @Test
+    void anAutoSaveFailureOfTheDiscardedProjectIsNotShownForAnOpenedOne() throws Exception {
+        Path other = savedProject("other.timing");
+        failAutoSaveOfAChangedProject();
+
+        controller.open(other);
+
+        assertThat(controller.document().file()).contains(other);
+        assertThat(controller.warnings()).isEmpty();
+    }
+
+    @Test
+    void anAutoSaveFailureOfTheDiscardedChangesIsNotShownAfterAFailedOpenRevertsThem() throws Exception {
+        Path bad = Files.writeString(dir.resolve("bad.timing"), "garbage");
+        failAutoSaveOfAChangedProject();
+
+        controller.open(bad);
+
+        assertThat(controller.document().isDirty()).isFalse();
+        assertThat(controller.warnings()).isEmpty();
+    }
+
     private static final byte[] PING = {org.lisasp.alphatimer.api.ares.serial.Characters.SOH_StartOfHeader, org.lisasp.alphatimer.api.ares.serial.Characters.DC2_Periphery, 0x39,
             org.lisasp.alphatimer.api.ares.serial.Characters.DC4_Command, 0x54, 0x50, org.lisasp.alphatimer.api.ares.serial.Characters.EOT_EndOfText};
 
@@ -868,12 +907,14 @@ class AppControllerTest {
         Path file = openChangedProject("x.timing");
         Files.move(work, dir.resolve("work-moved"));
         Files.writeString(work, "not a folder");
+        controller.onAutoSaveError(new IOException("disk full"));
         prompt.choices.add(SavePrompt.Choice.DISCARD);
 
         controller.newProject();
         controller.runAutoSave();
 
         assertThat(controller.document()).isNull();
+        assertThat(controller.warnings()).isEmpty();
         assertThat(TimingFileWriter.previousVersionOf(file)).doesNotExist();
         assertThat(prompt.errors).hasSize(2).first().asString().startsWith(I18n.get("error.new.title") + ": ");
         assertThat(prompt.errors.get(1)).startsWith(I18n.get("error.revert.title") + ": ");
