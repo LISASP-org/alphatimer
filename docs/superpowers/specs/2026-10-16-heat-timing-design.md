@@ -45,7 +45,8 @@ alphatimer's `messagesstorage`, `heats` and `legacy` modules are not copied as m
 
 Changes to copied code: `TcpReader` must not start its thread in the constructor (explicit `start()`), and
 `close()` must be safe when never connected (currently NPE) and repeatable, so a session can be started and stopped
-many times.
+many times. `close()` waits (bounded) until the reader thread has ended, so the bytes it already read reach the
+consumers before the session closes the raw data recorder, and a connect in progress is abandoned.
 
 ## Core components
 

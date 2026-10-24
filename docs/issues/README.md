@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [TcpReader does not wait for its thread on close](tcp-reader-close-does-not-join.md) | Medium | S | Up to 511 raw bytes can be lost at stop; a connect can race with `close()` |
 | [New and Open stop a running recording without asking](new-open-stop-recording-silently.md) | Medium | S | An accidental New/Open ends the recording, even when the user cancels |
 | [Save in the Swing UI does not add the file extension](swing-save-without-extension.md) | Medium | S | Projects saved without `.timing` are hidden by the Open dialog |
 | [The recovery dialog does not say what it would recover](recovery-dialog-without-details.md) | Medium | S | No file or date shown; Discard deletes the work file without a second question |

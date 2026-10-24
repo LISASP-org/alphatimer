@@ -18,12 +18,18 @@ import org.lisasp.alphatiming.ui.core.settings.SettingsProblem;
 import org.lisasp.alphatimer.serial.tcp.TcpReader;
 import org.lisasp.alphatiming.project.db.testdata.DataHandlingMessageTestData;
 
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -265,5 +271,63 @@ class RecordingSessionTest {
         assertThat(real.error().kind()).isEqualTo(RecordingError.Kind.SERIAL_PORT_NOT_FOUND);
         assertThat(real.error().detail()).isEqualTo("/dev/does-not-exist-42");
         real.close();
+    }
+
+    @Test
+    void stopStoresEveryByteTheTcpReaderReceivedBeforeTheRecordingEnds() throws Exception {
+        try (ServerSocket server = new ServerSocket(0)) {
+            ByteArrayOutputStream delivered = new ByteArrayOutputStream();
+            CountDownLatch firstByteArrived = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            RecordingSession tcp = new RecordingSession(db, s -> {
+                TcpReader r = new TcpReader(s.tcpHost(), s.tcpPort());
+                r.register(b -> {
+                    synchronized (delivered) {
+                        delivered.write(b);
+                    }
+                    if (firstByteArrived.getCount() > 0) {
+                        firstByteArrived.countDown();
+                        awaitIgnoringInterrupts(release);
+                    }
+                });
+                return r;
+            }, () -> LocalDateTime.of(2021, 6, 21, 14, 53));
+            tcp.start(new Settings("localhost", server.getLocalPort(), 60, 0).withCompetitionKey("WK"));
+            assertThat(tcp.state()).isEqualTo(RecordingState.RUNNING);
+
+            try (Socket device = server.accept()) {
+                OutputStream out = device.getOutputStream();
+                out.write(DataHandlingMessageTestData.message1);
+                out.flush();
+                assertThat(firstByteArrived.await(10, TimeUnit.SECONDS)).isTrue();
+
+                CompletableFuture<Void> stopped = CompletableFuture.runAsync(tcp::stop);
+                CompletableFuture.anyOf(stopped, CompletableFuture.runAsync(() -> {}, CompletableFuture.delayedExecutor(500, TimeUnit.MILLISECONDS))).join();
+                release.countDown();
+                stopped.get(10, TimeUnit.SECONDS);
+            }
+
+            ByteArrayOutputStream stored = new ByteArrayOutputStream();
+            RawDataRecorder.readAll(db).forEach(stored::writeBytes);
+            synchronized (delivered) {
+                assertThat(stored.toByteArray()).isNotEmpty().isEqualTo(delivered.toByteArray());
+            }
+            assertThat(tcp.state()).isEqualTo(RecordingState.STOPPED);
+        }
+    }
+
+    private static void awaitIgnoringInterrupts(CountDownLatch latch) {
+        boolean interrupted = false;
+        while (true) {
+            try {
+                latch.await();
+                break;
+            } catch (InterruptedException e) {
+                interrupted = true;
+            }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

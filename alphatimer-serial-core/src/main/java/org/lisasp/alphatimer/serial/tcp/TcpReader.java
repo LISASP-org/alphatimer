@@ -10,11 +10,13 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.time.Duration;
 
 @Slf4j
 public class TcpReader implements SerialPortReader {
 
     private static final int TIMEOUT_60s = 60000;
+    private static final Duration CLOSE_TIMEOUT = Duration.ofSeconds(5);
 
     private final ByteNotifier notifier = new ByteNotifier();
 
@@ -121,6 +123,10 @@ public class TcpReader implements SerialPortReader {
                 Socket s = new Socket();
                 s.setSoTimeout(TIMEOUT_60s);
                 socket = s;
+                if (Thread.currentThread().isInterrupted()) {
+                    closeConnection();
+                    return;
+                }
                 s.connect(new InetSocketAddress(server, port), TIMEOUT_60s);
                 input = s.getInputStream();
             }
@@ -183,7 +189,21 @@ public class TcpReader implements SerialPortReader {
                 log.warn("Exception on socket close.", e);
             }
         }
+        awaitReaderEnd();
         input = null;
         socket = null;
+    }
+
+    private void awaitReaderEnd() {
+        if (reader == null || reader == Thread.currentThread()) {
+            return;
+        }
+        try {
+            if (!reader.join(CLOSE_TIMEOUT)) {
+                log.warn("Reader thread {} did not end within {}", reader.getName(), CLOSE_TIMEOUT);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }
