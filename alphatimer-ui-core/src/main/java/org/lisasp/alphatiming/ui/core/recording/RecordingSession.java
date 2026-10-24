@@ -138,7 +138,8 @@ public final class RecordingSession implements AutoCloseable {
         MessageStore messageStore = new MessageStore(db);
         HeatService heatService = new HeatService(writes.heats(new HeatStore(db)), this::reportError);
         heatListeners.forEach(heatService::register);
-        rawRecorder = new RawDataRecorder(db, time, 512, 250, ex -> writes.failed(RecordedData.RAW_DATA, ex), () -> writes.stored(RecordedData.RAW_DATA));
+        rawRecorder = new RawDataRecorder(db, time, 512, 250, ex -> writes.failed(RecordedData.RAW_DATA, ex), () -> writes.stored(RecordedData.RAW_DATA),
+                                          bytes -> writes.dropped(RecordedData.RAW_DATA, bytes));
 
         InputCollector collector = new InputCollector(COMPETITION, time);
         MessageConverter converter = new MessageConverter();

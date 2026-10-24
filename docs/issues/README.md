@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [Buffered raw data is dropped silently at stop](buffered-raw-data-dropped-at-stop.md) | Medium | S | Bytes buffered during a disk problem are lost at stop without a message |
 | [The auto-save warning carries over to the next project](autosave-warning-carries-over.md) | Medium | S | A new project shows the previous project's auto-save warning |
 | [The command line ends with OK after a lost serial connection](cli-lost-connection-exit-code.md) | Medium | S | Scripts cannot tell a complete recording from a lost connection |
 | [Error dialogs show raw exception texts](raw-exception-texts-in-dialogs.md) | Medium | M | Technical Hibernate/SQLite messages, untranslated in German |

@@ -22,7 +22,7 @@ class RawDataRecorderTest {
     @Test
     void flushesBufferedBytesIntoChunksInOrder() throws Exception {
         try (TimingDatabase db = TimingDatabase.createNew(dir)) {
-            RawDataRecorder rec = new RawDataRecorder(db, () -> LocalDateTime.of(2026, 1, 1, 10, 0), 4, 60_000, e -> { }, () -> { });
+            RawDataRecorder rec = new RawDataRecorder(db, () -> LocalDateTime.of(2026, 1, 1, 10, 0), 4, 60_000, e -> { }, () -> { }, bytes -> { });
             for (byte b = 1; b <= 10; b++) {
                 rec.accept(b);
             }
@@ -37,18 +37,62 @@ class RawDataRecorderTest {
     }
 
     @Test
-    void aStoreThatKeepsFailingIsReportedOnceAndTheBytesStayBuffered() throws Exception {
+    void aStoreThatKeepsFailingIsReportedOnceAndTheBytesStayBufferedUntilClose() throws Exception {
         TimingDatabase db = TimingDatabase.createNew(dir);
         List<Exception> errors = new ArrayList<>();
-        RawDataRecorder rec = new RawDataRecorder(db, LocalDateTime::now, 1000, 60_000, errors::add, () -> { });
+        List<Integer> dropped = new ArrayList<>();
+        RawDataRecorder rec = new RawDataRecorder(db, LocalDateTime::now, 1000, 60_000, errors::add, () -> { }, dropped::add);
         db.close();
         rec.accept((byte) 7);
+        rec.accept((byte) 8);
         rec.flush();
         rec.flush();
+        assertThat(rec.bufferedBytes()).isEqualTo(2);
         rec.close();
+        rec.close();
+        assertThat(dropped).containsExactly(2);
         assertThat(errors).hasSize(1);
-        assertThat(rec.bufferedBytes()).isEqualTo(1);
+        assertThat(rec.bufferedBytes()).isZero();
         TimingWorkFolder.discard(db.workFile());
+    }
+
+    @Test
+    void closeStoresTheBufferedBytesWhenTheStoreWorksAgain() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            AtomicInteger calls = new AtomicInteger();
+            AtomicInteger stored = new AtomicInteger();
+            List<Integer> dropped = new ArrayList<>();
+            RawDataRecorder rec = new RawDataRecorder(db, () -> {
+                if (calls.incrementAndGet() == 1) {
+                    throw new IllegalStateException("disk full");
+                }
+                return LocalDateTime.now();
+            }, 1000, 60_000, e -> { }, stored::incrementAndGet, dropped::add);
+            rec.accept((byte) 7);
+            rec.flush();
+            rec.close();
+            assertThat(RawDataRecorder.readAll(db)).singleElement().satisfies(chunk -> assertThat(chunk).containsExactly(7));
+            assertThat(stored).hasValue(1);
+            assertThat(dropped).isEmpty();
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void bytesReceivedAfterCloseAreIgnored() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            List<Integer> dropped = new ArrayList<>();
+            RawDataRecorder rec = new RawDataRecorder(db, LocalDateTime::now, 1, 60_000, e -> { }, () -> { }, dropped::add);
+            rec.close();
+            rec.accept((byte) 7);
+            rec.accept((byte) 8);
+            rec.flush();
+            rec.close();
+            assertThat(RawDataRecorder.readAll(db)).isEmpty();
+            assertThat(rec.bufferedBytes()).isZero();
+            assertThat(dropped).isEmpty();
+            db.closeAndDelete();
+        }
     }
 
     @Test
@@ -62,7 +106,7 @@ class RawDataRecorderTest {
                     throw new IllegalStateException("disk full");
                 }
                 return LocalDateTime.now();
-            }, 1000, 60_000, errors::add, stored::incrementAndGet);
+            }, 1000, 60_000, errors::add, stored::incrementAndGet, bytes -> { });
             rec.accept((byte) 7);
             rec.flush();
             assertThat(errors).hasSize(1);
@@ -81,7 +125,7 @@ class RawDataRecorderTest {
     @Test
     void timerFlushesPartialBuffer() throws Exception {
         try (TimingDatabase db = TimingDatabase.createNew(dir)) {
-            RawDataRecorder rec = new RawDataRecorder(db, LocalDateTime::now, 1000, 50, e -> { }, () -> { });
+            RawDataRecorder rec = new RawDataRecorder(db, LocalDateTime::now, 1000, 50, e -> { }, () -> { }, bytes -> { });
             rec.accept((byte) 7);
             await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> assertThat(RawDataRecorder.readAll(db)).hasSize(1));
             rec.close();

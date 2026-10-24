@@ -65,6 +65,16 @@ final class WriteMonitor {
         }
     }
 
+    void dropped(RecordedData data, int bytes) {
+        for (WriteListener listener : listeners) {
+            try {
+                listener.dataDropped(data, bytes);
+            } catch (RuntimeException ex) {
+                log.warn("Write listener failed", ex);
+            }
+        }
+    }
+
     HeatRepository heats(HeatRepository store) {
         return new HeatRepository() {
             @Override

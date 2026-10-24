@@ -214,6 +214,10 @@ class RecordingSessionTest {
             public void writeRecovered(RecordedData data) {
                 events.add(new WriteEvent("recovered", data));
             }
+
+            @Override
+            public void dataDropped(RecordedData data, int bytes) {
+            }
         });
         return events;
     }
@@ -288,6 +292,31 @@ class RecordingSessionTest {
         await().atMost(5, TimeUnit.SECONDS)
                .untilAsserted(() -> assertThat(events).containsExactly(new WriteEvent("failed", RecordedData.RAW_DATA), new WriteEvent("recovered", RecordedData.RAW_DATA)));
         assertThat(RawDataRecorder.readAll(db)).isNotEmpty();
+    }
+
+    @Test
+    void rawDataThatStillCannotBeStoredAtStopIsReportedAsDropped() {
+        List<String> dropped = new CopyOnWriteArrayList<>();
+        session.addWriteListener(new WriteListener() {
+            @Override
+            public void writeFailed(RecordedData data, Exception cause) {
+            }
+
+            @Override
+            public void writeRecovered(RecordedData data) {
+            }
+
+            @Override
+            public void dataDropped(RecordedData data, int bytes) {
+                dropped.add(data + " " + bytes);
+            }
+        });
+        blockInserts("rawdata");
+        session.start(settings(0));
+        reader().push(DataHandlingMessageTestData.ping);
+        session.stop();
+        assertThat(dropped).containsExactly("RAW_DATA " + DataHandlingMessageTestData.ping.length);
+        assertThat(RawDataRecorder.readAll(db)).isEmpty();
     }
 
     @Test

@@ -584,17 +584,24 @@ class AppControllerTest {
             recordPing(recording, consumers);
             assertThat(recording.warnings()).singleElement().satisfies(w -> {
                 assertThat(w.text()).isEqualTo("Recorded data could not be stored");
-                assertThat(w.details()).startsWith("Raw data could not be stored: ").contains("disk full");
+                assertThat(w.details()).startsWith("Raw data could not be stored: ").contains("disk full")
+                                       .endsWith("(7 bytes were lost when the recording stopped)");
             });
             assertThat(log).anySatisfy(line -> assertThat(line).startsWith("Raw data could not be stored: ").contains("disk full"));
+            assertThat(log).contains("Raw data: 7 bytes could not be stored and were lost when the recording stopped");
 
             assertThat(recording.save()).isTrue();
             assertThat(recording.warnings()).as("saved, but the raw data is still missing").hasSize(1);
 
+            recordPing(recording, consumers);
+            assertThat(recording.warnings()).as("losses of several recordings add up").singleElement()
+                                            .satisfies(w -> assertThat(w.details()).contains("(14 bytes were lost when the recording stopped)"));
+
             execute(recording, "DROP TRIGGER block_rawdata");
             recordPing(recording, consumers);
-            assertThat(recording.warnings()).as("stored again, but not saved yet").singleElement()
-                                            .satisfies(w -> assertThat(w.details()).contains("stored again"));
+            assertThat(recording.warnings()).as("stored again, but not saved yet; the lost bytes stay lost").singleElement()
+                                            .satisfies(w -> assertThat(w.details()).contains("(14 bytes were lost when the recording stopped)")
+                                                                                   .contains("stored again"));
 
             assertThat(recording.save()).isTrue();
             assertThat(recording.warnings()).isEmpty();

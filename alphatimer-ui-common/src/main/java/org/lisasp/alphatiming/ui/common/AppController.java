@@ -401,6 +401,13 @@ public final class AppController implements AutoCloseable {
                 writeFailures.storedAgain(data);
                 fireChange();
             }
+
+            @Override
+            public void dataDropped(RecordedData data, int bytes) {
+                writeFailures.dropped(data, bytes);
+                announce(WriteFailures.describeDropped(data, bytes));
+                fireChange();
+            }
         });
         doc.addDirtyListener(dirty -> {
             if (!dirty) {

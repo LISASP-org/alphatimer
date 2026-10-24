@@ -10,6 +10,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 @Slf4j
 public final class RawDataRecorder implements ByteConsumer, AutoCloseable {
@@ -19,19 +20,27 @@ public final class RawDataRecorder implements ByteConsumer, AutoCloseable {
     private final int flushBytes;
     private final Consumer<RuntimeException> onError;
     private final Runnable onStored;
+    private final IntConsumer onDropped;
     private final ScheduledExecutorService flusher;
 
     private final Object lock = new Object();
     private ByteArrayOutputStream buffer = new ByteArrayOutputStream();
     private boolean failing;
+    private boolean closed;
+    private boolean refusalLogged;
 
-    /** Bytes that cannot be stored stay buffered until the store works again; only the first failure in a row is reported. */
-    public RawDataRecorder(TimingDatabase db, DateTimeFacade time, int flushBytes, long flushMillis, Consumer<RuntimeException> onError, Runnable onStored) {
+    /**
+     * Bytes that cannot be stored stay buffered until the store works again; only the first failure in a row is reported.
+     * Bytes still unstored when it closes are discarded and their number goes to {@code onDropped}.
+     */
+    public RawDataRecorder(TimingDatabase db, DateTimeFacade time, int flushBytes, long flushMillis, Consumer<RuntimeException> onError, Runnable onStored,
+                           IntConsumer onDropped) {
         this.db = db;
         this.time = time;
         this.flushBytes = flushBytes;
         this.onError = onError;
         this.onStored = onStored;
+        this.onDropped = onDropped;
         this.flusher = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "raw-data-flusher");
             t.setDaemon(true);
@@ -43,6 +52,10 @@ public final class RawDataRecorder implements ByteConsumer, AutoCloseable {
     @Override
     public void accept(byte b) {
         synchronized (lock) {
+            if (closed) {
+                refuse();
+                return;
+            }
             buffer.write(b);
             if (buffer.size() >= flushBytes) {
                 flush();
@@ -77,6 +90,13 @@ public final class RawDataRecorder implements ByteConsumer, AutoCloseable {
         }
     }
 
+    private void refuse() {
+        if (!refusalLogged) {
+            refusalLogged = true;
+            log.warn("Raw data arrived after the recording stopped; it is not recorded.");
+        }
+    }
+
     int bufferedBytes() {
         synchronized (lock) {
             return buffer.size();
@@ -86,7 +106,20 @@ public final class RawDataRecorder implements ByteConsumer, AutoCloseable {
     @Override
     public void close() {
         flusher.shutdownNow();
-        flush();
+        synchronized (lock) {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            flush();
+            int dropped = buffer.size();
+            if (dropped == 0) {
+                return;
+            }
+            buffer = new ByteArrayOutputStream();
+            log.warn("Discarding {} bytes of raw data that could not be stored.", dropped);
+            onDropped.accept(dropped);
+        }
     }
 
     public static List<byte[]> readAll(TimingDatabase db) {
