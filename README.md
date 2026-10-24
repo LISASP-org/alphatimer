@@ -28,7 +28,8 @@ java -jar alphatimer-ui/target/alphatiming.jar
 1. **Settings & Recording** panel: choose the input in the *Connection type* list:
    - **TCP** (host/port of the timekeeping system),
    - **Serial port** (port from the list or typed, protocol ARES21 = 9600 baud 7E1 or Quantum = 9600 baud 8N1, as in
-     AlphaServer). If the port is lost (e.g. the USB adapter is unplugged), the recording stops, keeps what it recorded
+     AlphaServer). Port names longer than 48 bytes are not offered and cannot be recorded, since the serial driver
+     cannot open them; use a shorter path or link. If the port is lost (e.g. the USB adapter is unplugged), the recording stops, keeps what it recorded
      and the status bar warns until the recording is started again by hand; TCP reconnects by itself instead,
    - **File replay**: a pure binary data file (e.g. a recorded `.serial` file) or another AlphaTiming project (`.timing`,
      its stored raw data is used). The data is replayed at 9600 baud (960 bytes per second) and the recording stops by

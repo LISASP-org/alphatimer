@@ -126,6 +126,7 @@ public final class RecordingSession implements AutoCloseable {
                 case IN_USE -> RecordingError.Kind.SERIAL_PORT_IN_USE;
                 case UNAVAILABLE -> RecordingError.Kind.SERIAL_UNAVAILABLE;
                 case OPEN_FAILED -> RecordingError.Kind.SERIAL_OPEN_FAILED;
+                case NAME_TOO_LONG -> RecordingError.Kind.SERIAL_PORT_NAME_TOO_LONG;
             };
             return new RecordingError(kind, serial.port());
         }

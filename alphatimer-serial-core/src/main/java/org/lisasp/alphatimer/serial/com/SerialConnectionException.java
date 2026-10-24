@@ -2,7 +2,7 @@ package org.lisasp.alphatimer.serial.com;
 
 public class SerialConnectionException extends RuntimeException {
 
-    public enum Reason { NOT_FOUND, IN_USE, UNAVAILABLE, OPEN_FAILED }
+    public enum Reason { NOT_FOUND, IN_USE, UNAVAILABLE, OPEN_FAILED, NAME_TOO_LONG }
 
     private final String port;
     private final Reason reason;

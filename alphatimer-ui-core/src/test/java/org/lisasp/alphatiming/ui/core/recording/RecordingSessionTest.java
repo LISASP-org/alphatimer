@@ -13,6 +13,7 @@ import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatimer.serial.com.NrSerialReader;
+import org.lisasp.alphatimer.serial.com.SerialPorts;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
@@ -411,6 +412,17 @@ class RecordingSessionTest {
         assertThat(real.error().kind()).isEqualTo(RecordingError.Kind.SERIAL_PORT_NOT_FOUND);
         assertThat(real.error().detail()).isEqualTo("/dev/does-not-exist-42");
         real.close();
+    }
+
+    @Test
+    void aSerialPortNameTooLongForTheDriverEndsInTheErrorState() {
+        String name = "/dev/" + "x".repeat(SerialPorts.MAX_NAME_BYTES);
+        RecordingSession guarded = new RecordingSession(db, s -> new NrSerialReader(name, SerialMode.ARES21.configuration()), () -> LocalDateTime.now());
+        guarded.start(new Settings(ConnectionType.SERIAL, "", 1, "COM3", SerialMode.ARES21, 60, 1999, false).withCompetitionKey("WK"));
+        assertThat(guarded.state()).isEqualTo(RecordingState.ERROR);
+        assertThat(guarded.error().kind()).isEqualTo(RecordingError.Kind.SERIAL_PORT_NAME_TOO_LONG);
+        assertThat(guarded.error().detail()).isEqualTo(name);
+        guarded.close();
     }
 
     @Test

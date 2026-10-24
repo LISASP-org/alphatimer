@@ -12,6 +12,7 @@ public record RecordingError(Kind kind, String detail, List<SettingsProblem> pro
         REST_PORT,
         SERIAL_PORT_NOT_FOUND,
         SERIAL_PORT_IN_USE,
+        SERIAL_PORT_NAME_TOO_LONG,
         SERIAL_UNAVAILABLE,
         SERIAL_OPEN_FAILED,
         REPLAY_FILE_NOT_FOUND,

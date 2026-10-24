@@ -3,7 +3,9 @@ package org.lisasp.alphatiming.ui.common;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.lisasp.alphatimer.serial.com.SerialPorts;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
+import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
 import java.util.Locale;
@@ -57,6 +59,15 @@ class SettingsFormRulesTest {
 
         assertThat(rules.recordEnabled()).isFalse();
         assertThat(rules.recordHint()).contains("TCP host must not be empty");
+    }
+
+    @Test
+    void aSerialPortNameTooLongForTheDriverCannotBeRecorded() {
+        Settings serial = TCP.withConnectionType(ConnectionType.SERIAL).withSerial("/dev/" + "x".repeat(SerialPorts.MAX_NAME_BYTES), SerialMode.ARES21);
+        SettingsFormRules rules = SettingsFormRules.of(serial, false, true);
+
+        assertThat(rules.recordEnabled()).isFalse();
+        assertThat(rules.recordHint()).contains("Serial port name is too long for the serial driver; use a shorter path");
     }
 
     @Test

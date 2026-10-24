@@ -54,6 +54,9 @@ public final class NrSerialReader implements SerialPortReader {
         if (port != null) {
             return;
         }
+        if (!SerialPorts.fitsDriver(portName)) {
+            throw new SerialConnectionException(portName, SerialConnectionException.Reason.NAME_TOO_LONG, null);
+        }
         SerialPort opened = null;
         try {
             opened = (SerialPort) find().open("AlphaTiming", OPEN_TIMEOUT_MILLIS);

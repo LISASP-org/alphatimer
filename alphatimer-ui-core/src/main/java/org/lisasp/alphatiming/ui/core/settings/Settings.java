@@ -1,5 +1,7 @@
 package org.lisasp.alphatiming.ui.core.settings;
 
+import org.lisasp.alphatimer.serial.com.SerialPorts;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -80,6 +82,8 @@ public record Settings(ConnectionType connectionType,
             case SERIAL -> {
                 if (serialPort.isBlank()) {
                     problems.add(SettingsProblem.SERIAL_PORT_MISSING);
+                } else if (!SerialPorts.fitsDriver(serialPort)) {
+                    problems.add(SettingsProblem.SERIAL_PORT_NAME_TOO_LONG);
                 }
             }
             case FILE -> {

@@ -109,6 +109,9 @@ at program start load the project off the EDT while the window is disabled; thei
 
 - Invalid/garbled device data: handled by the copied parsers (dropped messages are logged, never fatal).
 - Connection loss over TCP: reader reconnects with back-off; the state shows "disconnected"; recording remains RUNNING.
+- Serial port names longer than the driver accepts (`SerialPorts.MAX_NAME_BYTES`; nrjavaserial aborts the JVM on
+  longer ones): rejected by the settings validation, refused by the reader before nrjavaserial sees them, not offered in
+  the port list.
 - Connection loss of a serial port (read error, port vanished): the reader closes the port and the recording stops
   (STOPPED, everything recorded is kept); a status-bar warning stays until the recording is started again. No automatic
   reconnect.

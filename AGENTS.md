@@ -129,6 +129,9 @@ untrusted input:
 - Settings are validated by `Settings.validate()` (a list of `SettingsProblem`) before a recording starts; the UI surfaces the first problem at the
   fields and a failing start ends in the ERROR state, never in an exception dialog.
 - A serial port that is missing or in use ends the start in the ERROR state (`SerialConnectionException`), never in a crash.
+- nrjavaserial aborts the whole JVM natively on a port name of 54 bytes or more. Every name passes
+  `SerialPorts.fitsDriver` (`MAX_NAME_BYTES`) before nrjavaserial sees it: `Settings.validate()`, `NrSerialReader.start()`
+  and `SerialPorts.list()` reject longer ones. Never let a test open such a name inside the test JVM.
 - Bytes from the device are validated by the copied parsers; unknown or garbled data is dropped and logged, never fatal.
 - Files from disk are checked before use (`TimingDatabase.openCopy`, `DefaultSettingsStore.load`).
 - The REST server is intentionally without authentication: it serves read-only heat data to JAuswertung on the local
