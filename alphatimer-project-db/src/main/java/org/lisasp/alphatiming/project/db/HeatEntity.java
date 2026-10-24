@@ -1,9 +1,8 @@
 package org.lisasp.alphatiming.project.db;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -35,7 +34,7 @@ public class HeatEntity {
     private String competition;
     private int event;
     private int heatNumber;
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = EnumNameConverters.HeatStatusConverter.class)
     private HeatStatus status;
     private LocalDateTime started;
     private LocalDateTime ended;

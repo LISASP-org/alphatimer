@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [Enum columns carry CHECK constraints that are never updated](enum-check-constraints.md) | High | M | A new enum value makes inserts into older project files fail |
 | [TcpReader does not wait for its thread on close](tcp-reader-close-does-not-join.md) | Medium | S | Up to 511 raw bytes can be lost at stop; a connect can race with `close()` |
 | [New and Open stop a running recording without asking](new-open-stop-recording-silently.md) | Medium | S | An accidental New/Open ends the recording, even when the user cancels |
 | [Save in the Swing UI does not add the file extension](swing-save-without-extension.md) | Medium | S | Projects saved without `.timing` are hidden by the Open dialog |

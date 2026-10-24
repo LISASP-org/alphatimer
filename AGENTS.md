@@ -79,6 +79,15 @@ that solve problems this application does not have:
   loadable; `hbm2ddl=update` only adds, it never migrates data. Renaming or removing a column or table requires an
   explicit migration. Prove compatibility with a test that opens a fixture file created by the previous version
   (`alphatimer-ui-core/src/test/resources`).
+- Explicit migrations are `MigrationStep`s in `SchemaMigrations` (`alphatimer-project-db`). The schema version is SQLite's
+  `user_version`: 0 for files of the first versions, otherwise the number of steps applied; `VACUUM INTO` keeps it. Opening
+  (`openCopy`, `adopt`) runs every step above the file's version on the work copy, each in its own transaction, before
+  Hibernate's `update` sees the file; a new file is created with the current version and gets no step. To add a step,
+  append it to `SchemaMigrations.STEPS` (never reorder or change a released step) and extend the fixture test. SQLite
+  cannot drop a constraint or a column with ALTER TABLE; such a step rebuilds the table with `TableRebuild`.
+- Enum attributes are stored as their name through an `EnumNameConverter` (`EnumNameConverters`), never with
+  `@Enumerated`: Hibernate writes a CHECK with the enum's values for `@Enumerated`, so a value added later could not be
+  stored in existing files. Files of the first versions have such CHECKs; step 1 (`RemoveCheckConstraints`) removes them.
 - The settings of the last opened/saved project are kept in `~/.alphatiming/defaults.json` (`DefaultSettingsStore`);
   unknown or corrupt content falls back to the built-in defaults.
 - A project holds exactly one competition. Its key is a setting (`Settings.competitionKey`, the `competitionKey` column of

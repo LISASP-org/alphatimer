@@ -46,12 +46,17 @@ public final class ProjectDatabase implements AutoCloseable {
 
     private LockFile workLock;
 
-    private ProjectDatabase(Path workFile) throws IOException {
+    private ProjectDatabase(Path workFile, boolean isNew) throws IOException {
         this.workFile = workFile;
         acquireLock();
         try {
+            if (isNew) {
+                SchemaMigrations.initialize(workFile);
+            } else {
+                SchemaMigrations.migrate(workFile);
+            }
             this.factory = buildFactory(workFile);
-        } catch (RuntimeException ex) {
+        } catch (IOException | RuntimeException ex) {
             releaseLock();
             throw ex;
         }
@@ -85,7 +90,7 @@ public final class ProjectDatabase implements AutoCloseable {
 
     public static ProjectDatabase createNew(Path workDir) throws IOException {
         Files.createDirectories(workDir);
-        return new ProjectDatabase(newWorkFile(workDir));
+        return new ProjectDatabase(newWorkFile(workDir), true);
     }
 
     public static ProjectDatabase openCopy(Path projectFile, Path workDir) throws IOException {
@@ -95,7 +100,7 @@ public final class ProjectDatabase implements AutoCloseable {
         try {
             Files.copy(projectFile, work, StandardCopyOption.REPLACE_EXISTING);
             checkIsProjectDatabase(work, projectFile);
-            return new ProjectDatabase(work);
+            return new ProjectDatabase(work, false);
         } catch (IOException | RuntimeException ex) {
             discard(work);
             throw ex instanceof IOException io ? io : new InvalidProjectFileException(projectFile, ex);
@@ -103,7 +108,7 @@ public final class ProjectDatabase implements AutoCloseable {
     }
 
     public static ProjectDatabase adopt(Path workFile) throws IOException {
-        return new ProjectDatabase(workFile);
+        return new ProjectDatabase(workFile, false);
     }
 
     private static Path newWorkFile(Path workDir) {

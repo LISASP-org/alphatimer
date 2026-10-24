@@ -126,6 +126,38 @@ class ProjectDatabaseTest {
     }
 
     @Test
+    void aNewProjectHasNoCheckConstraintsAndTheCurrentSchemaVersion() throws Exception {
+        try (ProjectDatabase db = ProjectDatabase.createNew(dir);
+             var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + db.workFile());
+             var st = connection.createStatement()) {
+            List<String> tables = new ArrayList<>();
+            try (var rs = st.executeQuery("select sql from sqlite_master where type = 'table' and sql like '%check%'")) {
+                while (rs.next()) {
+                    tables.add(rs.getString(1));
+                }
+            }
+            assertThat(tables).isEmpty();
+            try (var rs = st.executeQuery("pragma user_version")) {
+                assertThat(rs.getInt(1)).isEqualTo(SchemaMigrations.CURRENT_VERSION);
+            }
+        }
+    }
+
+    @Test
+    void aSavedProjectKeepsItsSchemaVersion() throws Exception {
+        Path file = dir.resolve("a.timing");
+        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+            db.snapshotTo(file);
+            db.closeAndDelete();
+        }
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + file);
+             var st = connection.createStatement();
+             var rs = st.executeQuery("pragma user_version")) {
+            assertThat(rs.getInt(1)).isEqualTo(SchemaMigrations.CURRENT_VERSION);
+        }
+    }
+
+    @Test
     void openRejectsNonSqliteFileAndCreatesNoWorkFile() throws Exception {
         Path bad = dir.resolve("bad.heat");
         Files.writeString(bad, "this is not a database");

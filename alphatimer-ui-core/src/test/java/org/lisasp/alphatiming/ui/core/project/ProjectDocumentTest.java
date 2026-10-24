@@ -20,6 +20,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -248,6 +256,81 @@ class ProjectDocumentTest {
         try (ProjectDocument doc = ProjectDocument.open(dir.resolve("resaved.heat"), work())) {
             assertThat(doc.settings().tcpHost()).isEqualTo("other");
             assertThat(new HeatStore(doc.database()).findRecent(1).get(0).competition()).isEqualTo("TestWK");
+        }
+    }
+
+    private static final List<String> FIRST_VERSION_TABLES = List.of("settings", "rawdata", "aresmessage", "lanetime", "heat", "lane");
+
+    private static Map<String, List<List<Object>>> contentOf(Path file, Map<String, List<String>> columns) throws SQLException {
+        Map<String, List<List<Object>>> content = new LinkedHashMap<>();
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + file); var st = connection.createStatement()) {
+            for (var table : columns.entrySet()) {
+                List<List<Object>> rows = new ArrayList<>();
+                try (var rs = st.executeQuery("select " + String.join(", ", table.getValue()) + " from " + table.getKey() + " order by id")) {
+                    while (rs.next()) {
+                        List<Object> row = new ArrayList<>();
+                        for (int i = 1; i <= table.getValue().size(); i++) {
+                            Object value = rs.getObject(i);
+                            row.add(value instanceof byte[] bytes ? HexFormat.of().formatHex(bytes) : value);
+                        }
+                        rows.add(row);
+                    }
+                }
+                content.put(table.getKey(), rows);
+            }
+        }
+        return content;
+    }
+
+    private static Map<String, List<String>> columnsOf(Path file) throws SQLException {
+        Map<String, List<String>> columns = new LinkedHashMap<>();
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + file); var st = connection.createStatement()) {
+            for (String table : FIRST_VERSION_TABLES) {
+                List<String> names = new ArrayList<>();
+                try (var rs = st.executeQuery("select name from pragma_table_info('" + table + "')")) {
+                    while (rs.next()) {
+                        names.add(rs.getString(1));
+                    }
+                }
+                columns.put(table, names);
+            }
+        }
+        return columns;
+    }
+
+    private static List<String> schemaOf(Path file) throws SQLException {
+        List<String> sql = new ArrayList<>();
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + file); var st = connection.createStatement();
+             var rs = st.executeQuery("select sql from sqlite_master where sql is not null")) {
+            while (rs.next()) {
+                sql.add(rs.getString(1));
+            }
+        }
+        return sql;
+    }
+
+    @Test
+    void projectFileOfTheFirstVersionLosesItsEnumChecksAndKeepsItsData() throws Exception {
+        Path file = Files.copy(Path.of("src/test/resources/compat/first-version.heat"), dir.resolve("first-version.heat"));
+        Map<String, List<String>> columns = columnsOf(file);
+        Map<String, List<List<Object>>> before = contentOf(file, columns);
+        assertThat(schemaOf(file)).anyMatch(sql -> sql.contains("check"));
+
+        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+            Path workFile = doc.database().workFile();
+            assertThat(schemaOf(workFile)).noneMatch(sql -> sql.toLowerCase(Locale.ROOT).contains("check"));
+            assertThat(contentOf(workFile, columns)).isEqualTo(before);
+
+            doc.database().write(em -> {
+                em.createNativeQuery("update heat set status = 'NewStatus'").executeUpdate();
+                em.createNativeQuery("update lane set penalty = 'NewPenalty', status = 'NewStatus'").executeUpdate();
+                em.createNativeQuery("update aresmessage set messageType = 'New', kindOfTime = 'New', timeType = 'New', rankInfo = 'New', timeInfo = 'New', timeMarker = 'New'").executeUpdate();
+                em.createNativeQuery("insert into lanetime (event, heatNumber, laneIndex, timeInMillis, status) values (1, 1, 0, 0, 'New')").executeUpdate();
+                return null;
+            });
+            assertThat(contentOf(workFile, Map.of("heat", List.of("status"), "lanetime", List.of("status"))))
+                    .containsEntry("heat", List.of(List.of("NewStatus")))
+                    .containsEntry("lanetime", List.of(List.of("New")));
         }
     }
 
