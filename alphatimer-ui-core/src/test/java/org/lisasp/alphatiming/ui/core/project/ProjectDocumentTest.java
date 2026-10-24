@@ -206,6 +206,34 @@ class ProjectDocumentTest {
     }
 
     @Test
+    void aFailedRecoveryReleasesEverythingAndKeepsTheLeftover() throws Exception {
+        Path file = savedProject("x.timing");
+        Path leftover = leftoverOf(file);
+        corruptSettingsTable(leftover);
+        assertThatThrownBy(() -> ProjectDocument.recover(leftover)).isInstanceOf(RuntimeException.class);
+        assertThat(ProjectDocument.findRecoverable(work())).singleElement()
+                                                           .satisfies(l -> assertThat(l.workFile()).isEqualTo(leftover))
+                                                           .satisfies(l -> assertThat(l.projectFile()).contains(file));
+        ProjectDocument.open(file, work()).close();
+        ProjectDocument.discard(leftover);
+        assertThat(workFiles()).isZero();
+    }
+
+    /** Leaves the schema intact, so adopting the work file succeeds and only reading the settings fails. */
+    private static void corruptSettingsTable(Path workFile) throws Exception {
+        long offset;
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + workFile); var st = connection.createStatement();
+             var page = st.executeQuery("select rootpage, (select page_size from pragma_page_size) from sqlite_master where name = 'settings'")) {
+            offset = (page.getLong(1) - 1) * page.getLong(2);
+        }
+        try (var channel = java.nio.channels.FileChannel.open(workFile, java.nio.file.StandardOpenOption.WRITE)) {
+            byte[] garbage = new byte[512];
+            java.util.Arrays.fill(garbage, (byte) 0x7f);
+            channel.write(java.nio.ByteBuffer.wrap(garbage), offset);
+        }
+    }
+
+    @Test
     void workFilesOfOpenDocumentsAreNotOfferedForRecovery() throws Exception {
         try (ProjectDocument live = ProjectDocument.create(work(), SETTINGS)) {
             assertThat(ProjectDocument.findRecoverable(work())).isEmpty();

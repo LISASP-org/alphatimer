@@ -75,10 +75,11 @@ public final class AppController implements AutoCloseable {
                 case RECOVER -> {
                     try {
                         install(ProjectDocument.recover(leftover.workFile()));
+                        return;
                     } catch (IOException | RuntimeException ex) {
-                        prompt.showError(I18n.get("error.recovery.title"), describe(ex));
+                        log.warn("Could not recover {}", leftover.workFile().getFileName(), ex);
+                        prompt.showError(I18n.get("error.recovery.title"), I18n.get("error.recovery.message", describe(ex)));
                     }
-                    return;
                 }
                 case DISCARD -> {
                     if (prompt.confirmDiscard(leftover)) {

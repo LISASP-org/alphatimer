@@ -439,6 +439,23 @@ class AppControllerTest {
     }
 
     @Test
+    void aLeftoverThatCannotBeRecoveredIsOfferedAgain() throws Exception {
+        Path leftover = Files.writeString(work.resolve("heat-broken" + ProjectDatabase.WORK_FILE_SUFFIX), "not a database");
+        prompt.recoveries.add(SavePrompt.RecoveryChoice.RECOVER);
+        prompt.recoveries.add(SavePrompt.RecoveryChoice.DISCARD);
+        prompt.discards.add(true);
+        controller.init();
+        assertThat(events).containsExactly("askRecover", "askRecover", "confirmDiscard");
+        String[] message = I18n.get("error.recovery.message", "|").split("\\|");
+        assertThat(prompt.errors).singleElement().asString()
+                                 .startsWith(I18n.get("error.recovery.title") + ": " + message[0])
+                                 .endsWith(message[1]);
+        assertThat(prompt.leftovers).extracting(CrashLeftover::workFile).containsOnly(leftover);
+        assertThat(leftover).doesNotExist();
+        assertThat(controller.document()).isNotNull();
+    }
+
+    @Test
     void recoveryQuestionNamesTheProjectFileOfTheLeftover() throws Exception {
         Path file = dir.resolve("crashed.timing");
         try (ProjectDocument crashed = ProjectDocument.create(work, S)) {

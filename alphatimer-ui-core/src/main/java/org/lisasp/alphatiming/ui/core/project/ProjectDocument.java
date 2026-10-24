@@ -121,16 +121,22 @@ public final class ProjectDocument implements AutoCloseable {
     /**
      * Re-opens a work file left behind by a crash as a dirty document. It keeps its project file only while that file
      * is free and unchanged since the crashed session last opened or saved it; otherwise Save would overwrite newer data.
+     * If recovering fails, the work file stays a leftover that can be recovered or discarded later.
      */
     public static ProjectDocument recover(Path workFile) throws IOException {
         Optional<WorkFileOrigin> origin = WorkFileOrigin.read(workFile).filter(WorkFileOrigin::isUnchanged);
         Optional<LockFile> lock = origin.isPresent() ? LockFile.tryAcquire(LockFile.besides(origin.get().projectFile())) : Optional.empty();
         Path file = lock.isPresent() ? origin.get().projectFile() : null;
+        ProjectDatabase db = null;
         try {
-            ProjectDocument doc = new ProjectDocument(ProjectDatabase.adopt(workFile), file, lock.orElse(null));
+            db = ProjectDatabase.adopt(workFile);
+            ProjectDocument doc = new ProjectDocument(db, file, lock.orElse(null));
             doc.touch();
             return doc;
         } catch (IOException | RuntimeException ex) {
+            if (db != null) {
+                db.close();
+            }
             lock.ifPresent(LockFile::closeAndDelete);
             throw ex;
         }
