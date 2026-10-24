@@ -145,7 +145,9 @@ untrusted input:
   of all front ends; add a new front end to its list). A key built
   dynamically (`"problem." + name`) needs its family enumerated in that test.
 - Never put UI text into `alphatimer-ui-core`: core reports problems as data (`SettingsProblem`, `RecordingError`,
-  `SerialConnectionException.Reason`, `InvalidProjectFileException`) and the UI describes them with `I18n.describe(…)`.
+  `RecordedData`, `SerialConnectionException.Reason`, `InvalidProjectFileException`, `ProjectFileInUseException`) and
+  `alphatimer-ui-common` turns them into text — with `I18n.describe(…)`, or for the project-file exceptions in
+  `AppController`, which catches them by type.
 - Numbers shown to the user follow the locale (`TimeFormat` uses the locale's decimal separator).
 
 ## Documentation and Issues
