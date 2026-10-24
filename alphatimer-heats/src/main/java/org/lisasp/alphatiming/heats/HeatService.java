@@ -93,22 +93,33 @@ public final class HeatService implements Consumer<RefinedMessage> {
                 return;
             }
             HeatDto after = heat.createDto();
-            if (!after.equals(before)) {
-                if (stored.isPresent()) {
-                    store.save(after);
-                } else {
-                    store.create(after);
-                }
-                LiveHeats shown = live;
-                HeatDto previous = shown.current() != null && !sameHeat(shown.current(), after) ? shown.current() : shown.previous();
-                after.lanes().stream().filter(l -> l.status() == LaneStatus.Used).forEach(l -> usedLanes.add(l.number()));
-                live = new LiveHeats(after, previous, usedLanes);
-                LiveHeats announced = live;
-                listeners.forEach(l -> l.accept(announced));
+            if (after.equals(before)) {
+                return;
             }
+            if (stored.isPresent()) {
+                store.save(after);
+            } else {
+                store.create(after);
+            }
+            LiveHeats shown = live;
+            HeatDto previous = shown.current() != null && !sameHeat(shown.current(), after) ? shown.current() : shown.previous();
+            after.lanes().stream().filter(l -> l.status() == LaneStatus.Used).forEach(l -> usedLanes.add(l.number()));
+            live = new LiveHeats(after, previous, usedLanes);
         } catch (RuntimeException ex) {
             log.warn("Could not apply message '{}'.", message, ex);
             onError.accept(ex);
+            return;
+        }
+        announce(live);
+    }
+
+    private void announce(LiveHeats heats) {
+        for (Consumer<LiveHeats> listener : listeners) {
+            try {
+                listener.accept(heats);
+            } catch (RuntimeException ex) {
+                log.warn("Heat listener failed", ex);
+            }
         }
     }
 }

@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [Errors of heat listeners are reported as processing errors](listener-errors-as-processing-errors.md) | Low | S | A failing UI listener looks like a data problem |
 | [Looking for crash leftovers takes the work file locks](leftover-scan-takes-locks.md) | Low | S | A document opened at that moment could fail to get its lock |
 | [The status refresh reads the database on the EDT](refresh-reads-database-on-edt.md) | Low | S | The window waits briefly behind writes every second |
 | [Lanes have no foreign key to their heat](missing-foreign-keys.md) | Low | M | The SQLite dialect drops foreign and multi-column keys; other entities unchecked |
