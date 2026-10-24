@@ -19,16 +19,29 @@ import org.lisasp.alphatiming.ui.core.settings.Settings;
 import org.lisasp.alphatiming.ui.core.settings.SettingsProblem;
 
 import javax.swing.AbstractButton;
+import javax.swing.JButton;
+import javax.swing.JDialog;
 import javax.swing.JToggleButton;
 import javax.swing.SwingUtilities;
 import java.awt.Component;
+import java.awt.Container;
+import java.awt.Cursor;
 import java.awt.GraphicsEnvironment;
+import java.awt.Window;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 class JAlphaTimingSmokeTest {
 
@@ -446,6 +459,180 @@ class JAlphaTimingSmokeTest {
             });
         } finally {
             shutDown(controller, holder[0]);
+        }
+    }
+
+    private static void onEdtWithin(Runnable r) throws Exception {
+        FutureTask<Void> task = new FutureTask<>(r, null);
+        SwingUtilities.invokeLater(task);
+        task.get(5, TimeUnit.SECONDS);
+    }
+
+    private static Path savedProject(Path dir, String name) throws Exception {
+        Path file = dir.resolve(name);
+        try (ProjectDocument saved = ProjectDocument.create(Files.createDirectories(dir.resolve("saving")), Settings.defaults())) {
+            saved.saveAs(file);
+        }
+        return file;
+    }
+
+    private static Optional<JDialog> shownDialog(String title) {
+        return Arrays.stream(Window.getWindows())
+                     .filter(JDialog.class::isInstance)
+                     .map(JDialog.class::cast)
+                     .filter(d -> d.isShowing() && title.equals(d.getTitle()))
+                     .findFirst();
+    }
+
+    @Test
+    void openingLoadsInTheBackgroundWhileTheWindowIsDisabled() throws Exception {
+        Assumptions.assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display (run with xvfb-run)");
+        Path work = Files.createDirectories(dir.resolve("work9"));
+        Path file = savedProject(dir, "opened.timing");
+        AtomicBoolean holdNextLoad = new AtomicBoolean();
+        CountDownLatch loading = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        SwingSavePrompt prompt = new SwingSavePrompt();
+        AppController controller = new AppController(work, new DefaultSettingsStore(dir.resolve("d9.json")), prompt, () -> {
+            if (holdNextLoad.getAndSet(false)) {
+                loading.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            return s -> new SerialPortReader() {
+                @Override
+                public SerialPortReader register(ByteConsumer listener) {
+                    return this;
+                }
+
+                @Override
+                public void close() {
+                }
+            };
+        }, LocalDateTime::now);
+        JAlphaTiming[] holder = new JAlphaTiming[1];
+        onEdt(() -> {
+            controller.init();
+            holder[0] = new JAlphaTiming(controller, prompt);
+            holder[0].setVisible(true);
+        });
+        JAlphaTiming frame = holder[0];
+        try {
+            holdNextLoad.set(true);
+            SwingUtilities.invokeLater(() -> frame.open(file));
+            assertThat(loading.await(10, TimeUnit.SECONDS)).isTrue();
+
+            onEdtWithin(() -> {
+                assertThat(frame.isEnabled()).isFalse();
+                assertThat(frame.getCursor().getType()).isEqualTo(Cursor.WAIT_CURSOR);
+            });
+
+            release.countDown();
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> onEdt(() -> {
+                assertThat(frame.isEnabled()).isTrue();
+                assertThat(frame.getCursor().getType()).isEqualTo(Cursor.DEFAULT_CURSOR);
+                assertThat(frame.getTitle()).contains("opened.timing");
+            }));
+        } finally {
+            release.countDown();
+            shutDown(controller, frame);
+        }
+    }
+
+    @Test
+    void aFailedOpenShowsTheErrorAndEnablesTheWindowAfterwards() throws Exception {
+        Assumptions.assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display (run with xvfb-run)");
+        Path work = Files.createDirectories(dir.resolve("work10"));
+        Path bad = Files.writeString(dir.resolve("bad.timing"), "not a project");
+        SwingSavePrompt prompt = new SwingSavePrompt();
+        AppController controller = new AppController(work, new DefaultSettingsStore(dir.resolve("d10.json")), prompt, () -> s -> new SerialPortReader() {
+            @Override
+            public SerialPortReader register(ByteConsumer listener) {
+                return this;
+            }
+
+            @Override
+            public void close() {
+            }
+        }, LocalDateTime::now);
+        JAlphaTiming[] holder = new JAlphaTiming[1];
+        onEdt(() -> {
+            controller.init();
+            holder[0] = new JAlphaTiming(controller, prompt);
+            holder[0].setVisible(true);
+        });
+        JAlphaTiming frame = holder[0];
+        ProjectDocument before = controller.document();
+        try {
+            SwingUtilities.invokeLater(() -> frame.open(bad));
+            String title = I18n.get("error.open.title");
+            await().atMost(Duration.ofSeconds(20)).until(() -> shownDialog(title).isPresent());
+
+            onEdtWithin(() -> assertThat(frame.isEnabled()).isFalse());
+
+            onEdt(() -> shownDialog(title).ifPresent(JDialog::dispose));
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> onEdt(() -> assertThat(frame.isEnabled()).isTrue()));
+            assertThat(controller.document()).isSameAs(before);
+        } finally {
+            onEdt(() -> shownDialog(I18n.get("error.open.title")).ifPresent(JDialog::dispose));
+            shutDown(controller, frame);
+        }
+    }
+
+    private static void click(Container container, String text) {
+        for (Component c : container.getComponents()) {
+            if (c instanceof JButton button && text.equals(button.getText())) {
+                button.doClick();
+                return;
+            }
+            if (c instanceof Container inner) {
+                click(inner, text);
+            }
+        }
+    }
+
+    @Test
+    void openingFirstAppliesTheTypedSettingsToTheProjectBeingLeft() throws Exception {
+        Assumptions.assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display (run with xvfb-run)");
+        Path work = Files.createDirectories(dir.resolve("work11"));
+        Path file = savedProject(dir, "other.timing");
+        SwingSavePrompt prompt = new SwingSavePrompt();
+        AppController controller = new AppController(work, new DefaultSettingsStore(dir.resolve("d11.json")), prompt, () -> s -> new SerialPortReader() {
+            @Override
+            public SerialPortReader register(ByteConsumer listener) {
+                return this;
+            }
+
+            @Override
+            public void close() {
+            }
+        }, LocalDateTime::now);
+        JAlphaTiming[] holder = new JAlphaTiming[1];
+        onEdt(() -> {
+            controller.init();
+            holder[0] = new JAlphaTiming(controller, prompt);
+            holder[0].setVisible(true);
+        });
+        JAlphaTiming frame = holder[0];
+        ProjectDocument before = controller.document();
+        String title = I18n.get("dialog.save.title");
+        try {
+            onEdt(() -> {
+                frame.settingsPanel().hostField().setText("typed-host");
+                frame.open(file);
+            });
+            await().atMost(Duration.ofSeconds(10)).until(() -> shownDialog(title).isPresent());
+            assertThat(before.settings().tcpHost()).isEqualTo("typed-host");
+
+            onEdt(() -> shownDialog(title).ifPresent(d -> click(d, I18n.get("button.cancel"))));
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> onEdt(() -> assertThat(frame.isEnabled()).isTrue()));
+            assertThat(controller.document()).isSameAs(before);
+        } finally {
+            onEdt(() -> shownDialog(title).ifPresent(JDialog::dispose));
+            shutDown(controller, frame);
         }
     }
 }

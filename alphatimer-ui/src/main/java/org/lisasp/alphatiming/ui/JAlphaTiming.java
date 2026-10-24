@@ -11,6 +11,7 @@ import de.df.jutils.gui.JButtonBar;
 import de.df.jutils.gui.border.BorderUtils;
 import de.df.jutils.gui.util.WindowUtils;
 import org.lisasp.alphatiming.heats.LiveHeats;
+import lombok.extern.slf4j.Slf4j;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
@@ -26,19 +27,24 @@ import javax.swing.JToggleButton;
 import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
 import javax.swing.Timer;
 import javax.swing.UIManager;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.nio.file.Path;
 import java.time.LocalTime;
+import java.util.concurrent.ExecutionException;
 
 /** JAuswertung-style layout: button bar on the left, the selected panel on the right, status bar at the bottom. */
+@Slf4j
 public final class JAlphaTiming extends JFrame {
 
     static final String SETTINGS_CARD = "settings";
@@ -60,6 +66,7 @@ public final class JAlphaTiming extends JFrame {
     private final Timer refreshTimer = new Timer(1000, e -> refresh());
     private final JMenuItem startItem = new JMenuItem(I18n.get("menu.start"));
     private final JMenuItem stopItem = new JMenuItem(I18n.get("menu.stop"));
+    private boolean documentWorkRunning;
 
     public JAlphaTiming(AppController controller, SwingSavePrompt prompt) {
         super(I18n.get("app.title"));
@@ -153,7 +160,7 @@ public final class JAlphaTiming extends JFrame {
     private JMenuBar createMenuBar() {
         int shortcut = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
         JMenu file = new JMenu(I18n.get("menu.file"));
-        file.add(item(I18n.get("menu.new"), KeyEvent.VK_N, shortcut, controller::newProject));
+        file.add(item(I18n.get("menu.new"), KeyEvent.VK_N, shortcut, () -> runDocumentWork(controller::newProject)));
         file.add(item(I18n.get("menu.open"), KeyEvent.VK_O, shortcut, this::open));
         file.addSeparator();
         file.add(item(I18n.get("menu.save"), KeyEvent.VK_S, shortcut, controller::save));
@@ -191,10 +198,55 @@ public final class JAlphaTiming extends JFrame {
     }
 
     private void open() {
-        prompt.askOpenPath().ifPresent(controller::open);
+        prompt.askOpenPath().ifPresent(this::open);
+    }
+
+    void open(Path file) {
+        runDocumentWork(() -> controller.open(file));
+    }
+
+    /**
+     * Runs work that replaces the document (building its session factory takes seconds) off the EDT. The window stays
+     * disabled and is not refreshed until it is done, because the document it shows may be closed meanwhile.
+     */
+    void runDocumentWork(Runnable work) {
+        if (documentWorkRunning) {
+            return;
+        }
+        documentWorkRunning = true;
+        settingsPanel.holdCommits();
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+        setEnabled(false);
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() {
+                work.run();
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                } catch (ExecutionException ex) {
+                    log.error("Replacing the document failed", ex.getCause());
+                } finally {
+                    documentWorkRunning = false;
+                    settingsPanel.releaseCommits();
+                    setCursor(null);
+                    setEnabled(true);
+                    refresh();
+                }
+            }
+        }.execute();
     }
 
     private void exit() {
+        if (documentWorkRunning) {
+            return;
+        }
         if (controller.requestClose()) {
             dispose();
             System.exit(0);
@@ -202,6 +254,9 @@ public final class JAlphaTiming extends JFrame {
     }
 
     void refresh() {
+        if (documentWorkRunning) {
+            return;
+        }
         AppStatus status = AppStatus.of(controller);
         setTitle(status.title());
         statusFile.setText(status.file());

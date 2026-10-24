@@ -13,4 +13,3 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [Saving and opening block the UI](saving-blocks-ui.md) | Low | M | Saving, opening and the 1 s refresh work on the EDT; `VACUUM INTO` of hours of raw data or building the session factory can freeze the window |

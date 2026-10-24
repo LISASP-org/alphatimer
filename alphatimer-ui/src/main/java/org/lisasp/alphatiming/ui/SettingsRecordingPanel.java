@@ -63,6 +63,7 @@ public final class SettingsRecordingPanel extends JPanel {
     private final JPanel connectionCards = new JPanel(new CardLayout());
 
     private boolean updating;
+    private boolean commitsHeld;
     private boolean portsLoaded;
 
     public SettingsRecordingPanel(AppController controller) {
@@ -241,11 +242,21 @@ public final class SettingsRecordingPanel extends JPanel {
     }
 
     private void commit() {
-        if (updating) {
+        if (updating || commitsHeld) {
             return;
         }
         controller.applySettingsIfChanged(readFields());
         refreshButtons();
+    }
+
+    /** Applies what is typed to the document being left; until released, the fields must not reach its successor. */
+    void holdCommits() {
+        commit();
+        commitsHeld = true;
+    }
+
+    void releaseCommits() {
+        commitsHeld = false;
     }
 
     /** Applies whatever is typed in the fields (even if never committed) and starts recording. */

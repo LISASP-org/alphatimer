@@ -29,8 +29,9 @@ public final class AlphaTimingLauncher {
             Path workDir = Path.of(System.getProperty("user.home"), ".alphatiming", "work");
             SwingSavePrompt prompt = new SwingSavePrompt();
             AppController controller = new AppController(workDir, DefaultSettingsStore.inUserHome(), prompt, RecordingSession::standard, new ActualDateTime());
-            controller.init();
-            new JAlphaTiming(controller, prompt).setVisible(true);
+            JAlphaTiming window = new JAlphaTiming(controller, prompt);
+            window.setVisible(true);
+            window.runDocumentWork(controller::init);
         });
     }
 }

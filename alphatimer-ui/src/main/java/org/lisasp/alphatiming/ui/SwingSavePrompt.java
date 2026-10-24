@@ -12,8 +12,13 @@ import org.lisasp.swing.filechooser.filefilter.SimpleFileFilter;
 
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.function.Supplier;
 
 public final class SwingSavePrompt implements SavePrompt {
 
@@ -22,6 +27,10 @@ public final class SwingSavePrompt implements SavePrompt {
 
     @Override
     public Choice askSaveChanges() {
+        return answerOnEdt(this::saveChangesDialog, Choice.CANCEL);
+    }
+
+    private Choice saveChangesDialog() {
         Object[] options = {I18n.get("button.save"), I18n.get("button.discard"), I18n.get("button.cancel")};
         int answer = JOptionPane.showOptionDialog(parent,
                                                   I18n.get("dialog.save.message"),
@@ -40,6 +49,10 @@ public final class SwingSavePrompt implements SavePrompt {
 
     @Override
     public boolean askStopRecording() {
+        return answerOnEdt(this::stopRecordingDialog, false);
+    }
+
+    private boolean stopRecordingDialog() {
         Object[] options = {I18n.get("button.stopRecording"), I18n.get("button.cancel")};
         int answer = JOptionPane.showOptionDialog(parent,
                                                   I18n.get("dialog.stopRecording.message"),
@@ -54,6 +67,10 @@ public final class SwingSavePrompt implements SavePrompt {
 
     @Override
     public Optional<Path> askSavePath() {
+        return answerOnEdt(this::savePathDialog, Optional.empty());
+    }
+
+    private Optional<Path> savePathDialog() {
         return ProjectFiles.chooseSavePath(() -> Optional.ofNullable(FileChooserUtils.saveFile(parent, projectFilter())).map(Path::of),
                                            path -> JOptionPane.showConfirmDialog(parent, I18n.get("dialog.overwrite.message", path.getFileName()), I18n.get("dialog.overwrite.title"), JOptionPane.YES_NO_OPTION)
                                                    == JOptionPane.YES_OPTION);
@@ -63,17 +80,41 @@ public final class SwingSavePrompt implements SavePrompt {
         return Optional.ofNullable(FileChooserUtils.openFile(parent, projectFilter())).map(Path::of);
     }
 
+    /** The controller asks from the thread that runs its document work; dialogs must be shown on the EDT. */
+    static <T> T answerOnEdt(Supplier<T> question, T ifInterrupted) {
+        if (SwingUtilities.isEventDispatchThread()) {
+            return question.get();
+        }
+        FutureTask<T> asked = new FutureTask<>(question::get);
+        try {
+            SwingUtilities.invokeAndWait(asked);
+            return asked.get();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return ifInterrupted;
+        } catch (InvocationTargetException | ExecutionException ex) {
+            throw ex.getCause() instanceof RuntimeException failure ? failure : new IllegalStateException("A dialog failed", ex.getCause());
+        }
+    }
+
     static SimpleFileFilter projectFilter() {
         return new SimpleFileFilter(I18n.get("file.filter"), ProjectFiles.EXTENSION, ProjectFiles.EARLIER_EXTENSION);
     }
 
     @Override
     public void showError(String title, String message) {
-        JOptionPane.showMessageDialog(parent, message, title, JOptionPane.ERROR_MESSAGE);
+        answerOnEdt(() -> {
+            JOptionPane.showMessageDialog(parent, message, title, JOptionPane.ERROR_MESSAGE);
+            return null;
+        }, null);
     }
 
     @Override
     public RecoveryChoice askRecover(CrashLeftover leftover) {
+        return answerOnEdt(() -> recoverDialog(leftover), RecoveryChoice.LATER);
+    }
+
+    private RecoveryChoice recoverDialog(CrashLeftover leftover) {
         Object[] options = {I18n.get("button.recover"), I18n.get("button.discard"), I18n.get("button.later")};
         int answer = JOptionPane.showOptionDialog(parent,
                                                   RecoveryTexts.question(leftover),
@@ -92,6 +133,10 @@ public final class SwingSavePrompt implements SavePrompt {
 
     @Override
     public boolean confirmDiscard(CrashLeftover leftover) {
+        return answerOnEdt(() -> discardDialog(leftover), false);
+    }
+
+    private boolean discardDialog(CrashLeftover leftover) {
         Object[] options = {I18n.get("button.delete"), I18n.get("button.back")};
         int answer = JOptionPane.showOptionDialog(parent,
                                                   RecoveryTexts.discardQuestion(leftover),

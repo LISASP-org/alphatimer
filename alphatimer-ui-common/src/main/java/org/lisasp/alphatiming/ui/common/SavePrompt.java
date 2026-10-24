@@ -5,7 +5,7 @@ import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
 import java.nio.file.Path;
 import java.util.Optional;
 
-/** The questions the controller has to ask the user; implemented with dialogs in the UI and with stubs in tests. */
+/** The questions the controller asks on the thread that calls it, which need not be the UI thread; implemented with dialogs in the UI and with stubs in tests. */
 public interface SavePrompt {
 
     enum Choice { SAVE, DISCARD, CANCEL }

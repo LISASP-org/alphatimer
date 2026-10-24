@@ -102,7 +102,8 @@ panel keeps updating while hidden.
 from the heat start timestamp (UI timer, ~100 ms repaint). Every live start signal restarts it (repeated results and corrected or deleted starts do not); it is frozen at the official end or as soon as every used lane has a final time or a penalty (captured data often lacks the official end). It can differ slightly from the
 device clock; the final time from the device is authoritative.
 
-All UI updates run on the EDT; pipeline callbacks marshal via `SwingUtilities.invokeLater`.
+All UI updates run on the EDT; pipeline callbacks marshal via `SwingUtilities.invokeLater`. New, Open and the recovery
+at program start load the project off the EDT while the window is disabled; their dialogs are still shown on the EDT.
 
 ## Error handling
 

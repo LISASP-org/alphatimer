@@ -63,8 +63,12 @@ that solve problems this application does not have:
   Cancel, Save As path, recovery) and until a discarded document is closed; `pause()` waits for a running auto-save.
 - An exception inside the recording pipeline must never reach the reader thread (`RecordingSession.safe`); a failing
   listener must not affect the others.
-- Long-running work (saving, opening) must not be added to the EDT without thought — saving copies the database under
-  its lock, opening builds the session factory (see `docs/issues/`).
+- Replacing the document (New, Open, the crash recovery at program start) builds a Hibernate session factory and takes
+  seconds, so the Swing UI runs these controller calls through `JAlphaTiming.runDocumentWork` on a `SwingWorker`: the
+  window stays disabled with a wait cursor, is not refreshed and holds the commits of the settings form until the work
+  is done (also after a failure). `SwingSavePrompt` hands each question to the EDT and waits for the answer, so the
+  controller may ask from that worker. The TUI and the CLI call the controller synchronously. Saving stays on the EDT;
+  it holds the database lock only for the `VACUUM INTO` of a small file. Do not add other long-running work to the EDT.
 - Every thread, socket, REST port and file lock that a recording or a document opens must be released on stop/close;
   start → stop → start must be repeatable.
 
