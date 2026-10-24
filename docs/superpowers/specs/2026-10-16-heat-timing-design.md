@@ -109,6 +109,8 @@ All UI updates run on the EDT; pipeline callbacks marshal via `SwingUtilities.in
 - Save failures (disk full, permissions): error dialog, document stays dirty, previous file untouched (atomic rename).
 - Corrupt/unknown project file on Open: error dialog, current document unchanged.
 - Auto-save failure: status-bar warning, retried at the next interval.
+- Write failure during a recording (raw data, messages, heats, lane times): status-bar warning naming the data and the
+  error; the other stores go on. It stays until that data is stored again and the project has been saved after that.
 
 ## Testing
 

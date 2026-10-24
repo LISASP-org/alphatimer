@@ -1,5 +1,6 @@
 package org.lisasp.alphatiming.ui.common;
 
+import org.lisasp.alphatiming.ui.core.recording.RecordedData;
 import org.lisasp.alphatiming.ui.core.recording.RecordingError;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
@@ -27,6 +28,10 @@ public final class I18n {
             return error.problems().stream().map(I18n::describe).collect(Collectors.joining("; "));
         }
         return get("error." + error.kind().name(), error.detail());
+    }
+
+    public static String describe(RecordedData data) {
+        return get("data." + data.name());
     }
 
     public static String label(ConnectionType type) {

@@ -4,6 +4,7 @@ import org.lisasp.alphatiming.project.db.MessageStore;
 import org.lisasp.alphatiming.project.db.RawDataRecorder;
 import lombok.extern.slf4j.Slf4j;
 import org.lisasp.alphatimer.api.ares.serial.DataHandlingMessageAggregator;
+import org.lisasp.alphatimer.api.ares.serial.DataHandlingMessageListener;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.Ping;
 import org.lisasp.alphatimer.api.serial.SerialPortReader;
@@ -59,6 +60,8 @@ public final class RecordingSession implements AutoCloseable {
     private final List<Consumer<DataHandlingMessage>> messageListeners = new CopyOnWriteArrayList<>();
     private final List<Runnable> pingListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<Exception>> errorListeners = new CopyOnWriteArrayList<>();
+    private final List<WriteListener> writeListeners = new CopyOnWriteArrayList<>();
+    private final WriteMonitor writes = new WriteMonitor(writeListeners);
 
     private volatile RecordingState state = RecordingState.STOPPED;
     private volatile RecordingError error;
@@ -129,19 +132,19 @@ public final class RecordingSession implements AutoCloseable {
     }
 
     private void build(Settings s) {
-        legacy = new LegacyService(new LaneTimeStore(db));
+        legacy = new LegacyService(writes.laneTimes(new LaneTimeStore(db)));
         MessageStore messageStore = new MessageStore(db);
-        HeatService heatService = new HeatService(new HeatStore(db), this::reportError);
+        HeatService heatService = new HeatService(writes.heats(new HeatStore(db)), this::reportError);
         heatListeners.forEach(heatService::register);
-        rawRecorder = new RawDataRecorder(db, time, 512, 250, this::reportError);
+        rawRecorder = new RawDataRecorder(db, time, 512, 250, ex -> writes.failed(RecordedData.RAW_DATA, ex), () -> writes.stored(RecordedData.RAW_DATA));
 
         InputCollector collector = new InputCollector(COMPETITION, time);
         MessageConverter converter = new MessageConverter();
         DataHandlingMessageAggregator aggregator = new MessageAggregator();
         DataHandlingMessageRefiner refiner = new DataHandlingMessageRefiner();
 
-        aggregator.register(legacy);
-        aggregator.register(messageStore::put);
+        aggregator.register(isolated(legacy));
+        aggregator.register(isolated(m -> writes.write(RecordedData.MESSAGES, () -> messageStore.put(m))));
         aggregator.register(refiner);
         aggregator.register(this::announce);
         refiner.register(heatService::accept);
@@ -180,7 +183,23 @@ public final class RecordingSession implements AutoCloseable {
         };
     }
 
+    /** A store that cannot write a message must not keep it from the stores registered after it. */
+    private DataHandlingMessageListener isolated(DataHandlingMessageListener delegate) {
+        return m -> {
+            try {
+                delegate.accept(m);
+            } catch (RuntimeException ex) {
+                log.warn("Could not store received message", ex);
+                reportError(ex);
+            }
+        };
+    }
+
     private void reportError(RuntimeException ex) {
+        if (ex instanceof RecordingWriteException write) {
+            writes.failed(write.data(), (Exception) write.getCause());
+            return;
+        }
         for (Consumer<Exception> listener : errorListeners) {
             try {
                 listener.accept(ex);
@@ -268,6 +287,10 @@ public final class RecordingSession implements AutoCloseable {
 
     public void addErrorListener(Consumer<Exception> listener) {
         errorListeners.add(listener);
+    }
+
+    public void addWriteListener(WriteListener listener) {
+        writeListeners.add(listener);
     }
 
     public boolean isConnected() {

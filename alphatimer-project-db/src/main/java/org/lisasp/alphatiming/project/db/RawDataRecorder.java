@@ -18,6 +18,7 @@ public final class RawDataRecorder implements ByteConsumer, AutoCloseable {
     private final DateTimeFacade time;
     private final int flushBytes;
     private final Consumer<RuntimeException> onError;
+    private final Runnable onStored;
     private final ScheduledExecutorService flusher;
 
     private final Object lock = new Object();
@@ -25,11 +26,12 @@ public final class RawDataRecorder implements ByteConsumer, AutoCloseable {
     private boolean failing;
 
     /** Bytes that cannot be stored stay buffered until the store works again; only the first failure in a row is reported. */
-    public RawDataRecorder(ProjectDatabase db, DateTimeFacade time, int flushBytes, long flushMillis, Consumer<RuntimeException> onError) {
+    public RawDataRecorder(ProjectDatabase db, DateTimeFacade time, int flushBytes, long flushMillis, Consumer<RuntimeException> onError, Runnable onStored) {
         this.db = db;
         this.time = time;
         this.flushBytes = flushBytes;
         this.onError = onError;
+        this.onStored = onStored;
         this.flusher = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "raw-data-flusher");
             t.setDaemon(true);
@@ -59,8 +61,6 @@ public final class RawDataRecorder implements ByteConsumer, AutoCloseable {
                     em.persist(new RawDataChunkEntity(time.now(), data));
                     return null;
                 });
-                buffer = new ByteArrayOutputStream();
-                failing = false;
             } catch (RuntimeException ex) {
                 if (failing) {
                     log.debug("Raw data still cannot be stored; {} bytes buffered.", data.length);
@@ -69,7 +69,11 @@ public final class RawDataRecorder implements ByteConsumer, AutoCloseable {
                     log.warn("Could not store raw data; keeping it buffered until the store works again.", ex);
                     onError.accept(ex);
                 }
+                return;
             }
+            buffer = new ByteArrayOutputStream();
+            failing = false;
+            onStored.run();
         }
     }
 

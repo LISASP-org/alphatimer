@@ -10,8 +10,10 @@ import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.ui.core.project.AutoSaver;
 import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
 import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
+import org.lisasp.alphatiming.ui.core.recording.RecordedData;
 import org.lisasp.alphatiming.ui.core.recording.RecordingSession;
 import org.lisasp.alphatiming.ui.core.recording.RecordingState;
+import org.lisasp.alphatiming.ui.core.recording.WriteListener;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
@@ -43,7 +45,8 @@ public final class AppController implements AutoCloseable {
     private volatile ProjectDocument document;
     private volatile RecordingSession session;
     private volatile LiveHeats lastHeats = LiveHeats.NONE;
-    private volatile String warning = "";
+    private final StatusWarnings warnings = new StatusWarnings();
+    private final WriteFailures writeFailures = new WriteFailures(warnings);
 
     public AppController(Path workDir, DefaultSettingsStore defaults, SavePrompt prompt, Supplier<RecordingSession.ReaderFactory> readers, DateTimeFacade time) {
         this.workDir = workDir;
@@ -230,14 +233,15 @@ public final class AppController implements AutoCloseable {
         return session;
     }
 
-    /** A problem the user should see until it is resolved (currently: a failed auto-save); empty when there is none. */
-    public String warning() {
-        return warning;
+    /** The problems the user should see until they are resolved, the most important first. */
+    public List<StatusWarnings.Warning> warnings() {
+        return warnings.active();
     }
 
     void onAutoSaveError(Exception ex) {
-        warning = I18n.get("warn.autoSaveFailed", describe(ex));
-        announce(warning);
+        String text = I18n.get("warn.autoSaveFailed", describe(ex));
+        warnings.raise(StatusWarnings.Kind.AUTO_SAVE, new StatusWarnings.Warning(text, text));
+        announce(text);
         fireChange();
     }
 
@@ -313,12 +317,28 @@ public final class AppController implements AutoCloseable {
         next.addMessageListener(message -> announce(MessageText.describe(message)));
         next.addPingListener(() -> pingListeners.forEach(Runnable::run));
         next.addErrorListener(ex -> announce(I18n.get("log.processingError", ex.toString())));
+        next.addWriteListener(new WriteListener() {
+            @Override
+            public void writeFailed(RecordedData data, Exception cause) {
+                writeFailures.failed(data, cause);
+                announce(WriteFailures.describe(data, cause));
+                fireChange();
+            }
+
+            @Override
+            public void writeRecovered(RecordedData data) {
+                writeFailures.storedAgain(data);
+                fireChange();
+            }
+        });
         doc.addDirtyListener(dirty -> {
             if (!dirty) {
-                warning = "";
+                warnings.clear(StatusWarnings.Kind.AUTO_SAVE);
+                writeFailures.saved();
             }
             fireChange();
         });
+        writeFailures.reset();
 
         document = doc;
         session = next;

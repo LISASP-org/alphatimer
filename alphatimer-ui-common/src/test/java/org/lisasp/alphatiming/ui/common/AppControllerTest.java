@@ -22,8 +22,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -476,14 +478,99 @@ class AppControllerTest {
     void autoSaveFailureIsVisibleUntilTheDocumentIsSavedAgain() {
         controller.init();
         controller.applySettings(S);
-        List<String> changes = new ArrayList<>();
-        controller.addChangeListener(() -> changes.add(controller.warning()));
+        List<List<StatusWarnings.Warning>> changes = new ArrayList<>();
+        controller.addChangeListener(() -> changes.add(controller.warnings()));
         controller.onAutoSaveError(new IOException("disk full"));
-        assertThat(controller.warning()).contains("disk full");
+        assertThat(controller.warnings()).singleElement().satisfies(w -> {
+            assertThat(w.text()).contains("disk full");
+            assertThat(w.details()).contains("disk full");
+        });
         assertThat(changes).isNotEmpty();
         prompt.paths.add(Optional.of(dir.resolve("x.heat")));
         assertThat(controller.save()).isTrue();
-        assertThat(controller.warning()).isEmpty();
+        assertThat(controller.warnings()).isEmpty();
+    }
+
+    private static final byte[] PING = {org.lisasp.alphatimer.api.ares.serial.Characters.SOH_StartOfHeader, org.lisasp.alphatimer.api.ares.serial.Characters.DC2_Periphery, 0x39,
+            org.lisasp.alphatimer.api.ares.serial.Characters.DC4_Command, 0x54, 0x50, org.lisasp.alphatimer.api.ares.serial.Characters.EOT_EndOfText};
+
+    private AppController recordingController(List<ByteConsumer> consumers) {
+        return new AppController(work, defaults, prompt, () -> s -> new SerialPortReader() {
+            @Override
+            public SerialPortReader register(ByteConsumer listener) {
+                consumers.add(listener);
+                return this;
+            }
+
+            @Override
+            public void close() {
+            }
+        }, LocalDateTime::now);
+    }
+
+    private static void recordPing(AppController recording, List<ByteConsumer> consumers) {
+        consumers.clear();
+        recording.startRecording();
+        for (byte b : PING) {
+            consumers.forEach(c -> c.accept(b));
+        }
+        recording.stopRecording();
+    }
+
+    private static void execute(AppController recording, String sql) {
+        recording.document().database().write(em -> em.createNativeQuery(sql).executeUpdate());
+    }
+
+    @Test
+    void aWriteErrorIsVisibleWithItsDetailsUntilTheDataIsStoredAgainAndTheProjectSavedAfterwards() {
+        Locale original = Locale.getDefault();
+        Locale.setDefault(Locale.ENGLISH);
+        List<ByteConsumer> consumers = new CopyOnWriteArrayList<>();
+        try (AppController recording = recordingController(consumers)) {
+            recording.init();
+            recording.applySettings(S);
+            prompt.paths.add(Optional.of(dir.resolve("w.timing")));
+            assertThat(recording.save()).isTrue();
+            List<String> log = new CopyOnWriteArrayList<>();
+            recording.addMessageListener(log::add);
+            execute(recording, "CREATE TRIGGER block_rawdata BEFORE INSERT ON rawdata BEGIN SELECT RAISE(ABORT, 'disk full'); END");
+
+            recordPing(recording, consumers);
+            assertThat(recording.warnings()).singleElement().satisfies(w -> {
+                assertThat(w.text()).isEqualTo("Recorded data could not be stored");
+                assertThat(w.details()).startsWith("Raw data could not be stored: ").contains("disk full");
+            });
+            assertThat(log).anySatisfy(line -> assertThat(line).startsWith("Raw data could not be stored: ").contains("disk full"));
+
+            assertThat(recording.save()).isTrue();
+            assertThat(recording.warnings()).as("saved, but the raw data is still missing").hasSize(1);
+
+            execute(recording, "DROP TRIGGER block_rawdata");
+            recordPing(recording, consumers);
+            assertThat(recording.warnings()).as("stored again, but not saved yet").singleElement()
+                                            .satisfies(w -> assertThat(w.details()).contains("stored again"));
+
+            assertThat(recording.save()).isTrue();
+            assertThat(recording.warnings()).isEmpty();
+        } finally {
+            Locale.setDefault(original);
+        }
+    }
+
+    @Test
+    void aWriteErrorOfTheClosedProjectIsNotShownForTheNextOne() {
+        List<ByteConsumer> consumers = new CopyOnWriteArrayList<>();
+        try (AppController recording = recordingController(consumers)) {
+            recording.init();
+            recording.applySettings(S);
+            execute(recording, "CREATE TRIGGER block_rawdata BEFORE INSERT ON rawdata BEGIN SELECT RAISE(ABORT, 'disk full'); END");
+            recordPing(recording, consumers);
+            assertThat(recording.warnings()).hasSize(1);
+
+            prompt.choices.add(SavePrompt.Choice.DISCARD);
+            recording.newProject();
+            assertThat(recording.warnings()).isEmpty();
+        }
     }
 
     private Path savedProject(String name) throws IOException {

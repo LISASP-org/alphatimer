@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -21,7 +22,7 @@ class RawDataRecorderTest {
     @Test
     void flushesBufferedBytesIntoChunksInOrder() throws Exception {
         try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
-            RawDataRecorder rec = new RawDataRecorder(db, () -> LocalDateTime.of(2026, 1, 1, 10, 0), 4, 60_000, e -> { });
+            RawDataRecorder rec = new RawDataRecorder(db, () -> LocalDateTime.of(2026, 1, 1, 10, 0), 4, 60_000, e -> { }, () -> { });
             for (byte b = 1; b <= 10; b++) {
                 rec.accept(b);
             }
@@ -39,7 +40,7 @@ class RawDataRecorderTest {
     void aStoreThatKeepsFailingIsReportedOnceAndTheBytesStayBuffered() throws Exception {
         ProjectDatabase db = ProjectDatabase.createNew(dir);
         List<Exception> errors = new ArrayList<>();
-        RawDataRecorder rec = new RawDataRecorder(db, LocalDateTime::now, 1000, 60_000, errors::add);
+        RawDataRecorder rec = new RawDataRecorder(db, LocalDateTime::now, 1000, 60_000, errors::add, () -> { });
         db.close();
         rec.accept((byte) 7);
         rec.flush();
@@ -51,9 +52,36 @@ class RawDataRecorderTest {
     }
 
     @Test
+    void everySuccessfulWriteIsReportedAlsoAfterAFailure() throws Exception {
+        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+            AtomicInteger calls = new AtomicInteger();
+            List<Exception> errors = new ArrayList<>();
+            AtomicInteger stored = new AtomicInteger();
+            RawDataRecorder rec = new RawDataRecorder(db, () -> {
+                if (calls.incrementAndGet() == 1) {
+                    throw new IllegalStateException("disk full");
+                }
+                return LocalDateTime.now();
+            }, 1000, 60_000, errors::add, stored::incrementAndGet);
+            rec.accept((byte) 7);
+            rec.flush();
+            assertThat(errors).hasSize(1);
+            assertThat(stored).hasValue(0);
+            rec.flush();
+            assertThat(stored).hasValue(1);
+            rec.accept((byte) 8);
+            rec.flush();
+            assertThat(stored).hasValue(2);
+            assertThat(RawDataRecorder.readAll(db)).hasSize(2);
+            rec.close();
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
     void timerFlushesPartialBuffer() throws Exception {
         try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
-            RawDataRecorder rec = new RawDataRecorder(db, LocalDateTime::now, 1000, 50, e -> { });
+            RawDataRecorder rec = new RawDataRecorder(db, LocalDateTime::now, 1000, 50, e -> { }, () -> { });
             rec.accept((byte) 7);
             await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> assertThat(RawDataRecorder.readAll(db)).hasSize(1));
             rec.close();

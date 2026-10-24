@@ -6,6 +6,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.lisasp.alphatimer.api.serial.SerialPortReader;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.project.db.ProjectDatabase;
@@ -182,6 +184,97 @@ class RecordingSessionTest {
         reader().push(DataHandlingMessageTestData.message2);
         assertThat(errors).isNotEmpty();
         assertThat(session.state()).isEqualTo(RecordingState.RUNNING);
+    }
+
+    record WriteEvent(String kind, RecordedData data) {
+    }
+
+    private List<WriteEvent> recordWrites() {
+        List<WriteEvent> events = new CopyOnWriteArrayList<>();
+        session.addWriteListener(new WriteListener() {
+            @Override
+            public void writeFailed(RecordedData data, Exception cause) {
+                events.add(new WriteEvent("failed", data));
+            }
+
+            @Override
+            public void writeRecovered(RecordedData data) {
+                events.add(new WriteEvent("recovered", data));
+            }
+        });
+        return events;
+    }
+
+    private static byte[] finishTime1() {
+        byte[] finish = DataHandlingMessageTestData.message1.clone();
+        finish[4] = 'A';
+        return finish;
+    }
+
+    private void blockInserts(String table) {
+        db.write(em -> em.createNativeQuery("CREATE TRIGGER block_" + table + " BEFORE INSERT ON " + table + " BEGIN SELECT RAISE(ABORT, 'disk full'); END")
+                         .executeUpdate());
+    }
+
+    private void unblockInserts(String table) {
+        db.write(em -> em.createNativeQuery("DROP TRIGGER block_" + table).executeUpdate());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"aresmessage, MESSAGES", "heat, HEATS", "lanetime, LANE_TIMES", "rawdata, RAW_DATA"})
+    void aWriteErrorNamesWhatCouldNotBeStoredAndIsNoProcessingError(String table, RecordedData data) {
+        List<WriteEvent> events = recordWrites();
+        List<Exception> errors = new CopyOnWriteArrayList<>();
+        session.addErrorListener(errors::add);
+        blockInserts(table);
+        session.start(settings(0));
+        reader().push(finishTime1());
+        reader().push(DataHandlingMessageTestData.message2);
+        session.stop();
+        assertThat(events).isNotEmpty().containsOnly(new WriteEvent("failed", data));
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
+    void aFailingStoreDoesNotKeepTheOtherStoresFromTheMessage() {
+        List<org.lisasp.alphatiming.heats.LiveHeats> heats = new CopyOnWriteArrayList<>();
+        session.addHeatListener(heats::add);
+        blockInserts("lanetime");
+        session.start(settings(0));
+        reader().push(finishTime1());
+        reader().push(DataHandlingMessageTestData.message2);
+        assertThat(new MessageStore(db).findBy("", (short) 1, (byte) 1)).hasSize(1);
+        assertThat(heats).isNotEmpty();
+    }
+
+    @Test
+    void theFirstSuccessfulWriteAfterAFailureIsReportedAlsoInTheNextRecording() {
+        List<WriteEvent> events = recordWrites();
+        blockInserts("aresmessage");
+        session.start(settings(0));
+        reader().push(DataHandlingMessageTestData.message1);
+        reader().push(DataHandlingMessageTestData.message2);
+        session.stop();
+        unblockInserts("aresmessage");
+        session.start(settings(0));
+        reader().push(DataHandlingMessageTestData.message1);
+        reader().push(DataHandlingMessageTestData.message2);
+        reader().push(DataHandlingMessageTestData.message1);
+        reader().push(DataHandlingMessageTestData.message2);
+        assertThat(events).containsExactly(new WriteEvent("failed", RecordedData.MESSAGES), new WriteEvent("recovered", RecordedData.MESSAGES));
+    }
+
+    @Test
+    void rawDataIsReportedAsStoredAgainOnceTheBufferedBytesAreWritten() {
+        List<WriteEvent> events = recordWrites();
+        blockInserts("rawdata");
+        session.start(settings(0));
+        reader().push(DataHandlingMessageTestData.ping);
+        await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> assertThat(events).containsExactly(new WriteEvent("failed", RecordedData.RAW_DATA)));
+        unblockInserts("rawdata");
+        await().atMost(5, TimeUnit.SECONDS)
+               .untilAsserted(() -> assertThat(events).containsExactly(new WriteEvent("failed", RecordedData.RAW_DATA), new WriteEvent("recovered", RecordedData.RAW_DATA)));
+        assertThat(RawDataRecorder.readAll(db)).isNotEmpty();
     }
 
     @Test

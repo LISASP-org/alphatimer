@@ -207,6 +207,7 @@ public final class JAlphaTiming extends JFrame {
         setTitle(status.title());
         statusFile.setText(status.file());
         statusWarning.setText(status.warning());
+        statusWarning.setToolTipText(toolTip(status.warningDetails()));
         statusWarning.setVisible(!status.warning().isEmpty());
         statusState.setText(status.state());
         startItem.setEnabled(status.canStart());
@@ -223,6 +224,14 @@ public final class JAlphaTiming extends JFrame {
 
     Timer refreshTimer() {
         return refreshTimer;
+    }
+
+    private static String toolTip(String details) {
+        if (details.isEmpty()) {
+            return null;
+        }
+        String escaped = details.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        return "<html>" + escaped.replace("\n", "<br>") + "</html>";
     }
 
     JLabel statusWarningLabel() {
