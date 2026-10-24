@@ -147,7 +147,7 @@ class JAlphaTimingSmokeTest {
                 assertThat(frame.settingsPanel().lockableInputs()).isNotEmpty().allSatisfy(c -> assertThat(c.isEnabled()).as(c.getClass().getSimpleName()).isFalse());
             });
 
-            HeatDto heat = new HeatDto("WK", 3, 2, HeatStatus.Started, LocalDateTime.now().minusSeconds(5), null, 2, List.of(
+            HeatDto heat = new HeatDto(3, 2, HeatStatus.Started, LocalDateTime.now().minusSeconds(5), null, 2, List.of(
                     new LaneDto(1, 12_340, 1, LaneStatus.Used, Penalty.None, 0, false),
                     new LaneDto(2, 25_000, 2, LaneStatus.Used, Penalty.None, 1, true)));
             onEdt(() -> frame.showHeats(new org.lisasp.alphatiming.heats.LiveHeats(heat, null)));

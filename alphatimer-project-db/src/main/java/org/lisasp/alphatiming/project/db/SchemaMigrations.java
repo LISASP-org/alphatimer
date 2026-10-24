@@ -18,7 +18,7 @@ import java.util.List;
 @Slf4j
 final class SchemaMigrations {
 
-    private static final List<MigrationStep> STEPS = List.of(new RemoveCheckConstraints());
+    private static final List<MigrationStep> STEPS = List.of(new RemoveCheckConstraints(), new RemoveHeatCompetition());
 
     static final int CURRENT_VERSION = STEPS.size();
 

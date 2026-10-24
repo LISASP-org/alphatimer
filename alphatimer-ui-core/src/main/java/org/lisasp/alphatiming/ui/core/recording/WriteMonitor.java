@@ -68,8 +68,8 @@ final class WriteMonitor {
     HeatRepository heats(HeatRepository store) {
         return new HeatRepository() {
             @Override
-            public Optional<HeatDto> find(String competition, int event, int heat) {
-                return store.find(competition, event, heat);
+            public Optional<HeatDto> find(int event, int heat) {
+                return store.find(event, heat);
             }
 
             @Override

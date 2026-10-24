@@ -50,7 +50,7 @@ public final class HeatService implements Consumer<RefinedMessage> {
     }
 
     private static boolean sameHeat(HeatDto a, HeatDto b) {
-        return a.competition().equals(b.competition()) && a.event() == b.event() && a.heat() == b.heat();
+        return a.event() == b.event() && a.heat() == b.heat();
     }
 
     public synchronized void register(Consumer<LiveHeats> listener) {
@@ -73,8 +73,8 @@ public final class HeatService implements Consumer<RefinedMessage> {
             return;
         }
         try {
-            Optional<HeatDto> stored = store.find(message.getCompetition(), message.getEvent(), message.getHeat());
-            HeatDto before = stored.orElseGet(() -> HeatDto.empty(message.getCompetition(), message.getEvent(), message.getHeat(), LANE_COUNT));
+            Optional<HeatDto> stored = store.find(message.getEvent(), message.getHeat());
+            HeatDto before = stored.orElseGet(() -> HeatDto.empty(message.getEvent(), message.getHeat(), LANE_COUNT));
             Heat heat = new Heat(before);
             if (message instanceof StartMessage m) {
                 heat.start(m);

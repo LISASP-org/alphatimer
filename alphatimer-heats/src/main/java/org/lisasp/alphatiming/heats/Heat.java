@@ -18,7 +18,6 @@ import java.util.List;
 
 final class Heat {
 
-    private final String competition;
     private final int event;
     private final int heat;
     private HeatStatus status;
@@ -29,7 +28,6 @@ final class Heat {
     private final List<Lane> lanes = new ArrayList<>();
 
     Heat(HeatDto dto) {
-        this.competition = dto.competition();
         this.event = dto.event();
         this.heat = dto.heat();
         this.status = dto.status();
@@ -41,7 +39,7 @@ final class Heat {
     }
 
     HeatDto createDto() {
-        return new HeatDto(competition, event, heat, status, started, ended, lapCount, lanes.stream().map(Lane::createDto).toList(), lastMessage);
+        return new HeatDto(event, heat, status, started, ended, lapCount, lanes.stream().map(Lane::createDto).toList(), lastMessage);
     }
 
     /**
@@ -159,7 +157,7 @@ final class Heat {
         return lanes.stream()
                     .filter(l -> l.number() == number)
                     .findFirst()
-                    .orElseThrow(() -> new UnknownLaneException(competition, event, heat, number));
+                    .orElseThrow(() -> new UnknownLaneException(event, heat, number));
     }
 
     private void assureStarted(RefinedMessage message) {

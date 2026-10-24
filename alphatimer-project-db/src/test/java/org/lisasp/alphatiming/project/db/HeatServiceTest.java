@@ -32,8 +32,8 @@ class HeatServiceTest {
             service.accept(TestMessageCreator.used(1, 1, "1100000000"));
             service.accept(TestMessageCreator.used(2, 1, "0011000000"));
             service.accept(TestMessageCreator.split(1, 1, 1, 1, 1000));
-            assertThat(store.find("WK", 1, 1).orElseThrow().lanes().get(0).timeInMillis()).isEqualTo(1000);
-            assertThat(store.find("WK", 2, 1).orElseThrow().lanes().get(0).status()).isEqualTo(LaneStatus.NotUsed);
+            assertThat(store.find(1, 1).orElseThrow().lanes().get(0).timeInMillis()).isEqualTo(1000);
+            assertThat(store.find(2, 1).orElseThrow().lanes().get(0).status()).isEqualTo(LaneStatus.NotUsed);
             db.closeAndDelete();
         }
     }
@@ -169,7 +169,7 @@ class HeatServiceTest {
             service.accept(TestMessageCreator.used(1, 1, "0000000011"));
             service.accept(TestMessageCreator.split(1, 1, 9, 1, 1000));
             service.accept(TestMessageCreator.fin(1, 1, 10, 0, 2000));
-            HeatDto heat = store.find("WK", 1, 1).orElseThrow();
+            HeatDto heat = store.find(1, 1).orElseThrow();
             assertThat(heat.lanes()).extracting(LaneDto::number).containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
             assertThat(heat.lanes().get(8)).isEqualTo(new LaneDto(9, 1000, 1, LaneStatus.Used, Penalty.None, 0, false));
             assertThat(heat.lanes().get(9)).isEqualTo(new LaneDto(10, 2000, 2, LaneStatus.Used, Penalty.None, 1, true));
@@ -198,7 +198,7 @@ class HeatServiceTest {
             service.accept(TestMessageCreator.dns(1, 1, 1));
             service.accept(TestMessageCreator.fin(1, 1, 1, 0, 2000));
             service.accept(TestMessageCreator.fin(1, 1, 2, 0, 2100));
-            HeatDto heat = store.find("WK", 1, 1).orElseThrow();
+            HeatDto heat = store.find(1, 1).orElseThrow();
             assertThat(heat.lanes().get(0)).isEqualTo(new LaneDto(1, 2000, 2, LaneStatus.Used, Penalty.DidNotStart, 0, true));
             assertThat(heat.lanes().get(1).place()).isEqualTo(1);
             db.closeAndDelete();
@@ -214,10 +214,10 @@ class HeatServiceTest {
             service.accept(TestMessageCreator.start(1, 1, T0));
             service.accept(TestMessageCreator.fin(1, 1, 1, 0, 2000));
             service.accept(TestMessageCreator.fin(1, 1, 1, 0, 2050));
-            assertThat(store.find("WK", 1, 1).orElseThrow().lanes().get(0)).isEqualTo(new LaneDto(1, 2050, 2, LaneStatus.Used, Penalty.None, 1, true));
+            assertThat(store.find(1, 1).orElseThrow().lanes().get(0)).isEqualTo(new LaneDto(1, 2050, 2, LaneStatus.Used, Penalty.None, 1, true));
 
             service.accept(TestMessageCreator.split(1, 1, 1, 1, 1000));
-            assertThat(store.find("WK", 1, 1).orElseThrow().lanes().get(0)).isEqualTo(new LaneDto(1, 2050, 2, LaneStatus.Used, Penalty.None, 1, true));
+            assertThat(store.find(1, 1).orElseThrow().lanes().get(0)).isEqualTo(new LaneDto(1, 2050, 2, LaneStatus.Used, Penalty.None, 1, true));
             db.closeAndDelete();
         }
     }
@@ -229,7 +229,7 @@ class HeatServiceTest {
             HeatService service = new HeatService(store);
             service.accept(TestMessageCreator.used(1, 1, "1100000000"));
             service.accept(TestMessageCreator.split(1, 2, 11, 1, 1000));
-            assertThat(store.find("WK", 1, 2)).isEmpty();
+            assertThat(store.find(1, 2)).isEmpty();
             assertThat(store.findLatest().orElseThrow().heat()).isEqualTo(1);
             db.closeAndDelete();
         }
@@ -249,7 +249,7 @@ class HeatServiceTest {
         }
         Path work = Files.createDirectories(dir.resolve("w"));
         try (ProjectDatabase db = ProjectDatabase.openCopy(file, work)) {
-            HeatDto heat = new HeatStore(db).find("WK", 1, 1).orElseThrow();
+            HeatDto heat = new HeatStore(db).find(1, 1).orElseThrow();
             assertThat(heat.status()).isEqualTo(HeatStatus.Finished);
             assertThat(heat.ended()).isEqualTo(T0.plusSeconds(20));
             assertThat(heat.lastMessage()).isEqualTo(T0.plusSeconds(20));
@@ -289,7 +289,7 @@ class HeatServiceTest {
 
             assertThat(seen).hasSize(1);
             assertThat(store.findLatest().orElseThrow().heat()).isEqualTo(2);
-            assertThat(store.find("WK", 1, 1).orElseThrow().lanes().get(0).timeInMillis()).isEqualTo(1900);
+            assertThat(store.find(1, 1).orElseThrow().lanes().get(0).timeInMillis()).isEqualTo(1900);
             db.closeAndDelete();
         }
     }

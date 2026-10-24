@@ -6,7 +6,9 @@ import org.lisasp.alphatiming.project.db.InvalidProjectFileException;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.project.db.ProjectDatabase;
 import org.lisasp.alphatiming.heats.HeatDto;
+import org.lisasp.alphatiming.heats.HeatService;
 import org.lisasp.alphatiming.heats.HeatStatus;
+import org.lisasp.alphatiming.heats.TestMessageCreator;
 import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.heats.LaneStatus;
 import org.lisasp.alphatiming.project.db.MessageStore;
@@ -329,7 +331,6 @@ class ProjectDocumentTest {
             assertThat(s.competitionKey()).isEqualTo("TestWK");
 
             HeatDto heat = new HeatStore(doc.database()).findRecent(1).get(0);
-            assertThat(heat.competition()).isEqualTo("TestWK");
             assertThat(heat.event()).isEqualTo(1);
             assertThat(heat.heat()).isEqualTo(1);
             assertThat(heat.status()).isEqualTo(HeatStatus.Started);
@@ -349,7 +350,7 @@ class ProjectDocumentTest {
         }
         try (ProjectDocument doc = ProjectDocument.open(dir.resolve("resaved.heat"), work())) {
             assertThat(doc.settings().tcpHost()).isEqualTo("other");
-            assertThat(new HeatStore(doc.database()).findRecent(1).get(0).competition()).isEqualTo("TestWK");
+            assertThat(new HeatStore(doc.database()).find(1, 1)).isPresent();
         }
     }
 
@@ -392,6 +393,18 @@ class ProjectDocumentTest {
         return columns;
     }
 
+    private static List<String> uniqueKeysOfHeat(Path file) throws SQLException {
+        List<String> keys = new ArrayList<>();
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + file); var st = connection.createStatement();
+             var rs = st.executeQuery("select group_concat(ii.name, ',') from pragma_index_list('heat') il, pragma_index_info(il.name) ii "
+                     + "where il.\"unique\" = 1 group by il.name")) {
+            while (rs.next()) {
+                keys.add(rs.getString(1));
+            }
+        }
+        return keys;
+    }
+
     private static List<String> schemaOf(Path file) throws SQLException {
         List<String> sql = new ArrayList<>();
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + file); var st = connection.createStatement();
@@ -404,15 +417,18 @@ class ProjectDocumentTest {
     }
 
     @Test
-    void projectFileOfTheFirstVersionLosesItsEnumChecksAndKeepsItsData() throws Exception {
+    void projectFileOfTheFirstVersionLosesItsEnumChecksAndTheHeatCompetitionAndKeepsItsData() throws Exception {
         Path file = Files.copy(Path.of("src/test/resources/compat/first-version.heat"), dir.resolve("first-version.heat"));
         Map<String, List<String>> columns = columnsOf(file);
+        assertThat(columns.get("heat").remove("competition")).isTrue();
         Map<String, List<List<Object>>> before = contentOf(file, columns);
         assertThat(schemaOf(file)).anyMatch(sql -> sql.contains("check"));
 
         try (ProjectDocument doc = ProjectDocument.open(file, work())) {
             Path workFile = doc.database().workFile();
             assertThat(schemaOf(workFile)).noneMatch(sql -> sql.toLowerCase(Locale.ROOT).contains("check"));
+            assertThat(columnsOf(workFile).get("heat")).doesNotContain("competition");
+            assertThat(uniqueKeysOfHeat(workFile)).containsExactly("event,heatNumber");
             assertThat(contentOf(workFile, columns)).isEqualTo(before);
 
             doc.database().write(em -> {
@@ -425,6 +441,22 @@ class ProjectDocumentTest {
             assertThat(contentOf(workFile, Map.of("heat", List.of("status"), "lanetime", List.of("status"))))
                     .containsEntry("heat", List.of(List.of("NewStatus")))
                     .containsEntry("lanetime", List.of(List.of("New")));
+        }
+    }
+
+    @Test
+    void recordingIntoAProjectFileOfTheFirstVersionUpdatesItsTaggedHeat() throws Exception {
+        Path file = Files.copy(Path.of("src/test/resources/compat/first-version.heat"), dir.resolve("first-version.heat"));
+        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+            HeatService heats = new HeatService(new HeatStore(doc.database()));
+
+            heats.accept(TestMessageCreator.split(1, 1, 3, 1, 12_340));
+
+            Path workFile = doc.database().workFile();
+            assertThat(contentOf(workFile, Map.of("heat", List.of("id", "event", "heatNumber")))).containsEntry("heat", List.of(List.of(1, 1, 1)));
+            assertThat(contentOf(workFile, Map.of("lane", List.of("id", "heat_id", "number", "timeInMillis"))).get("lane"))
+                    .hasSize(8)
+                    .contains(List.of(3, 1, 3, 12_340));
         }
     }
 

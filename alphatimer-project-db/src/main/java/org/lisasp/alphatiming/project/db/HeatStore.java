@@ -18,8 +18,8 @@ public final class HeatStore implements HeatRepository {
     private final ProjectDatabase db;
 
     @Override
-    public Optional<HeatDto> find(String competition, int event, int heat) {
-        return db.read(em -> findEntity(em, competition, event, heat).map(HeatStore::toDto));
+    public Optional<HeatDto> find(int event, int heat) {
+        return db.read(em -> findEntity(em, event, heat).map(HeatStore::toDto));
     }
 
     public Optional<HeatDto> findLatest() {
@@ -42,15 +42,14 @@ public final class HeatStore implements HeatRepository {
                                .toList());
     }
 
-    public HeatDto create(String competition, int event, int heat, int laneCount) {
-        return create(HeatDto.empty(competition, event, heat, laneCount));
+    public HeatDto create(int event, int heat, int laneCount) {
+        return create(HeatDto.empty(event, heat, laneCount));
     }
 
     @Override
     public HeatDto create(HeatDto dto) {
         return db.write(em -> {
             HeatEntity e = new HeatEntity();
-            e.setCompetition(dto.competition());
             e.setEvent(dto.event());
             e.setHeatNumber(dto.heat());
             apply(em, e, dto);
@@ -62,7 +61,7 @@ public final class HeatStore implements HeatRepository {
     @Override
     public void save(HeatDto dto) {
         db.write(em -> {
-            apply(em, findEntity(em, dto.competition(), dto.event(), dto.heat()).orElseThrow(), dto);
+            apply(em, findEntity(em, dto.event(), dto.heat()).orElseThrow(), dto);
             return null;
         });
     }
@@ -97,9 +96,8 @@ public final class HeatStore implements HeatRepository {
         return max == null ? 1 : max + 1;
     }
 
-    private static Optional<HeatEntity> findEntity(EntityManager em, String competition, int event, int heat) {
-        return em.createQuery("select h from HeatEntity h where h.competition = :c and h.event = :e and h.heatNumber = :h", HeatEntity.class)
-                 .setParameter("c", competition)
+    private static Optional<HeatEntity> findEntity(EntityManager em, int event, int heat) {
+        return em.createQuery("select h from HeatEntity h where h.event = :e and h.heatNumber = :h", HeatEntity.class)
                  .setParameter("e", event)
                  .setParameter("h", heat)
                  .getResultStream()
@@ -107,8 +105,7 @@ public final class HeatStore implements HeatRepository {
     }
 
     private static HeatDto toDto(HeatEntity e) {
-        return new HeatDto(e.getCompetition(),
-                           e.getEvent(),
+        return new HeatDto(e.getEvent(),
                            e.getHeatNumber(),
                            e.getStatus(),
                            e.getStarted(),

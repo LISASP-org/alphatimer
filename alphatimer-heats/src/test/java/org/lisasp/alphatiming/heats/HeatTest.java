@@ -14,7 +14,7 @@ import static org.lisasp.alphatiming.heats.TestMessageCreator.T0;
 class HeatTest {
 
     private static HeatDto emptyHeat() {
-        return new HeatDto("WK", 1, 1, HeatStatus.Open, null, null, 0,
+        return new HeatDto(1, 1, HeatStatus.Open, null, null, 0,
                            List.of(1, 2, 3, 4, 5, 6, 7, 8).stream().map(n -> new LaneDto(n, 0, 0, LaneStatus.NotUsed, Penalty.None, 0, false)).toList());
     }
 
@@ -207,7 +207,6 @@ class HeatTest {
         Heat heat = prepared();
         HeatDto before = heat.createDto();
         assertThatThrownBy(() -> heat.touch(TestMessageCreator.split(1, 1, 9, 1, 1000))).isInstanceOfSatisfying(UnknownLaneException.class, ex -> {
-            assertThat(ex.competition()).isEqualTo("WK");
             assertThat(ex.event()).isEqualTo(1);
             assertThat(ex.heat()).isEqualTo(1);
             assertThat(ex.lane()).isEqualTo(9);

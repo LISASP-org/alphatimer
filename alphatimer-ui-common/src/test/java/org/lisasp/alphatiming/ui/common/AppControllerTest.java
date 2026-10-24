@@ -414,7 +414,7 @@ class AppControllerTest {
         Path file = dir.resolve("heat.heat");
         HeatDto created;
         try (ProjectDocument other = ProjectDocument.create(work, S)) {
-            created = new HeatStore(other.database()).create("WK", 4, 2, 8);
+            created = new HeatStore(other.database()).create(4, 2, 8);
             other.saveAs(file);
         }
         controller.init();
@@ -482,8 +482,8 @@ class AppControllerTest {
         Path file = dir.resolve("two.heat");
         try (ProjectDocument a = ProjectDocument.create(work, S)) {
             HeatStore store = new HeatStore(a.database());
-            store.create("", 1, 1, 8);
-            store.create("", 1, 2, 8);
+            store.create(1, 1, 8);
+            store.create(1, 2, 8);
             a.saveAs(file);
         }
         controller.init();
@@ -501,7 +501,7 @@ class AppControllerTest {
         Path withHeat = dir.resolve("with.heat");
         Path without = dir.resolve("without.heat");
         try (ProjectDocument a = ProjectDocument.create(work, S)) {
-            new HeatStore(a.database()).create("WK", 4, 2, 8);
+            new HeatStore(a.database()).create(4, 2, 8);
             a.saveAs(withHeat);
         }
         try (ProjectDocument b = ProjectDocument.create(work, S)) {

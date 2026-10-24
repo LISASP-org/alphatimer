@@ -22,7 +22,7 @@ class SchemaMigrationsTest {
     private Path fileOfTheFirstVersion() throws SQLException {
         Path file = dir.resolve("old.sqlite");
         try (Connection c = connect(file); Statement st = c.createStatement()) {
-            st.execute("create table heat (id integer, competition varchar(255), event integer not null, heatNumber integer not null, "
+            st.execute("create table heat (id integer, changeSeq bigint not null, competition varchar(255), event integer not null, heatNumber integer not null, "
                     + "status varchar(255) check (status in ('Open','Started','Finished')), primary key (id), "
                     + "constraint UK_heat unique (competition, event, heatNumber))");
             st.execute("create table lane (id integer, number integer not null, "
@@ -30,7 +30,7 @@ class SchemaMigrationsTest {
                     + "status varchar(255) check (status in ('NotUsed','Used')), heat_id bigint, primary key (id), "
                     + "constraint FK_lane_heat foreign key (heat_id) references heat)");
             st.execute("create index IX_lane_heat on lane (heat_id)");
-            st.execute("insert into heat (id, competition, event, heatNumber, status) values (7, 'WK', 1, 2, 'Finished')");
+            st.execute("insert into heat (id, changeSeq, competition, event, heatNumber, status) values (7, 1, 'WK', 1, 2, 'Finished')");
             st.execute("insert into lane (id, number, penalty, status, heat_id) values (3, 4, 'DidNotStart', 'Used', 7)");
         }
         return file;
@@ -62,21 +62,41 @@ class SchemaMigrationsTest {
     }
 
     @Test
-    void migratingAFileOfTheFirstVersionRemovesItsCheckConstraintsAndKeepsDataIndexesAndKeys() throws Exception {
+    void migratingAFileOfTheFirstVersionRemovesItsCheckConstraintsAndTheHeatCompetitionAndKeepsDataIndexesAndKeys() throws Exception {
         Path file = fileOfTheFirstVersion();
 
         SchemaMigrations.migrate(file);
 
+        assertThat(query(file, "select name from pragma_table_info('heat')")).containsExactly("id", "changeSeq", "event", "heatNumber", "status");
         assertThat(query(file, "select sql from sqlite_master where sql like '%check%'")).isEmpty();
-        assertThat(query(file, "select id, competition, event, heatNumber, status from heat")).containsExactly("7|WK|1|2|Finished");
+        assertThat(query(file, "select id, changeSeq, event, heatNumber, status from heat")).containsExactly("7|1|1|2|Finished");
         assertThat(query(file, "select id, number, penalty, status, heat_id from lane")).containsExactly("3|4|DidNotStart|Used|7");
-        assertThat(query(file, "select name from sqlite_master where type = 'index' and sql is not null")).containsExactly("IX_lane_heat");
+        assertThat(query(file, "select name from sqlite_master where type = 'index' and sql is not null"))
+                .containsExactlyInAnyOrder("IX_lane_heat", "heat_event_heatNumber");
         assertThat(query(file, "select \"table\", \"from\", \"to\" from pragma_foreign_key_list('lane')")).containsExactly("heat|heat_id|null");
         assertThat(query(file, "pragma user_version")).containsExactly(String.valueOf(SchemaMigrations.CURRENT_VERSION));
 
-        execute(file, "insert into heat (id, competition, event, heatNumber, status) values (8, 'WK', 1, 3, 'SomethingNew')");
+        execute(file, "insert into heat (id, changeSeq, event, heatNumber, status) values (8, 2, 1, 3, 'SomethingNew')");
         execute(file, "insert into lane (id, number, penalty, status, heat_id) values (4, 5, 'NewPenalty', 'NewStatus', 8)");
-        assertThatThrownBy(() -> execute(file, "insert into heat (competition, event, heatNumber) values ('WK', 1, 2)"))
+        assertThatThrownBy(() -> execute(file, "insert into heat (changeSeq, event, heatNumber) values (3, 1, 2)"))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("UNIQUE");
+    }
+
+    @Test
+    void aHeatStoredUnderTwoCompetitionTagsKeepsOnlyItsMostRecentlyChangedRowWithItsLanes() throws Exception {
+        Path file = dir.resolve("tagged.sqlite");
+        execute(file, "create table heat (id integer, changeSeq bigint not null, competition varchar(255), event integer not null, "
+                + "heatNumber integer not null, primary key (id))");
+        execute(file, "create table lane (id integer, number integer not null, heat_id bigint, primary key (id))");
+        execute(file, "insert into heat (id, changeSeq, competition, event, heatNumber) values (7, 3, 'TestWK', 1, 2), (8, 4, 'TestWK', 1, 3), (9, 5, '', 1, 2)");
+        execute(file, "insert into lane (id, number, heat_id) values (1, 1, 7), (2, 2, 7), (3, 1, 9), (4, 2, 9), (5, 1, 8)");
+
+        SchemaMigrations.migrate(file);
+
+        assertThat(query(file, "select id, changeSeq, event, heatNumber from heat order by id")).containsExactly("8|4|1|3", "9|5|1|2");
+        assertThat(query(file, "select id, number, heat_id from lane order by id")).containsExactly("3|1|9", "4|2|9", "5|1|8");
+        assertThatThrownBy(() -> execute(file, "insert into heat (changeSeq, event, heatNumber) values (6, 1, 3)"))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("UNIQUE");
     }

@@ -31,6 +31,20 @@ class ProjectDatabaseTest {
     }
 
     @Test
+    void aNewProjectIdentifiesAHeatByEventAndHeatNumberOnly() throws Exception {
+        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+            List<Object> heatColumns = db.read(em -> em.createNativeQuery("select name from pragma_table_info('heat')").getResultList());
+            List<Object> uniqueKeys = db.read(em -> em.createNativeQuery(
+                    "select group_concat(ii.name, ',') from pragma_index_list('heat') il, pragma_index_info(il.name) ii where il.\"unique\" = 1 group by il.name")
+                                                 .getResultList());
+
+            assertThat(heatColumns).doesNotContain("competition");
+            assertThat(uniqueKeys).containsExactly("event,heatNumber");
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
     void writeSetsDirtyAndSnapshotRoundTrips() throws Exception {
         Path file = dir.resolve("a.heat");
         try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {

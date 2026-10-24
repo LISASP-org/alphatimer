@@ -10,7 +10,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -21,17 +20,19 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity(name = "HeatEntity")
-@Table(name = "heat", uniqueConstraints = @UniqueConstraint(columnNames = {"competition", "event", "heatNumber"}))
+@Table(name = "heat")
 @Getter
 @Setter
 @NoArgsConstructor
 public class HeatEntity {
 
+    /** Hibernate's SQLite dialect silently skips unique keys over several columns, so a new file gets it from this statement. */
+    static final String UNIQUE_KEY = "create unique index heat_event_heatNumber on heat (event, heatNumber)";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String competition;
     private int event;
     private int heatNumber;
     @Convert(converter = EnumNameConverters.HeatStatusConverter.class)

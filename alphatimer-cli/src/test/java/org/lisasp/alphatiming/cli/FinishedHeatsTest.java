@@ -32,7 +32,7 @@ class FinishedHeatsTest {
     }
 
     private static HeatDto heat(int event, int heat, HeatStatus status) {
-        return new HeatDto("", event, heat, status, null, null, 0, List.of(
+        return new HeatDto(event, heat, status, null, null, 0, List.of(
                 new LaneDto(1, 65_430, 0, LaneStatus.Used, Penalty.None, 2, true),
                 new LaneDto(2, 61_000, 0, LaneStatus.Used, Penalty.None, 1, true),
                 new LaneDto(3, 0, 0, LaneStatus.Used, Penalty.DidNotStart, 0, false),

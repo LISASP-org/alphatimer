@@ -59,7 +59,11 @@ public final class ProjectDatabase implements AutoCloseable {
             } else {
                 SchemaMigrations.migrate(workFile);
             }
-            this.factory = buildFactory(workFile);
+            SessionFactory built = buildFactory(workFile);
+            if (isNew) {
+                createUniqueKeys(built);
+            }
+            this.factory = built;
         } catch (IOException | RuntimeException ex) {
             releaseLock();
             throw ex;
@@ -139,6 +143,15 @@ public final class ProjectDatabase implements AutoCloseable {
             }
         } catch (java.sql.SQLException ex) {
             throw new InvalidProjectFileException(shownName, ex);
+        }
+    }
+
+    private static void createUniqueKeys(SessionFactory built) {
+        try {
+            built.inTransaction(session -> session.createNativeMutationQuery(HeatEntity.UNIQUE_KEY).executeUpdate());
+        } catch (RuntimeException ex) {
+            built.close();
+            throw ex;
         }
     }
 

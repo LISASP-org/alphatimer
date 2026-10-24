@@ -189,10 +189,10 @@ class TuiMainWindowTest {
         render();
         assertThat(screenText()).contains("No data to display yet");
 
-        HeatDto heat = new HeatDto("", 3, 2, HeatStatus.Finished, null, null, 0, List.of(
+        HeatDto heat = new HeatDto(3, 2, HeatStatus.Finished, null, null, 0, List.of(
                 new LaneDto(1, 65_430, 0, LaneStatus.Used, Penalty.None, 2, true),
                 new LaneDto(2, 0, 0, LaneStatus.Used, Penalty.DidNotStart, 0, false)));
-        HeatDto before = new HeatDto("", 3, 1, HeatStatus.Finished, null, null, 0, List.of(
+        HeatDto before = new HeatDto(3, 1, HeatStatus.Finished, null, null, 0, List.of(
                 new LaneDto(1, 61_000, 0, LaneStatus.Used, Penalty.None, 1, true)));
         window.liveViewPanel().setHeats(new LiveHeats(heat, before));
         render();
@@ -240,8 +240,8 @@ class TuiMainWindowTest {
     void theLiveViewTellsWhenTheHeatsStartedAndFinished() throws IOException {
         LocalDateTime start = LocalDateTime.of(2026, 5, 1, 10, 0, 0);
         window.showLiveView();
-        window.liveViewPanel().setHeats(new LiveHeats(new HeatDto("", 3, 2, HeatStatus.Started, start.plusMinutes(3), null, 0, List.of()),
-                                                      new HeatDto("", 3, 1, HeatStatus.Finished, start, start.plusSeconds(65), 0, List.of())));
+        window.liveViewPanel().setHeats(new LiveHeats(new HeatDto(3, 2, HeatStatus.Started, start.plusMinutes(3), null, 0, List.of()),
+                                                      new HeatDto(3, 1, HeatStatus.Finished, start, start.plusSeconds(65), 0, List.of())));
         render();
 
         List<String> lines = screenText().lines().toList();

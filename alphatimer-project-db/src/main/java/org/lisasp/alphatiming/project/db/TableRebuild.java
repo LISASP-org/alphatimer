@@ -37,11 +37,21 @@ final class TableRebuild {
 
     /** {@code createSql} defines the table under its own name, with the columns of the old table in the same order. */
     static void rebuild(Connection connection, String table, String createSql) throws SQLException {
+        rebuild(connection, table, createSql, "*", "");
+    }
+
+    /** {@code createSql} defines the table under its own name, with at least the given columns. */
+    static void rebuild(Connection connection, String table, String createSql, List<String> columns) throws SQLException {
+        String quoted = String.join(", ", columns.stream().map(TableRebuild::quote).toList());
+        rebuild(connection, table, createSql, quoted, " (" + quoted + ")");
+    }
+
+    private static void rebuild(Connection connection, String table, String createSql, String selected, String inserted) throws SQLException {
         String temporary = table + "_rebuild";
         List<String> dependents = dependentObjectsOf(connection, table);
         try (Statement st = connection.createStatement()) {
             st.execute(withTableName(createSql, temporary));
-            st.execute("insert into " + quote(temporary) + " select * from " + quote(table));
+            st.execute("insert into " + quote(temporary) + inserted + " select " + selected + " from " + quote(table));
             st.execute("drop table " + quote(table));
             st.execute("alter table " + quote(temporary) + " rename to " + quote(table));
             for (String sql : dependents) {
@@ -72,7 +82,7 @@ final class TableRebuild {
         return m.group(1) + quote(name) + createSql.substring(m.end());
     }
 
-    private static String quote(String name) {
+    static String quote(String name) {
         return '"' + name.replace("\"", "\"\"") + '"';
     }
 }
