@@ -24,6 +24,8 @@ import java.util.function.Consumer;
 /**
  * Saves (Save, Save As, auto-save) run one after another on the save lock, taken before the database lock; switching to
  * another file, the origin note and closing run under it too, so a running save finishes before the database closes.
+ * The settings are kept in memory so that reading them never waits for the database lock; this only holds while
+ * {@link #updateSettings} is the only code that writes the settings table.
  */
 @Slf4j
 public final class TimingDocument implements AutoCloseable {
@@ -36,11 +38,13 @@ public final class TimingDocument implements AutoCloseable {
     private volatile LockFile fileLock;
     private boolean closed;
     private volatile TimingFileWriter fileWriter = new TimingFileWriter();
+    private volatile Settings settings;
 
     private TimingDocument(TimingDatabase database, Path file, LockFile fileLock) {
         this.database = database;
         this.file = file;
         this.fileLock = fileLock;
+        this.settings = readSettings();
         database.addWriteListener(() -> setDirty(true));
     }
 
@@ -93,9 +97,9 @@ public final class TimingDocument implements AutoCloseable {
     private static TimingDocument load(Path file, Path workDir, LockFile lock) throws IOException {
         TimingDatabase db = TimingDatabase.openCopy(file, workDir);
         log.info("Opened project {}", file.getFileName());
-        TimingDocument doc = new TimingDocument(db, file, lock);
+        TimingDocument doc;
         try {
-            doc.settings();
+            doc = new TimingDocument(db, file, lock);
         } catch (RuntimeException ex) {
             db.closeAndDelete();
             throw new InvalidProjectFileException(file, ex);
@@ -144,6 +148,10 @@ public final class TimingDocument implements AutoCloseable {
     }
 
     public Settings settings() {
+        return settings;
+    }
+
+    private Settings readSettings() {
         return database.read(em -> em.createQuery("select s from SettingsEntity s order by s.id", SettingsEntity.class)
                                      .setMaxResults(1)
                                      .getResultStream()
@@ -152,8 +160,8 @@ public final class TimingDocument implements AutoCloseable {
                                      .orElseGet(Settings::defaults));
     }
 
-    public void updateSettings(Settings s) {
-        database.write(em -> {
+    public synchronized void updateSettings(Settings s) {
+        settings = database.write(em -> {
             SettingsEntity e = em.createQuery("select s from SettingsEntity s order by s.id", SettingsEntity.class)
                                  .setMaxResults(1)
                                  .getResultStream()
@@ -173,7 +181,7 @@ public final class TimingDocument implements AutoCloseable {
             e.setRestEnabled(s.restEnabled());
             e.setReplayFile(s.replayFile());
             e.setCompetitionKey(s.competitionKey());
-            return null;
+            return toSettings(e);
         });
     }
 

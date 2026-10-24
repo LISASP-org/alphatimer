@@ -101,6 +101,35 @@ class TimingDocumentTest {
     }
 
     @Test
+    void settingsAreReadWithoutWaitingForTheDatabase() throws Exception {
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
+            CountDownLatch writing = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            Thread writer = new Thread(() -> doc.database().write(em -> {
+                writing.countDown();
+                awaitQuietly(release);
+                return null;
+            }));
+            writer.start();
+            writing.await();
+            AtomicReference<Settings> read = new AtomicReference<>();
+            Thread reader = new Thread(() -> read.set(doc.settings()));
+            reader.start();
+            awaitParkedOrTerminated(reader);
+            Thread.State readerState = reader.getState();
+            release.countDown();
+            writer.join();
+            reader.join();
+
+            assertThat(readerState).isEqualTo(Thread.State.TERMINATED);
+            assertThat(read.get()).isEqualTo(SETTINGS);
+            Settings changed = SETTINGS.withTcp("changed", 1);
+            doc.updateSettings(changed);
+            assertThat(doc.settings()).isEqualTo(changed);
+        }
+    }
+
+    @Test
     void saveWithoutFileIsRejected() throws Exception {
         try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
             assertThatThrownBy(doc::save).isInstanceOf(IllegalStateException.class);
