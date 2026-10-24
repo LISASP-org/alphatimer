@@ -2,6 +2,7 @@ package org.lisasp.alphatiming.ui;
 
 import org.lisasp.alphatiming.ui.common.AppController;
 import org.lisasp.alphatiming.ui.common.I18n;
+import org.lisasp.alphatiming.ui.common.SavePrompt;
 import org.lisasp.alphatiming.ui.common.TimeFormat;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.lisasp.alphatiming.heats.HeatStatus;
 import org.lisasp.alphatiming.heats.LaneDto;
 import org.lisasp.alphatiming.heats.LaneStatus;
 import org.lisasp.alphatiming.heats.Penalty;
+import org.lisasp.alphatiming.project.db.CrashLeftover;
 import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
@@ -39,6 +41,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -633,6 +636,95 @@ class JAlphaTimingSmokeTest {
         } finally {
             onEdt(() -> shownDialog(title).ifPresent(JDialog::dispose));
             shutDown(controller, frame);
+        }
+    }
+    @Test
+    void openingShowsTheNewSettingsInTheFocusedFieldAndKeepsTheOldTextOutOfIt() throws Exception {
+        Assumptions.assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display (run with xvfb-run)");
+        Path work = Files.createDirectories(dir.resolve("work12"));
+        Path file = dir.resolve("other-host.timing");
+        try (TimingDocument saved = TimingDocument.create(Files.createDirectories(dir.resolve("saving12")), Settings.defaults().withTcp("other-host", 8585))) {
+            saved.saveAs(file);
+        }
+        AppController controller = new AppController(work, new DefaultSettingsStore(dir.resolve("d12.json")), new DiscardingPrompt(), () -> s -> new SerialPortReader() {
+            @Override
+            public SerialPortReader register(ByteConsumer listener) {
+                return this;
+            }
+
+            @Override
+            public void close() {
+            }
+        }, LocalDateTime::now);
+        JAlphaTiming[] holder = new JAlphaTiming[1];
+        onEdt(() -> {
+            controller.init();
+            holder[0] = new JAlphaTiming(controller, new SwingSavePrompt());
+            holder[0].setVisible(true);
+        });
+        JAlphaTiming frame = holder[0];
+        TimingDocument before = controller.document();
+        try {
+            onEdt(() -> frame.settingsPanel().hostField().requestFocusInWindow());
+            await().atMost(Duration.ofSeconds(10)).until(() -> onEdtTrue(() -> frame.settingsPanel().hostField().hasFocus()));
+            onEdt(() -> {
+                frame.settingsPanel().hostField().setText("typed-host");
+                frame.open(file);
+            });
+            await().atMost(Duration.ofSeconds(10)).until(() -> onEdtTrue(() -> controller.document() != before && frame.isEnabled()));
+            await().atMost(Duration.ofSeconds(10)).until(() -> onEdtTrue(() -> frame.settingsPanel().hostField().hasFocus()));
+
+            onEdt(() -> {
+                frame.refresh();
+                assertThat(frame.settingsPanel().hostField().getText()).isEqualTo("other-host");
+                frame.settingsPanel().competitionKeyField().requestFocusInWindow();
+            });
+            await().atMost(Duration.ofSeconds(10)).until(() -> onEdtTrue(() -> frame.settingsPanel().competitionKeyField().hasFocus()));
+            onEdt(() -> {
+                assertThat(controller.document().settings().tcpHost()).isEqualTo("other-host");
+                assertThat(controller.document().isDirty()).isFalse();
+            });
+        } finally {
+            shutDown(controller, frame);
+        }
+    }
+
+    private static boolean onEdtTrue(BooleanSupplier condition) throws Exception {
+        FutureTask<Boolean> task = new FutureTask<>(condition::getAsBoolean);
+        SwingUtilities.invokeLater(task);
+        return task.get(5, TimeUnit.SECONDS);
+    }
+
+    /** A Swing dialog would wait for a click that this test never sends. */
+    private static final class DiscardingPrompt implements SavePrompt {
+        @Override
+        public Choice askSaveChanges() {
+            return Choice.DISCARD;
+        }
+
+        @Override
+        public boolean askStopRecording() {
+            return true;
+        }
+
+        @Override
+        public Optional<Path> askSavePath() {
+            return Optional.empty();
+        }
+
+        @Override
+        public void showError(String title, String message) {
+            throw new AssertionError(title + ": " + message);
+        }
+
+        @Override
+        public RecoveryChoice askRecover(CrashLeftover leftover) {
+            return RecoveryChoice.LATER;
+        }
+
+        @Override
+        public boolean confirmDiscard(CrashLeftover leftover) {
+            return false;
         }
     }
 }

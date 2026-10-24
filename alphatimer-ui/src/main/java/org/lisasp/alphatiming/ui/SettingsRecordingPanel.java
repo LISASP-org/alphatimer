@@ -3,6 +3,7 @@ package org.lisasp.alphatiming.ui;
 import org.lisasp.alphatiming.ui.common.AppController;
 import org.lisasp.alphatiming.ui.common.I18n;
 import org.lisasp.alphatiming.ui.common.SettingsFormRules;
+import org.lisasp.alphatiming.ui.common.ShownDocument;
 import com.jgoodies.forms.factories.CC;
 import com.jgoodies.forms.layout.FormLayout;
 import de.df.jutils.gui.JWarningTextField;
@@ -61,6 +62,7 @@ public final class SettingsRecordingPanel extends JPanel {
     private final JTextArea messageLog = new JTextArea();
 
     private final JPanel connectionCards = new JPanel(new CardLayout());
+    private final ShownDocument shownDocument = new ShownDocument();
 
     private boolean updating;
     private boolean commitsHeld;
@@ -268,18 +270,19 @@ public final class SettingsRecordingPanel extends JPanel {
     /** Brings the fields, buttons and labels in line with the document and the recording state. Call on the EDT. */
     public void refresh() {
         TimingDocument doc = controller.document();
+        boolean replaced = shownDocument.replacedBy(doc);
         updating = true;
         try {
             if (doc != null) {
                 Settings s = doc.settings();
                 connectionType.setSelectedItem(s.connectionType());
-                if (!replayFile.hasFocus()) {
+                if (replaced || !replayFile.hasFocus()) {
                     replayFile.setText(s.replayFile());
                 }
-                if (!competitionKey.hasFocus()) {
+                if (replaced || !competitionKey.hasFocus()) {
                     competitionKey.setText(s.competitionKey());
                 }
-                if (!host.hasFocus()) {
+                if (replaced || !host.hasFocus()) {
                     host.setText(s.tcpHost());
                 }
                 port.setValue(clamp(s.tcpPort(), 1, 65535));
@@ -287,7 +290,7 @@ public final class SettingsRecordingPanel extends JPanel {
                 restPort.setValue(clamp(s.restPort(), 1, 65535));
                 serverToggle.setSelected(s.restEnabled());
                 serialMode.setSelectedItem(s.serialMode());
-                if (!serialPort.getEditor().getEditorComponent().hasFocus()) {
+                if (replaced || !serialPort.getEditor().getEditorComponent().hasFocus()) {
                     serialPort.setSelectedItem(s.serialPort());
                 }
             }

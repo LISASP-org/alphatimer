@@ -23,6 +23,7 @@ import org.lisasp.alphatiming.ui.common.SavePrompt;
 import org.lisasp.alphatiming.project.db.CrashLeftover;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
+import org.lisasp.alphatiming.ui.core.settings.Settings;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
 
 import java.io.IOException;
@@ -247,6 +248,32 @@ class TuiMainWindowTest {
         List<String> lines = screenText().lines().toList();
         assertCentered(lines.stream().filter(l -> l.contains("Event 3 \u00B7 Heat 2")).findFirst().orElseThrow(), "Event 3 \u00B7 Heat 2", "10:03:00 \u2192", "0:00.0");
         assertCentered(lines.stream().filter(l -> l.contains("Event 3 \u00B7 Heat 1")).findFirst().orElseThrow(), "Event 3 \u00B7 Heat 1", "10:00:00 \u2192 10:01:05", "Previous heat");
+    }
+
+    @Test
+    void aNewProjectShowsItsSettingsInTheFocusedFieldAndKeepsTheOldTextOutOfIt() throws IOException {
+        new DefaultSettingsStore(dir.resolve("defaults.json")).save(Settings.defaults().withTcp("next-host", 8585));
+        TuiSettingsPanel settings = window.settingsPanel();
+        window.setFocusedInteractable(settings.hostField());
+        settings.hostField().setText("typed-host");
+
+        controller.newProject();
+        render();
+
+        assertThat(settings.hostField().isFocused()).isTrue();
+        assertThat(settings.hostField().getText()).isEqualTo("next-host");
+
+        window.setFocusedInteractable(settings.competitionKeyField());
+        render();
+
+        assertThat(controller.document().settings().tcpHost()).isEqualTo("next-host");
+        assertThat(controller.document().isDirty()).isFalse();
+
+        window.setFocusedInteractable(settings.hostField());
+        settings.hostField().setText("edited-host");
+        settings.refresh();
+
+        assertThat(settings.hostField().getText()).isEqualTo("edited-host");
     }
 
     /** The times stand in the middle between the start of the title and the end of the right text. */

@@ -17,6 +17,7 @@ import org.lisasp.alphatimer.serial.com.SerialPorts;
 import org.lisasp.alphatiming.ui.common.AppController;
 import org.lisasp.alphatiming.ui.common.I18n;
 import org.lisasp.alphatiming.ui.common.SettingsFormRules;
+import org.lisasp.alphatiming.ui.common.ShownDocument;
 import org.lisasp.alphatiming.ui.common.TimeFormat;
 import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
@@ -61,6 +62,7 @@ final class TuiSettingsPanel extends Panel {
     private final Panel tcpPanel = new Panel(new GridLayout(2));
     private final Panel serialPanel = new Panel(new GridLayout(2));
     private final Panel filePanel = new Panel(new GridLayout(2));
+    private final ShownDocument shownDocument = new ShownDocument();
 
     private boolean updating;
     private boolean portsLoaded;
@@ -227,23 +229,24 @@ final class TuiSettingsPanel extends Panel {
         }
     }
 
-    /** Brings the fields in line with the document; fields being edited keep their text. */
+    /** Brings the fields in line with the document; fields being edited keep their text until the document is replaced. */
     void refresh() {
         TimingDocument doc = controller.document();
+        boolean replaced = shownDocument.replacedBy(doc);
         updating = true;
         try {
             if (doc != null) {
                 Settings s = doc.settings();
                 connectionType.setSelectedIndex(s.connectionType().ordinal());
-                setUnlessFocused(competitionKey, s.competitionKey());
-                setUnlessFocused(host, s.tcpHost());
-                setUnlessFocused(port, String.valueOf(s.tcpPort()));
-                setUnlessFocused(replayFile, s.replayFile());
-                setUnlessFocused(autoSave, String.valueOf(s.autoSaveSeconds()));
-                setUnlessFocused(restPort, String.valueOf(s.restPort()));
+                setUnlessEdited(competitionKey, s.competitionKey(), replaced);
+                setUnlessEdited(host, s.tcpHost(), replaced);
+                setUnlessEdited(port, String.valueOf(s.tcpPort()), replaced);
+                setUnlessEdited(replayFile, s.replayFile(), replaced);
+                setUnlessEdited(autoSave, String.valueOf(s.autoSaveSeconds()), replaced);
+                setUnlessEdited(restPort, String.valueOf(s.restPort()), replaced);
                 server.setChecked(s.restEnabled());
                 serialMode.setSelectedIndex(s.serialMode().ordinal());
-                if (!serialPort.isFocused()) {
+                if (replaced || !serialPort.isFocused()) {
                     selectPort(s.serialPort());
                 }
             }
@@ -256,8 +259,8 @@ final class TuiSettingsPanel extends Panel {
         refreshButtons();
     }
 
-    private static void setUnlessFocused(TextBox box, String text) {
-        if (!box.isFocused() && !box.getText().equals(text)) {
+    private static void setUnlessEdited(TextBox box, String text, boolean replaced) {
+        if ((replaced || !box.isFocused()) && !box.getText().equals(text)) {
             box.setText(text);
         }
     }
