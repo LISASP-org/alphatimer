@@ -79,7 +79,9 @@ ARES messages and the heats. While a project is open, the app works on a tempora
   periodically for projects that already have a file.
 - Each save keeps the state before it as `<name>-previous.timing` next to the project file (replacing an older one). Open
   it like any project to go back one save.
-- Closing (or New/Open) stops the recording first and asks Save / Discard / Cancel when there are unsaved changes.
+- Closing (or New/Open) during a recording first asks whether to stop it; Cancel keeps the recording running and the
+  project open. Then Save / Discard / Cancel is asked when there are unsaved changes (Cancel keeps the project open, the
+  recording stays stopped).
 - After a crash the next start offers to recover the leftover work file.
 - A project file can be open in only one running AlphaTiming (window, text UI or command line) at a time; another one
   refuses to open it or to save over it. While it is open, a `<name>.timing.lock` file lies next to it.

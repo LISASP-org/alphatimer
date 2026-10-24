@@ -33,6 +33,13 @@ final class TuiSavePrompt implements SavePrompt {
     }
 
     @Override
+    public boolean askStopRecording() {
+        return choose(I18n.get("dialog.stopRecording.title"), I18n.get("dialog.stopRecording.message"), false,
+                      I18n.get("button.cancel"), false,
+                      I18n.get("button.stopRecording"), true);
+    }
+
+    @Override
     public Optional<Path> askSavePath() {
         File chosen;
         while ((chosen = new FileDialogBuilder().setTitle(I18n.get("menu.saveAs")).setActionLabel(I18n.get("button.save")).build().showDialog(gui)) != null) {

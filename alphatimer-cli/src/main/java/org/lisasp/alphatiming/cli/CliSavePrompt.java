@@ -23,6 +23,11 @@ public final class CliSavePrompt implements SavePrompt {
     }
 
     @Override
+    public boolean askStopRecording() {
+        return true;
+    }
+
+    @Override
     public Optional<Path> askSavePath() {
         return Optional.ofNullable(target);
     }

@@ -79,6 +79,11 @@ class TuiMainWindowTest {
         }
 
         @Override
+        public boolean askStopRecording() {
+            return true;
+        }
+
+        @Override
         public Optional<Path> askSavePath() {
             return Optional.empty();
         }

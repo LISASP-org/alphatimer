@@ -10,6 +10,9 @@ public interface SavePrompt {
 
     enum RecoveryChoice { RECOVER, DISCARD, LATER }
 
+    /** Leaving the document would end the running recording; false keeps both. */
+    boolean askStopRecording();
+
     /** The current project has unsaved changes. */
     Choice askSaveChanges();
 

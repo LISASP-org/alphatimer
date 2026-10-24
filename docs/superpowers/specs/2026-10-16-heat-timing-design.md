@@ -18,8 +18,10 @@ Workflow: stop recording → change settings → start recording.
   project file (`VACUUM INTO` a temp file next to the target, then atomic rename).
 - Dirty tracking, periodic auto-save (when dirty and the project has a file; interval is a setting, default 60 s),
   explicit Save / Save As.
-- Closing (window close, File → Exit, and also File → New / Open): the **recording is stopped first**, then if the
-  document is dirty a dialog offers Save / Discard / Cancel. Cancel returns to the app (recording stays stopped).
+- Closing (window close, File → Exit, and also File → New / Open): while a recording runs, a dialog first asks whether
+  to **stop the recording**; Cancel returns to the app with the recording still running. Only after the user confirmed,
+  the recording stops, and then, if the document is dirty, a dialog offers Save / Discard / Cancel. Cancel there returns
+  to the app (recording stays stopped). The command line stops its recording itself and is never asked.
 - Default settings: the settings of the last loaded/saved project are stored in `~/.heat-timing/defaults.json` and used
   when the program starts and when a new project is created.
 - Main window: JAuswertung-style left button bar with two panels, "Settings & Recording" (host, port, other

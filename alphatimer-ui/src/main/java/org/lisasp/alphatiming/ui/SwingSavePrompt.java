@@ -39,6 +39,20 @@ public final class SwingSavePrompt implements SavePrompt {
     }
 
     @Override
+    public boolean askStopRecording() {
+        Object[] options = {I18n.get("button.stopRecording"), I18n.get("button.cancel")};
+        int answer = JOptionPane.showOptionDialog(parent,
+                                                  I18n.get("dialog.stopRecording.message"),
+                                                  I18n.get("dialog.stopRecording.title"),
+                                                  JOptionPane.OK_CANCEL_OPTION,
+                                                  JOptionPane.WARNING_MESSAGE,
+                                                  null,
+                                                  options,
+                                                  options[1]);
+        return answer == 0;
+    }
+
+    @Override
     public Optional<Path> askSavePath() {
         String name;
         while ((name = FileChooserUtils.saveFile(parent, projectFilter())) != null) {

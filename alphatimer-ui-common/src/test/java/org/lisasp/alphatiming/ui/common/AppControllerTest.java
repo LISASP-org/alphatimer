@@ -33,6 +33,7 @@ class AppControllerTest {
         final Queue<Choice> choices = new ArrayDeque<>();
         final Queue<Optional<Path>> paths = new ArrayDeque<>();
         final Queue<RecoveryChoice> recoveries = new ArrayDeque<>();
+        final Queue<Boolean> stops = new ArrayDeque<>();
         final List<String> errors = new ArrayList<>();
         final List<String> events;
 
@@ -44,6 +45,12 @@ class AppControllerTest {
         public Choice askSaveChanges() {
             events.add("askSaveChanges");
             return choices.remove();
+        }
+
+        @Override
+        public boolean askStopRecording() {
+            events.add("askStopRecording");
+            return stops.remove();
         }
 
         @Override
@@ -160,7 +167,7 @@ class AppControllerTest {
         controller.init();
         assertThat(controller.document().isDirty()).isFalse();
         assertThat(controller.requestClose()).isTrue();
-        assertThat(events).doesNotContain("askSaveChanges");
+        assertThat(events).doesNotContain("askSaveChanges", "askStopRecording");
         assertThat(workFiles()).isZero();
     }
 
@@ -178,17 +185,38 @@ class AppControllerTest {
     }
 
     @Test
-    void closeWhileRecordingStopsFirstThenAsks() throws Exception {
+    void closeWhileRecordingAsksToStopThenStopsThenAsksToSave() throws Exception {
         controller.init();
         controller.applySettings(S);
         controller.startRecording();
         assertThat(controller.session().state()).isEqualTo(RecordingState.RUNNING);
+        prompt.stops.add(true);
         prompt.choices.add(SavePrompt.Choice.DISCARD);
 
         assertThat(controller.requestClose()).isTrue();
 
-        assertThat(events).containsExactly("readerClosed", "askSaveChanges");
+        assertThat(events).containsExactly("askStopRecording", "readerClosed", "askSaveChanges");
         assertThat(workFiles()).isZero();
+    }
+
+    @Test
+    void declinedStopKeepsTheRecordingAndTheDocumentOnCloseNewAndOpen() throws Exception {
+        Path file = savedProject("other.timing");
+        controller.init();
+        controller.applySettings(S);
+        controller.startRecording();
+        ProjectDocument before = controller.document();
+        prompt.stops.addAll(List.of(false, false, false));
+
+        assertThat(controller.requestClose()).isFalse();
+        controller.newProject();
+        controller.open(file);
+
+        assertThat(events).containsExactly("askStopRecording", "askStopRecording", "askStopRecording");
+        assertThat(controller.document()).isSameAs(before);
+        assertThat(controller.session().state()).isEqualTo(RecordingState.RUNNING);
+        assertThat(controller.document().isDirty()).isTrue();
+        controller.stopRecording();
     }
 
     @Test
@@ -210,10 +238,11 @@ class AppControllerTest {
     }
 
     @Test
-    void cancelKeepsTheDocumentAndLeavesRecordingStopped() {
+    void cancelOfTheSaveQuestionAfterAConfirmedStopKeepsTheDocumentWithTheRecordingStopped() {
         controller.init();
         controller.applySettings(S);
         controller.startRecording();
+        prompt.stops.add(true);
         prompt.choices.add(SavePrompt.Choice.CANCEL);
 
         assertThat(controller.requestClose()).isFalse();

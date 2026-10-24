@@ -147,7 +147,7 @@ public final class AppController implements AutoCloseable {
         }
     }
 
-    /** Stops the recording, asks about unsaved data and closes the document. True when the program may exit. */
+    /** Asks to stop a running recording, then about unsaved data, and closes the document. True when the program may exit. */
     public boolean requestClose() {
         if (!prepareToLeaveDocument()) {
             return false;
@@ -261,7 +261,12 @@ public final class AppController implements AutoCloseable {
     }
 
     private boolean prepareToLeaveDocument() {
-        stopRecording();
+        if (isRecording()) {
+            if (!prompt.askStopRecording()) {
+                return false;
+            }
+            stopRecording();
+        }
         ProjectDocument doc = document;
         if (doc == null || !doc.isDirty()) {
             return true;
