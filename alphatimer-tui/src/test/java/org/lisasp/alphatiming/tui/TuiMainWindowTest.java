@@ -187,7 +187,7 @@ class TuiMainWindowTest {
     void theLiveViewShowsTheHeatWithItsLanes() throws IOException {
         window.showLiveView();
         render();
-        assertThat(screenText()).contains("Do data to display present");
+        assertThat(screenText()).contains("No data to display yet");
 
         HeatDto heat = new HeatDto("", 3, 2, HeatStatus.Finished, null, null, 0, List.of(
                 new LaneDto(1, 65_430, 0, LaneStatus.Used, Penalty.None, 2, true),
@@ -229,7 +229,7 @@ class TuiMainWindowTest {
     void functionKeysSwitchThePanels() throws IOException {
         window.handleInput(new KeyStroke(KeyType.F6));
         render();
-        assertThat(screenText()).contains("Do data to display present");
+        assertThat(screenText()).contains("No data to display yet");
 
         window.handleInput(new KeyStroke(KeyType.F5));
         render();

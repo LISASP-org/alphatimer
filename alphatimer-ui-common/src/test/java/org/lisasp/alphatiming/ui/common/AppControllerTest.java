@@ -351,6 +351,24 @@ class AppControllerTest {
     }
 
     @Test
+    void theErrorForACorruptFileSaysItIsNotAnAlphaTimingProject() throws Exception {
+        Locale original = Locale.getDefault();
+        Locale.setDefault(Locale.ENGLISH);
+        try {
+            controller.init();
+            Path bad = dir.resolve("bad.timing");
+            Files.writeString(bad, "garbage");
+            prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+            controller.open(bad);
+
+            assertThat(prompt.errors).singleElement().asString().contains(bad + " is not an AlphaTiming project file.");
+        } finally {
+            Locale.setDefault(original);
+        }
+    }
+
+    @Test
     void settingsCannotChangeWhileRecording() {
         controller.init();
         controller.applySettings(S);
