@@ -1,6 +1,7 @@
 package org.lisasp.alphatiming.ui;
 
 import org.lisasp.alphatiming.ui.common.AppController;
+import org.lisasp.alphatiming.ui.common.LogFileCleanup;
 import de.df.jutils.gui.util.DesignInit;
 import org.lisasp.basics.jre.date.ActualDateTime;
 import org.lisasp.alphatiming.ui.core.recording.RecordingSession;
@@ -21,6 +22,7 @@ public final class AlphaTimingLauncher {
     public static void main(String[] args) {
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> log.error("Uncaught exception in thread {}", thread.getName(), throwable));
         log.info("Starting AlphaTiming");
+        LogFileCleanup.inUserHome("alphatiming").run();
         DesignInit.init();
         PlatformFileChooser.initialize();
         SwingUtilities.invokeLater(() -> {

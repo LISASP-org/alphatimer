@@ -103,8 +103,8 @@ ARES messages and the heats. While a project is open, the app works on a tempora
 
 Every program start writes a log file `~/.alphatiming/logs/alphatiming-<date-time>.log` (and to the console); the
 text UI and the command line program write `alphatiming-tui-<date-time>.log` / `alphatiming-cli-<date-time>.log` and
-nothing to the console. Attach it
-when reporting a problem. Old log files are not deleted automatically.
+nothing to the console. Attach it when reporting a problem. At its start, each program deletes its own log files that
+are older than 30 days, but always keeps its 10 newest ones.
 
 ## REST endpoints
 

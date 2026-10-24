@@ -2,6 +2,7 @@ package org.lisasp.alphatiming.cli;
 
 import lombok.extern.slf4j.Slf4j;
 import org.lisasp.alphatiming.ui.common.AppController;
+import org.lisasp.alphatiming.ui.common.LogFileCleanup;
 import org.lisasp.alphatiming.ui.common.I18n;
 import org.lisasp.alphatiming.ui.core.recording.RecordingSession;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
@@ -30,6 +31,7 @@ public final class RecordLauncher {
             System.exit(ExitCode.USAGE.code());
         }
         log.info("Starting AlphaTiming command line recording");
+        LogFileCleanup.inUserHome("alphatiming-cli").run();
         Path file = Path.of(args[0]).toAbsolutePath();
         Path workDir = Path.of(System.getProperty("user.home"), ".alphatiming", "work");
         AppController controller = new AppController(workDir, DefaultSettingsStore.inUserHome(), new CliSavePrompt(file, System.err), RecordingSession::standard, new ActualDateTime());
