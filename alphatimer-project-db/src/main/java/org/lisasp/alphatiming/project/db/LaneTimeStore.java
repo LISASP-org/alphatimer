@@ -35,6 +35,17 @@ public class LaneTimeStore implements LaneTimeRepository {
                                .toList());
     }
 
+    @Override
+    public void delete(int event, int heatNumber, int laneIndex, long timeInMillis) {
+        db.write(em -> em.createQuery("delete from LaneTimeEntity l where l.event = :event and l.heatNumber = :heatNumber"
+                                              + " and l.laneIndex = :laneIndex and l.timeInMillis = :timeInMillis")
+                         .setParameter("event", event)
+                         .setParameter("heatNumber", heatNumber)
+                         .setParameter("laneIndex", laneIndex)
+                         .setParameter("timeInMillis", timeInMillis)
+                         .executeUpdate());
+    }
+
     private static LaneTime toLaneTime(LaneTimeEntity e) {
         return new LaneTime(e.getCompetition(), e.getEvent(), e.getHeatNumber(), e.getLaneIndex(), e.getTimeInMillis(), e.getStatus(), e.getTimestamp());
     }

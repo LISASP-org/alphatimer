@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [A deleted finish stays in the legacy REST data](deleted-finish-stays-in-legacy-data.md) | High | S | JAuswertung keeps seeing a time the timekeeper deleted |
 | [Discarded changes can be auto-saved after a failed Open](discarded-changes-saved-after-failed-open.md) | Medium | S | After Discard and a failed Open, auto-save resumes on the discarded changes |
 | [Buffered raw data is dropped silently at stop](buffered-raw-data-dropped-at-stop.md) | Medium | S | Bytes buffered during a disk problem are lost at stop without a message |
 | [The auto-save warning carries over to the next project](autosave-warning-carries-over.md) | Medium | S | A new project shows the previous project's auto-save warning |

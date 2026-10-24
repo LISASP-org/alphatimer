@@ -105,6 +105,11 @@ final class WriteMonitor {
             public List<LaneTime> findAll() {
                 return store.findAll();
             }
+
+            @Override
+            public void delete(int event, int heatNumber, int laneIndex, long timeInMillis) {
+                write(RecordedData.LANE_TIMES, () -> store.delete(event, heatNumber, laneIndex, timeInMillis));
+            }
         };
     }
 }
