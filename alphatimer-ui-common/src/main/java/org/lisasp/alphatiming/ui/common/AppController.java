@@ -62,7 +62,7 @@ public final class AppController implements AutoCloseable {
             if (document != null) {
                 break; // keep the remaining leftovers for the next start
             }
-            offerRecovery(leftover);
+            withoutAutoSave(() -> offerRecovery(leftover));
         }
         if (document == null) {
             newProject();
@@ -94,17 +94,23 @@ public final class AppController implements AutoCloseable {
     }
 
     public void newProject() {
-        if (!prepareToLeaveDocument()) {
-            return;
-        }
-        try {
-            replaceDocument(ProjectDocument.create(workDir, defaults.load()));
-        } catch (IOException ex) {
-            prompt.showError(I18n.get("error.new.title"), describe(ex));
-        }
+        withoutAutoSave(() -> {
+            if (!prepareToLeaveDocument()) {
+                return;
+            }
+            try {
+                replaceDocument(ProjectDocument.create(workDir, defaults.load()));
+            } catch (IOException ex) {
+                prompt.showError(I18n.get("error.new.title"), describe(ex));
+            }
+        });
     }
 
     public void open(Path file) {
+        withoutAutoSave(() -> openAfterQuestions(file));
+    }
+
+    private void openAfterQuestions(Path file) {
         if (!prepareToLeaveDocument()) {
             return;
         }
@@ -142,6 +148,10 @@ public final class AppController implements AutoCloseable {
     }
 
     public boolean saveAs() {
+        return withoutAutoSave(this::askPathAndSave);
+    }
+
+    private boolean askPathAndSave() {
         ProjectDocument doc = document;
         if (doc == null) {
             return false;
@@ -166,16 +176,18 @@ public final class AppController implements AutoCloseable {
 
     /** Asks to stop a running recording, then about unsaved data, and closes the document. True when the program may exit. */
     public boolean requestClose() {
-        if (!prepareToLeaveDocument()) {
-            return false;
-        }
-        ProjectDocument doc = document;
-        document = null;
-        session = null;
-        if (doc != null) {
-            doc.close();
-        }
-        return true;
+        return withoutAutoSave(() -> {
+            if (!prepareToLeaveDocument()) {
+                return false;
+            }
+            ProjectDocument doc = document;
+            document = null;
+            session = null;
+            if (doc != null) {
+                doc.close();
+            }
+            return true;
+        });
     }
 
     public void startRecording() {
@@ -284,6 +296,27 @@ public final class AppController implements AutoCloseable {
     @Override
     public void close() {
         autoSaver.close();
+    }
+
+    void runAutoSave() {
+        autoSaver.runOnce();
+    }
+
+    /** The user's answers decide whether changes reach the file, so the pause lasts until a discarded document is closed. */
+    private <T> T withoutAutoSave(Supplier<T> questionsAndTheirConsequence) {
+        autoSaver.pause();
+        try {
+            return questionsAndTheirConsequence.get();
+        } finally {
+            autoSaver.resume();
+        }
+    }
+
+    private void withoutAutoSave(Runnable questionsAndTheirConsequence) {
+        withoutAutoSave(() -> {
+            questionsAndTheirConsequence.run();
+            return null;
+        });
     }
 
     private boolean prepareToLeaveDocument() {

@@ -13,6 +13,7 @@ import org.lisasp.alphatiming.ui.core.settings.Settings;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -25,6 +26,7 @@ public final class ProjectDocument implements AutoCloseable {
     private final ProjectDatabase database;
     private volatile Path file;
     private volatile LockFile fileLock;
+    private boolean closed;
 
     private ProjectDocument(ProjectDatabase database, Path file, LockFile fileLock) {
         this.database = database;
@@ -53,13 +55,17 @@ public final class ProjectDocument implements AutoCloseable {
 
     /** Opens the saved state of this document's file once more; the new document takes over the lock on the file. */
     public ProjectDocument reopen(Path workDir) throws IOException {
-        Path current = file;
-        if (current == null) {
-            throw new IllegalStateException("The project has no file yet.");
-        }
-        ProjectDocument doc = load(current, workDir, fileLock);
-        fileLock = null;
-        return doc;
+        List<ProjectDocument> reopened = new ArrayList<>(1);
+        database.runWithSaveLock(() -> {
+            checkOpen();
+            Path current = file;
+            if (current == null) {
+                throw new IllegalStateException("The project has no file yet.");
+            }
+            reopened.add(load(current, workDir, fileLock));
+            fileLock = null;
+        });
+        return reopened.getFirst();
     }
 
     public boolean isSavedAs(Path candidate) {
@@ -206,30 +212,52 @@ public final class ProjectDocument implements AutoCloseable {
     }
 
     public void save() throws IOException {
-        Path target = file;
-        if (target == null) {
-            throw new IllegalStateException("The project has no file yet; use saveAs.");
-        }
-        snapshot(target);
+        database.runWithSaveLock(() -> {
+            checkOpen();
+            Path target = file;
+            if (target == null) {
+                throw new IllegalStateException("The project has no file yet; use saveAs.");
+            }
+            snapshot(target);
+        });
+    }
+
+    /** Saves unsaved changes to the project file; does nothing without a file or once the document is closed. */
+    public void saveIfChanged() throws IOException {
+        database.runWithSaveLock(() -> {
+            Path target = file;
+            if (!closed && target != null && isDirty()) {
+                snapshot(target);
+            }
+        });
     }
 
     public void saveAs(Path target) throws IOException {
-        if (isSavedAs(target)) {
-            snapshot(target);
-            return;
-        }
-        LockFile targetLock = lockProjectFile(target);
-        try {
-            snapshot(target);
-        } catch (IOException | RuntimeException ex) {
-            targetLock.closeAndDelete();
-            throw ex;
-        }
-        LockFile previous = fileLock;
-        fileLock = targetLock;
-        file = target;
-        if (previous != null) {
-            previous.closeAndDelete();
+        database.runWithSaveLock(() -> {
+            checkOpen();
+            if (isSavedAs(target)) {
+                snapshot(target);
+                return;
+            }
+            LockFile targetLock = lockProjectFile(target);
+            try {
+                snapshot(target);
+            } catch (IOException | RuntimeException ex) {
+                targetLock.closeAndDelete();
+                throw ex;
+            }
+            LockFile previous = fileLock;
+            fileLock = targetLock;
+            file = target;
+            if (previous != null) {
+                previous.closeAndDelete();
+            }
+        });
+    }
+
+    private void checkOpen() {
+        if (closed) {
+            throw new IllegalStateException("The project is closed.");
         }
     }
 
@@ -243,14 +271,21 @@ public final class ProjectDocument implements AutoCloseable {
         }
     }
 
+    /** Waits for a running save. */
     @Override
     public void close() {
-        database.closeAndDelete();
-        WorkFileOrigin.delete(database.workFile());
-        LockFile lock = fileLock;
-        fileLock = null;
-        if (lock != null) {
-            lock.closeAndDelete();
-        }
+        database.runWithSaveLock(() -> {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            database.closeAndDelete();
+            WorkFileOrigin.delete(database.workFile());
+            LockFile lock = fileLock;
+            fileLock = null;
+            if (lock != null) {
+                lock.closeAndDelete();
+            }
+        });
     }
 }

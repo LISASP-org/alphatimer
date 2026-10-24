@@ -16,8 +16,8 @@ Workflow: stop recording → change settings → start recording.
   interpreted messages and heats. SQLite via `hibernate-community-dialects` + `sqlite-jdbc`.
 - Working database while a project is open: a temporary SQLite database. **Save** writes a consistent snapshot to the
   project file (`VACUUM INTO` a temp file next to the target, then atomic rename).
-- Dirty tracking, periodic auto-save (when dirty and the project has a file; interval is a setting, default 60 s),
-  explicit Save / Save As.
+- Dirty tracking, periodic auto-save (when dirty and the project has a file; interval is a setting, default 60 s;
+  paused while a question about the project or the Save As dialog is open), explicit Save / Save As.
 - Closing (window close, File → Exit, and also File → New / Open): while a recording runs, a dialog first asks whether
   to **stop the recording**; Cancel returns to the app with the recording still running. Only after the user confirmed,
   the recording stops, and then, if the document is dirty, a dialog offers Save / Discard / Cancel. Cancel there returns

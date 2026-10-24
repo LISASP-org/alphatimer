@@ -29,9 +29,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 class ProjectDocumentTest {
 
@@ -503,6 +507,112 @@ class ProjectDocumentTest {
         Files.writeString(dir.resolve("x.timing.lock"), "");
         try (ProjectDocument doc = ProjectDocument.open(file, work())) {
             assertThat(doc.file()).contains(file);
+        }
+    }
+
+    @Test
+    void closeWaitsForARunningSaveAndLeavesNoOriginNote() throws Exception {
+        Path file = dir.resolve("x.timing");
+        ProjectDocument doc = ProjectDocument.create(work(), SETTINGS);
+        doc.saveAs(file);
+        doc.updateSettings(SETTINGS.withTcp("changed", 1));
+        CountDownLatch saveBlocked = new CountDownLatch(1);
+        CountDownLatch releaseSave = new CountDownLatch(1);
+        AtomicReference<Exception> saveFailure = new AtomicReference<>();
+        Thread saver = new Thread(() -> {
+            try {
+                doc.save();
+            } catch (Exception ex) {
+                saveFailure.set(ex);
+            }
+        });
+        doc.addDirtyListener(dirty -> {
+            if (!dirty && Thread.currentThread() == saver) {
+                saveBlocked.countDown();
+                awaitQuietly(releaseSave);
+            }
+        });
+        saver.start();
+        saveBlocked.await();
+        Thread closer = new Thread(doc::close);
+        closer.start();
+        awaitParkedOrTerminated(closer);
+        boolean closeWaited = closer.isAlive();
+        releaseSave.countDown();
+        saver.join();
+        closer.join();
+
+        assertThat(closeWaited).isTrue();
+        assertThat(saveFailure.get()).isNull();
+        assertThat(WorkFileOrigin.read(doc.database().workFile())).isEmpty();
+        assertThat(doc.database().workFile()).doesNotExist();
+    }
+
+    @Test
+    void aSaveWaitingForSaveAsWritesToTheNewFile() throws Exception {
+        Path a = dir.resolve("a.timing");
+        Path b = dir.resolve("b.timing");
+        try (ProjectDocument doc = ProjectDocument.create(work(), SETTINGS)) {
+            doc.saveAs(a);
+            doc.updateSettings(SETTINGS.withTcp("changed", 1));
+            CountDownLatch saveAsBlocked = new CountDownLatch(1);
+            CountDownLatch releaseSaveAs = new CountDownLatch(1);
+            List<Exception> failures = new CopyOnWriteArrayList<>();
+            Thread savingAs = new Thread(() -> {
+                try {
+                    doc.saveAs(b);
+                } catch (Exception ex) {
+                    failures.add(ex);
+                }
+            });
+            doc.addDirtyListener(dirty -> {
+                if (!dirty && Thread.currentThread() == savingAs) {
+                    saveAsBlocked.countDown();
+                    awaitQuietly(releaseSaveAs);
+                }
+            });
+            savingAs.start();
+            saveAsBlocked.await();
+            Thread saving = new Thread(() -> {
+                try {
+                    doc.save();
+                } catch (Exception ex) {
+                    failures.add(ex);
+                }
+            });
+            saving.start();
+            awaitParkedOrTerminated(saving);
+            releaseSaveAs.countDown();
+            savingAs.join();
+            saving.join();
+
+            assertThat(failures).isEmpty();
+            assertThat(ProjectDatabase.previousVersionOf(a)).doesNotExist();
+            assertThat(ProjectDatabase.previousVersionOf(b)).exists();
+            assertThat(WorkFileOrigin.read(doc.database().workFile())).map(WorkFileOrigin::projectFile).contains(b.toAbsolutePath());
+        }
+    }
+
+    @Test
+    void aClosedDocumentRefusesToSave() throws Exception {
+        ProjectDocument doc = ProjectDocument.create(work(), SETTINGS);
+        doc.saveAs(dir.resolve("x.timing"));
+        doc.updateSettings(SETTINGS.withTcp("changed", 1));
+        doc.close();
+
+        assertThatThrownBy(doc::save).isInstanceOf(IllegalStateException.class);
+        assertThat(ProjectDatabase.previousVersionOf(dir.resolve("x.timing"))).doesNotExist();
+    }
+
+    static void awaitParkedOrTerminated(Thread thread) {
+        await().until(() -> thread.getState() == Thread.State.WAITING || thread.getState() == Thread.State.TERMINATED);
+    }
+
+    static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
         }
     }
 }

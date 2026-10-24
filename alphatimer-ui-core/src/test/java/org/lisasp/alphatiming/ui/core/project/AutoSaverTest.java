@@ -2,6 +2,7 @@ package org.lisasp.alphatiming.ui.core.project;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.lisasp.alphatiming.project.db.ProjectDatabase;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
 import java.nio.file.Files;
@@ -9,6 +10,8 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -81,5 +84,64 @@ class AutoSaverTest {
             assertThat(errors).hasSize(1);
             assertThat(doc.isDirty()).isTrue();
         }
+    }
+
+    @Test
+    void aPausedAutoSaverWritesNothingUntilResumed() throws Exception {
+        try (ProjectDocument doc = ProjectDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
+             AutoSaver saver = new AutoSaver(() -> doc, e -> { })) {
+            doc.saveAs(dir.resolve("x.timing"));
+            doc.updateSettings(SETTINGS.withTcp("b", 2));
+            saver.pause();
+            saver.runOnce();
+            assertThat(doc.isDirty()).isTrue();
+            saver.resume();
+            saver.runOnce();
+            assertThat(doc.isDirty()).isFalse();
+        }
+    }
+
+    @Test
+    void pauseWaitsForARunningAutoSave() throws Exception {
+        try (ProjectDocument doc = ProjectDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
+             AutoSaver saver = new AutoSaver(() -> doc, e -> { })) {
+            doc.saveAs(dir.resolve("x.timing"));
+            doc.updateSettings(SETTINGS.withTcp("b", 2));
+            CountDownLatch saveBlocked = new CountDownLatch(1);
+            CountDownLatch releaseSave = new CountDownLatch(1);
+            Thread autoSave = new Thread(saver::runOnce);
+            doc.addDirtyListener(dirty -> {
+                if (!dirty && Thread.currentThread() == autoSave) {
+                    saveBlocked.countDown();
+                    ProjectDocumentTest.awaitQuietly(releaseSave);
+                }
+            });
+            autoSave.start();
+            saveBlocked.await();
+            Thread pausing = new Thread(saver::pause);
+            pausing.start();
+            ProjectDocumentTest.awaitParkedOrTerminated(pausing);
+            boolean pauseWaited = pausing.isAlive();
+            releaseSave.countDown();
+            autoSave.join();
+            pausing.join();
+
+            assertThat(pauseWaited).isTrue();
+        }
+    }
+
+    @Test
+    void aClosedDocumentIsNotSavedAndReportsNoError() throws Exception {
+        List<Exception> errors = new CopyOnWriteArrayList<>();
+        Path target = dir.resolve("x.timing");
+        ProjectDocument doc = ProjectDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
+        try (AutoSaver saver = new AutoSaver(() -> doc, errors::add)) {
+            doc.saveAs(target);
+            doc.updateSettings(SETTINGS.withTcp("b", 2));
+            doc.close();
+            saver.runOnce();
+        }
+        assertThat(errors).isEmpty();
+        assertThat(ProjectDatabase.previousVersionOf(target)).doesNotExist();
     }
 }

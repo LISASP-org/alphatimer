@@ -56,7 +56,10 @@ that solve problems this application does not have:
 - All database access goes through `ProjectDatabase.read/write` (one lock, one connection). Never open sessions on the
   side. Lock order: component locks (`RecordingSession`, `HeatService`, `RawDataRecorder`) first, the database lock
   second. Saves (Save, Save As, auto-save) run one after another on the save lock of `ProjectDatabase`, which
-  `snapshotTo` takes before the database lock.
+  `snapshotTo` takes before the database lock. `ProjectDocument` switches to a new file (Save As), records the
+  work file's origin note and closes under the same save lock, so a running save finishes before the database closes.
+- `AppController` pauses the `AutoSaver` while it asks the user about the document (stop recording, Save / Discard /
+  Cancel, Save As path, recovery) and until a discarded document is closed; `pause()` waits for a running auto-save.
 - An exception inside the recording pipeline must never reach the reader thread (`RecordingSession.safe`); a failing
   listener must not affect the others.
 - Long-running work (saving, opening) must not be added to the EDT without thought — saving takes the database lock

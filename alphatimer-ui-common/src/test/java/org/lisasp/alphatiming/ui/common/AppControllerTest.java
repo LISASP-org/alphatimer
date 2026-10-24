@@ -7,6 +7,7 @@ import org.lisasp.alphatimer.api.serial.SerialPortReader;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.project.db.HeatStore;
+import org.lisasp.alphatiming.project.db.ProjectDatabase;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
@@ -45,6 +46,7 @@ class AppControllerTest {
         final Queue<Boolean> stops = new ArrayDeque<>();
         final List<String> errors = new ArrayList<>();
         final List<String> events;
+        Runnable whileAsking = () -> { };
 
         RecordingPrompt(List<String> events) {
             this.events = events;
@@ -53,18 +55,21 @@ class AppControllerTest {
         @Override
         public Choice askSaveChanges() {
             events.add("askSaveChanges");
+            whileAsking.run();
             return choices.remove();
         }
 
         @Override
         public boolean askStopRecording() {
             events.add("askStopRecording");
+            whileAsking.run();
             return stops.remove();
         }
 
         @Override
         public Optional<Path> askSavePath() {
             events.add("askSavePath");
+            whileAsking.run();
             return paths.remove();
         }
 
@@ -76,6 +81,7 @@ class AppControllerTest {
         @Override
         public RecoveryChoice askRecover(CrashLeftover leftover) {
             events.add("askRecover");
+            whileAsking.run();
             leftovers.add(leftover);
             return recoveries.remove();
         }
@@ -703,5 +709,64 @@ class AppControllerTest {
         assertThatThrownBy(() -> ProjectDocument.open(file, otherWork())).isInstanceOf(ProjectFileInUseException.class);
         assertThat(controller.requestClose()).isTrue();
         assertThat(dir.resolve("x.timing.lock")).doesNotExist();
+    }
+
+    private void autoSaveFromAnotherThread() {
+        Thread autoSave = new Thread(controller::runAutoSave);
+        autoSave.start();
+        try {
+            autoSave.join();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private Path openChangedProject(String name) throws IOException {
+        Path file = savedProject(name);
+        controller.init();
+        controller.open(file);
+        controller.applySettings(S.withTcp("changed", 1));
+        return file;
+    }
+
+    @Test
+    void anAutoSaveDuringTheSaveQuestionDoesNotWriteChangesTheUserDiscards() throws Exception {
+        Path file = openChangedProject("x.timing");
+        prompt.whileAsking = this::autoSaveFromAnotherThread;
+        prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+        controller.newProject();
+
+        assertThat(ProjectDatabase.previousVersionOf(file)).doesNotExist();
+        try (ProjectDocument saved = ProjectDocument.open(file, otherWork())) {
+            assertThat(saved.settings().tcpHost()).isEqualTo(S.tcpHost());
+        }
+    }
+
+    @Test
+    void afterACancelledQuestionAutoSaveResumes() throws Exception {
+        Path file = openChangedProject("x.timing");
+        prompt.whileAsking = this::autoSaveFromAnotherThread;
+        prompt.choices.add(SavePrompt.Choice.CANCEL);
+
+        assertThat(controller.requestClose()).isFalse();
+        assertThat(controller.document().isDirty()).isTrue();
+
+        controller.runAutoSave();
+        assertThat(controller.document().isDirty()).isFalse();
+        assertThat(ProjectDatabase.previousVersionOf(file)).exists();
+    }
+
+    @Test
+    void anAutoSaveWhileTheSaveAsDialogIsOpenDoesNotWriteTheCurrentFile() throws Exception {
+        Path file = openChangedProject("a.timing");
+        Path target = dir.resolve("b.timing");
+        prompt.whileAsking = this::autoSaveFromAnotherThread;
+        prompt.paths.add(Optional.of(target));
+
+        assertThat(controller.saveAs()).isTrue();
+
+        assertThat(ProjectDatabase.previousVersionOf(file)).doesNotExist();
+        assertThat(target).exists();
     }
 }

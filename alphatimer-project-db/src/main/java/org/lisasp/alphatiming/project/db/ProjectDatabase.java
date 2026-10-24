@@ -200,6 +200,21 @@ public final class ProjectDatabase implements AutoCloseable {
         }
     }
 
+    @FunctionalInterface
+    public interface SaveWork<E extends Exception> {
+        void run() throws E;
+    }
+
+    /** Runs work while no save of this database runs; work may save itself, the save lock is reentrant. */
+    public <E extends Exception> void runWithSaveLock(SaveWork<E> work) throws E {
+        saveLock.lock();
+        try {
+            work.run();
+        } finally {
+            saveLock.unlock();
+        }
+    }
+
     private void snapshotUnderSaveLock(Path target) throws IOException {
         Path tmp = target.resolveSibling(target.getFileName() + ".tmp");
         Files.deleteIfExists(tmp);
@@ -284,10 +299,18 @@ public final class ProjectDatabase implements AutoCloseable {
         return workFile;
     }
 
+    /** Waits for a running save and database access. */
     @Override
     public void close() {
-        factory.close();
-        releaseLock();
+        saveLock.lock();
+        lock.lock();
+        try {
+            factory.close();
+            releaseLock();
+        } finally {
+            lock.unlock();
+            saveLock.unlock();
+        }
     }
 
     public void closeAndDelete() {

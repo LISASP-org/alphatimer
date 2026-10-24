@@ -77,7 +77,8 @@ One SQLite file (`*.timing`; files of earlier versions named `*.heat` still open
 ARES messages and the heats. While a project is open, the app works on a temporary copy in `~/.alphatiming/work/`:
 
 - **File → Save** writes a consistent snapshot of that copy (atomic replace of the `.timing` file); auto-save does the same
-  periodically for projects that already have a file.
+  periodically for projects that already have a file, but never while a question about the project or the Save As
+  dialog is open, so changes the user then discards do not reach the file.
 - **File → Save As** adds `.timing` to a name typed without it (a name ending in `.heat` is kept) and asks before
   overwriting the file that will actually be written.
 - Each save keeps the state before it as `<name>-previous.timing` next to the project file (replacing an older one). Open

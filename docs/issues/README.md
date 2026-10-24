@@ -14,7 +14,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
 | [Saving also blocks the recording](save-blocks-recording.md) | Medium | M | A slow save target blocks the reader thread for the whole save |
-| [Auto-save runs while the save dialog is open](autosave-during-save-dialog.md) | Low | S | Changes can reach the file although the user then chooses Discard |
 | [Old log files are never deleted](log-files-not-rotated.md) | Low | S | Every start adds a log file under `~/.alphatiming/logs`, none is ever removed |
 | [Text errors in English messages](open-invalid-wrong-article.md) | Low | S | "not a AlphaTiming project file" and "Do data to display present" |
 | [The REST server uses an unbounded thread pool](rest-server-unbounded-threads.md) | Low | S | Every concurrent request gets its own thread, without a limit |
