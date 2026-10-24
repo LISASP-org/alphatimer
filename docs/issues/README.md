@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [Save does not flush the file before replacing the project file](save-not-flushed.md) | High | S | After a power loss the project file can be incomplete while the old version is gone |
 | [Deleted times are applied as real times](deleted-time-applied.md) | High | S | `DeletedTime` messages overwrite a lane's time; inherited from alphatimer |
 | [The project file is not locked](project-file-not-locked.md) | High | M | Two program instances can overwrite the same project file |
 | [Enum columns carry CHECK constraints that are never updated](enum-check-constraints.md) | High | M | A new enum value makes inserts into older project files fail |

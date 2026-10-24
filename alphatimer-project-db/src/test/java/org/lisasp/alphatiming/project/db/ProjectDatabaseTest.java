@@ -59,7 +59,69 @@ class ProjectDatabaseTest {
             db.closeAndDelete();
         }
         try (var files = Files.list(dir)) {
-            assertThat(files.map(p -> p.getFileName().toString())).containsExactly("a.heat");
+            assertThat(files.map(p -> p.getFileName().toString())).containsExactlyInAnyOrder("a.heat", "a-previous.heat");
+        }
+    }
+
+    private void saveWithSettings(ProjectDatabase db, Path file, int count) throws IOException {
+        db.write(em -> {
+            em.createQuery("delete from SettingsEntity").executeUpdate();
+            for (int i = 0; i < count; i++) {
+                em.persist(new SettingsEntity("h", 1, 60, 0));
+            }
+            return null;
+        });
+        db.snapshotTo(file);
+    }
+
+    private long settingsIn(Path file) throws IOException {
+        try (ProjectDatabase db = ProjectDatabase.openCopy(file, dir)) {
+            long count = countSettings(db);
+            db.closeAndDelete();
+            return count;
+        }
+    }
+
+    @Test
+    void savingAgainKeepsThePreviousStateNextToTheFile() throws Exception {
+        Path projects = Files.createDirectory(dir.resolve("projects"));
+        Path file = projects.resolve("wk.timing");
+        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+            saveWithSettings(db, file, 1);
+            saveWithSettings(db, file, 2);
+            db.closeAndDelete();
+        }
+        Path previous = projects.resolve("wk-previous.timing");
+        assertThat(previous).exists();
+        assertThat(settingsIn(previous)).isEqualTo(1);
+        assertThat(settingsIn(file)).isEqualTo(2);
+    }
+
+    @Test
+    void aFurtherSaveReplacesThePreviousFile() throws Exception {
+        Path projects = Files.createDirectory(dir.resolve("projects"));
+        Path file = projects.resolve("wk.timing");
+        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+            saveWithSettings(db, file, 1);
+            saveWithSettings(db, file, 2);
+            saveWithSettings(db, file, 3);
+            db.closeAndDelete();
+        }
+        Path previous = projects.resolve("wk-previous.timing");
+        assertThat(previous).exists();
+        assertThat(settingsIn(previous)).isEqualTo(2);
+        assertThat(settingsIn(file)).isEqualTo(3);
+    }
+
+    @Test
+    void theFirstSaveCreatesNoPreviousFile() throws Exception {
+        Path projects = Files.createDirectory(dir.resolve("projects"));
+        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+            saveWithSettings(db, projects.resolve("wk.timing"), 1);
+            db.closeAndDelete();
+        }
+        try (var files = Files.list(projects)) {
+            assertThat(files.map(p -> p.getFileName().toString())).containsExactly("wk.timing");
         }
     }
 

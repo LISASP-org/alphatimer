@@ -67,7 +67,8 @@ that solve problems this application does not have:
 
 - A `.timing` project file (earlier versions saved `.heat`; the Open dialog still accepts it) is a SQLite file written through JPA/Hibernate (native bootstrap, no `persistence.xml`,
   `hibernate-community-dialects`). Tables: `settings`, `rawdata`, `aresmessage`, `lanetime`, `heat`, `lane`. Columns added later (e.g. the connection type in `settings`) are nullable and read as the earlier behavior (TCP), so files of earlier versions still open.
-- Save = `VACUUM INTO` a temp file + atomic move (`ProjectDatabase.snapshotTo`); a failed save keeps the old file and
+- Save = `VACUUM INTO` a temp file, flushed to disk, then the existing file is renamed to `<name>-previous.timing`
+  (replacing an older one) and the temp file moved into place (`ProjectDatabase.snapshotTo`); a failed save keeps the old file (at worst as `-previous`) and
   the dirty flag. Open copies the file to `~/.alphatiming/work/` and rejects files that are not AlphaTiming projects.
 - Work files are protected by an OS lock (`.lock` next to them); only unlocked ones are offered for crash recovery.
 - **Users open files from earlier versions.** Every change to an entity (table or column) must keep older project files

@@ -219,7 +219,8 @@ public final class ProjectDatabase implements AutoCloseable {
     }
 
     /**
-     * Writes a consistent copy of the database to target (via a temp file and an atomic rename). Does not clear the dirty flag.
+     * Writes a consistent copy of the database to target (via a temp file and an atomic rename); an existing target becomes
+     * {@link #previousVersionOf(Path)}. Does not clear the dirty flag.
      */
     public void snapshotTo(Path target) throws IOException {
         Path tmp = target.resolveSibling(target.getFileName() + ".tmp");
@@ -235,7 +236,15 @@ public final class ProjectDatabase implements AutoCloseable {
                     connection.setAutoCommit(auto);
                 }
             });
+            // VACUUM INTO does not sync its output; without this a power loss can leave a half-written project file.
+            force(tmp);
+            if (Files.exists(target)) {
+                Path previous = previousVersionOf(target);
+                Files.deleteIfExists(previous);
+                Files.move(target, previous, StandardCopyOption.ATOMIC_MOVE);
+            }
             Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            forceDirectory(target.toAbsolutePath().getParent());
         } catch (IOException | RuntimeException ex) {
             try {
                 Files.deleteIfExists(tmp);
@@ -245,6 +254,29 @@ public final class ProjectDatabase implements AutoCloseable {
             throw ex instanceof IOException io ? io : new IOException("Could not save project file " + target, ex);
         } finally {
             lock.unlock();
+        }
+    }
+
+    /** The file that keeps the state before the last save: {@code wk.timing} → {@code wk-previous.timing}. */
+    public static Path previousVersionOf(Path file) {
+        String name = file.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        String previous = dot > 0 ? name.substring(0, dot) + "-previous" + name.substring(dot) : name + "-previous";
+        return file.resolveSibling(previous);
+    }
+
+    private static void force(Path file) throws IOException {
+        try (FileChannel channel = FileChannel.open(file, StandardOpenOption.WRITE)) {
+            channel.force(true);
+        }
+    }
+
+    private static void forceDirectory(Path directory) {
+        try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ)) {
+            channel.force(true);
+        } catch (IOException ex) {
+            // Windows cannot open a directory as a channel; there the renames are not synced separately.
+            log.debug("Could not sync directory {}", directory, ex);
         }
     }
 

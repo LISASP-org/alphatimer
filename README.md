@@ -77,6 +77,8 @@ ARES messages and the heats. While a project is open, the app works on a tempora
 
 - **File → Save** writes a consistent snapshot of that copy (atomic replace of the `.timing` file); auto-save does the same
   periodically for projects that already have a file.
+- Each save keeps the state before it as `<name>-previous.timing` next to the project file (replacing an older one). Open
+  it like any project to go back one save.
 - Closing (or New/Open) stops the recording first and asks Save / Discard / Cancel when there are unsaved changes.
 - After a crash the next start offers to recover the leftover work file.
 - The settings of the last opened/saved project are kept in `~/.alphatiming/defaults.json` and used for new projects and
