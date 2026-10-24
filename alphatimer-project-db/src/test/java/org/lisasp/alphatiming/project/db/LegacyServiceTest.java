@@ -47,7 +47,7 @@ class LegacyServiceTest {
 
     @Test
     void storesFinishTimesPerHeatAndIgnoresEverythingElse() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             LegacyService service = new LegacyService(new LaneTimeStore(db));
             assertThat(service.getHeats()).isEmpty();
 

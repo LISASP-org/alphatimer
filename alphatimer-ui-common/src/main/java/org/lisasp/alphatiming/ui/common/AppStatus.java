@@ -1,6 +1,6 @@
 package org.lisasp.alphatiming.ui.common;
 
-import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
+import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.recording.RecordingError;
 import org.lisasp.alphatiming.ui.core.recording.RecordingSession;
 import org.lisasp.alphatiming.ui.core.recording.RecordingState;
@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 public record AppStatus(String title, String file, String state, String warning, String warningDetails, boolean canStart, boolean canStop, boolean recording) {
 
     public static AppStatus of(AppController controller) {
-        ProjectDocument doc = controller.document();
+        TimingDocument doc = controller.document();
         RecordingSession session = controller.session();
         RecordingState state = session == null ? RecordingState.STOPPED : session.state();
         return of(doc != null,

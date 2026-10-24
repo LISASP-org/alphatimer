@@ -3,7 +3,7 @@ package org.lisasp.alphatiming.ui.core.project;
 import lombok.extern.slf4j.Slf4j;
 import org.lisasp.alphatiming.project.db.InvalidProjectFileException;
 import org.lisasp.alphatiming.project.db.LockFile;
-import org.lisasp.alphatiming.project.db.ProjectDatabase;
+import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.project.db.SettingsEntity;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
@@ -20,29 +20,29 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 @Slf4j
-public final class ProjectDocument implements AutoCloseable {
+public final class TimingDocument implements AutoCloseable {
 
-    private final ProjectDatabase database;
+    private final TimingDatabase database;
     private volatile Path file;
     private volatile LockFile fileLock;
     private boolean closed;
 
-    private ProjectDocument(ProjectDatabase database, Path file, LockFile fileLock) {
+    private TimingDocument(TimingDatabase database, Path file, LockFile fileLock) {
         this.database = database;
         this.file = file;
         this.fileLock = fileLock;
     }
 
     /** A new, never saved project; it only counts as changed once something other than its initial settings is written. */
-    public static ProjectDocument create(Path workDir, Settings initial) throws IOException {
-        ProjectDatabase db = ProjectDatabase.createNew(workDir);
-        ProjectDocument doc = new ProjectDocument(db, null, null);
+    public static TimingDocument create(Path workDir, Settings initial) throws IOException {
+        TimingDatabase db = TimingDatabase.createNew(workDir);
+        TimingDocument doc = new TimingDocument(db, null, null);
         doc.updateSettings(initial);
         db.markClean();
         return doc;
     }
 
-    public static ProjectDocument open(Path file, Path workDir) throws IOException {
+    public static TimingDocument open(Path file, Path workDir) throws IOException {
         LockFile lock = lockProjectFile(file);
         try {
             return load(file, workDir, lock);
@@ -53,8 +53,8 @@ public final class ProjectDocument implements AutoCloseable {
     }
 
     /** Opens the saved state of this document's file once more; the new document takes over the lock on the file. */
-    public ProjectDocument reopen(Path workDir) throws IOException {
-        List<ProjectDocument> reopened = new ArrayList<>(1);
+    public TimingDocument reopen(Path workDir) throws IOException {
+        List<TimingDocument> reopened = new ArrayList<>(1);
         database.runWithSaveLock(() -> {
             checkOpen();
             Path current = file;
@@ -76,10 +76,10 @@ public final class ProjectDocument implements AutoCloseable {
         return LockFile.tryAcquire(LockFile.besides(file)).orElseThrow(() -> new ProjectFileInUseException(file));
     }
 
-    private static ProjectDocument load(Path file, Path workDir, LockFile lock) throws IOException {
-        ProjectDatabase db = ProjectDatabase.openCopy(file, workDir);
+    private static TimingDocument load(Path file, Path workDir, LockFile lock) throws IOException {
+        TimingDatabase db = TimingDatabase.openCopy(file, workDir);
         log.info("Opened project {}", file.getFileName());
-        ProjectDocument doc = new ProjectDocument(db, file, lock);
+        TimingDocument doc = new TimingDocument(db, file, lock);
         try {
             doc.settings();
         } catch (RuntimeException ex) {
@@ -95,10 +95,10 @@ public final class ProjectDocument implements AutoCloseable {
             return List.of();
         }
         try (Stream<Path> files = Files.list(workDir)) {
-            return files.filter(p -> p.getFileName().toString().endsWith(ProjectDatabase.WORK_FILE_SUFFIX))
-                        .filter(p -> !ProjectDatabase.isInUse(p))
+            return files.filter(p -> p.getFileName().toString().endsWith(TimingDatabase.WORK_FILE_SUFFIX))
+                        .filter(p -> !TimingDatabase.isInUse(p))
                         .sorted()
-                        .map(ProjectDocument::describeLeftover)
+                        .map(TimingDocument::describeLeftover)
                         .flatMap(Optional::stream)
                         .toList();
         } catch (IOException ex) {
@@ -122,14 +122,14 @@ public final class ProjectDocument implements AutoCloseable {
      * is free and unchanged since the crashed session last opened or saved it; otherwise Save would overwrite newer data.
      * If recovering fails, the work file stays a leftover that can be recovered or discarded later.
      */
-    public static ProjectDocument recover(Path workFile) throws IOException {
+    public static TimingDocument recover(Path workFile) throws IOException {
         Optional<WorkFileOrigin> origin = WorkFileOrigin.read(workFile).filter(WorkFileOrigin::isUnchanged);
         Optional<LockFile> lock = origin.isPresent() ? LockFile.tryAcquire(LockFile.besides(origin.get().projectFile())) : Optional.empty();
         Path file = lock.isPresent() ? origin.get().projectFile() : null;
-        ProjectDatabase db = null;
+        TimingDatabase db = null;
         try {
-            db = ProjectDatabase.adopt(workFile);
-            ProjectDocument doc = new ProjectDocument(db, file, lock.orElse(null));
+            db = TimingDatabase.adopt(workFile);
+            TimingDocument doc = new TimingDocument(db, file, lock.orElse(null));
             doc.touch();
             return doc;
         } catch (IOException | RuntimeException ex) {
@@ -142,7 +142,7 @@ public final class ProjectDocument implements AutoCloseable {
     }
 
     public static void discard(Path workFile) {
-        ProjectDatabase.discard(workFile);
+        TimingDatabase.discard(workFile);
         WorkFileOrigin.delete(workFile);
     }
 
@@ -150,7 +150,7 @@ public final class ProjectDocument implements AutoCloseable {
         updateSettings(settings());
     }
 
-    public ProjectDatabase database() {
+    public TimingDatabase database() {
         return database;
     }
 
@@ -163,7 +163,7 @@ public final class ProjectDocument implements AutoCloseable {
                                      .setMaxResults(1)
                                      .getResultStream()
                                      .findFirst()
-                                     .map(ProjectDocument::toSettings)
+                                     .map(TimingDocument::toSettings)
                                      .orElseGet(Settings::defaults));
     }
 

@@ -9,7 +9,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class LaneTimeStore implements LaneTimeRepository {
 
-    private final ProjectDatabase db;
+    private final TimingDatabase db;
 
     @Override
     public void save(LaneTime laneTime) {

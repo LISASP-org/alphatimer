@@ -7,11 +7,11 @@ import org.lisasp.alphatimer.api.serial.SerialPortReader;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.project.db.HeatStore;
-import org.lisasp.alphatiming.project.db.ProjectDatabase;
+import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
-import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
+import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.recording.RecordingState;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
@@ -197,7 +197,7 @@ class AppControllerTest {
     void newAndOpenOnAFreshProjectDoNotAsk() throws Exception {
         controller.init();
         Path file = dir.resolve("other.heat");
-        try (ProjectDocument other = ProjectDocument.create(work, S)) {
+        try (TimingDocument other = TimingDocument.create(work, S)) {
             other.saveAs(file);
         }
         controller.newProject();
@@ -227,7 +227,7 @@ class AppControllerTest {
         controller.init();
         controller.applySettings(S);
         controller.startRecording();
-        ProjectDocument before = controller.document();
+        TimingDocument before = controller.document();
         prompt.stops.addAll(List.of(false, false, false));
 
         assertThat(controller.requestClose()).isFalse();
@@ -312,7 +312,7 @@ class AppControllerTest {
         assertThat(controller.document().settings()).isEqualTo(remembered);
 
         Path file = dir.resolve("other.heat");
-        try (ProjectDocument other = ProjectDocument.create(work, S)) {
+        try (TimingDocument other = TimingDocument.create(work, S)) {
             other.saveAs(file);
         }
         prompt.choices.add(SavePrompt.Choice.DISCARD);
@@ -329,7 +329,7 @@ class AppControllerTest {
     void newProjectOnDirtyDocumentCanBeCancelled() {
         controller.init();
         controller.applySettings(S);
-        ProjectDocument before = controller.document();
+        TimingDocument before = controller.document();
         prompt.choices.add(SavePrompt.Choice.CANCEL);
         controller.newProject();
         assertThat(controller.document()).isSameAs(before);
@@ -338,7 +338,7 @@ class AppControllerTest {
     @Test
     void openingACorruptFileShowsAnErrorAndKeepsTheCurrentDocument() throws Exception {
         controller.init();
-        ProjectDocument before = controller.document();
+        TimingDocument before = controller.document();
         Path bad = dir.resolve("bad.heat");
         Files.writeString(bad, "garbage");
         prompt.choices.add(SavePrompt.Choice.DISCARD);
@@ -389,7 +389,7 @@ class AppControllerTest {
 
     @Test
     void leftoverWorkFileCanBeRecoveredOrDiscarded() throws Exception {
-        ProjectDocument crashed = ProjectDocument.create(work, S);
+        TimingDocument crashed = TimingDocument.create(work, S);
         crashed.database().close();
         prompt.recoveries.add(SavePrompt.RecoveryChoice.RECOVER);
         controller.init();
@@ -399,7 +399,7 @@ class AppControllerTest {
         controller.requestClose();
         assertThat(workFiles()).isZero();
 
-        ProjectDocument crashed2 = ProjectDocument.create(work, S);
+        TimingDocument crashed2 = TimingDocument.create(work, S);
         crashed2.database().close();
         prompt.recoveries.add(SavePrompt.RecoveryChoice.DISCARD);
         prompt.discards.add(true);
@@ -413,7 +413,7 @@ class AppControllerTest {
     void latestHeatIsRestoredWhenOpeningAFile() throws Exception {
         Path file = dir.resolve("heat.heat");
         HeatDto created;
-        try (ProjectDocument other = ProjectDocument.create(work, S)) {
+        try (TimingDocument other = TimingDocument.create(work, S)) {
             created = new HeatStore(other.database()).create(4, 2, 8);
             other.saveAs(file);
         }
@@ -427,7 +427,7 @@ class AppControllerTest {
 
     @Test
     void discardingALeftoverNeedsASecondConfirmation() throws Exception {
-        ProjectDocument crashed = ProjectDocument.create(work, S);
+        TimingDocument crashed = TimingDocument.create(work, S);
         crashed.database().close();
         prompt.recoveries.add(SavePrompt.RecoveryChoice.DISCARD);
         prompt.discards.add(false);
@@ -440,7 +440,7 @@ class AppControllerTest {
 
     @Test
     void aLeftoverThatCannotBeRecoveredIsOfferedAgain() throws Exception {
-        Path leftover = Files.writeString(work.resolve("heat-broken" + ProjectDatabase.WORK_FILE_SUFFIX), "not a database");
+        Path leftover = Files.writeString(work.resolve("heat-broken" + TimingDatabase.WORK_FILE_SUFFIX), "not a database");
         prompt.recoveries.add(SavePrompt.RecoveryChoice.RECOVER);
         prompt.recoveries.add(SavePrompt.RecoveryChoice.DISCARD);
         prompt.discards.add(true);
@@ -458,7 +458,7 @@ class AppControllerTest {
     @Test
     void recoveryQuestionNamesTheProjectFileOfTheLeftover() throws Exception {
         Path file = dir.resolve("crashed.timing");
-        try (ProjectDocument crashed = ProjectDocument.create(work, S)) {
+        try (TimingDocument crashed = TimingDocument.create(work, S)) {
             crashed.saveAs(file);
             crashed.database().close();
             prompt.recoveries.add(SavePrompt.RecoveryChoice.LATER);
@@ -469,7 +469,7 @@ class AppControllerTest {
 
     @Test
     void closingTheRecoveryDialogKeepsTheLeftoverForLater() throws Exception {
-        ProjectDocument crashed = ProjectDocument.create(work, S);
+        TimingDocument crashed = TimingDocument.create(work, S);
         crashed.database().close();
         prompt.recoveries.add(SavePrompt.RecoveryChoice.LATER);
         controller.init();
@@ -480,7 +480,7 @@ class AppControllerTest {
     @Test
     void openingAProjectRestoresTheCurrentAndThePreviousHeat() throws Exception {
         Path file = dir.resolve("two.heat");
-        try (ProjectDocument a = ProjectDocument.create(work, S)) {
+        try (TimingDocument a = TimingDocument.create(work, S)) {
             HeatStore store = new HeatStore(a.database());
             store.create(1, 1, 8);
             store.create(1, 2, 8);
@@ -500,11 +500,11 @@ class AppControllerTest {
     void openingAProjectWithoutHeatsClearsTheLiveHeat() throws Exception {
         Path withHeat = dir.resolve("with.heat");
         Path without = dir.resolve("without.heat");
-        try (ProjectDocument a = ProjectDocument.create(work, S)) {
+        try (TimingDocument a = TimingDocument.create(work, S)) {
             new HeatStore(a.database()).create(4, 2, 8);
             a.saveAs(withHeat);
         }
-        try (ProjectDocument b = ProjectDocument.create(work, S)) {
+        try (TimingDocument b = TimingDocument.create(work, S)) {
             b.saveAs(without);
         }
         controller.init();
@@ -686,7 +686,7 @@ class AppControllerTest {
 
     private Path savedProject(String name) throws IOException {
         Path file = dir.resolve(name);
-        try (ProjectDocument doc = ProjectDocument.create(work, S)) {
+        try (TimingDocument doc = TimingDocument.create(work, S)) {
             doc.saveAs(file);
         }
         return file;
@@ -699,9 +699,9 @@ class AppControllerTest {
     @Test
     void openingAFileThatAnotherProgramHoldsIsRefusedAndKeepsTheCurrentDocument() throws Exception {
         Path file = savedProject("x.timing");
-        try (ProjectDocument holder = ProjectDocument.open(file, otherWork())) {
+        try (TimingDocument holder = TimingDocument.open(file, otherWork())) {
             controller.init();
-            ProjectDocument before = controller.document();
+            TimingDocument before = controller.document();
 
             controller.open(file);
 
@@ -714,7 +714,7 @@ class AppControllerTest {
     @Test
     void saveAsToAFileThatAnotherProgramHoldsIsRefused() throws Exception {
         Path file = savedProject("x.timing");
-        try (ProjectDocument holder = ProjectDocument.open(file, otherWork())) {
+        try (TimingDocument holder = TimingDocument.open(file, otherWork())) {
             controller.init();
             controller.applySettings(S.withTcp("changed", 1));
             prompt.paths.add(Optional.of(file));
@@ -741,7 +741,7 @@ class AppControllerTest {
 
         assertThat(prompt.errors).isEmpty();
         assertThat(controller.document().settings()).isEqualTo(S);
-        assertThatThrownBy(() -> ProjectDocument.open(file, otherWork())).isInstanceOf(ProjectFileInUseException.class);
+        assertThatThrownBy(() -> TimingDocument.open(file, otherWork())).isInstanceOf(ProjectFileInUseException.class);
         assertThat(controller.requestClose()).isTrue();
         assertThat(dir.resolve("x.timing.lock")).doesNotExist();
     }
@@ -772,8 +772,8 @@ class AppControllerTest {
 
         controller.newProject();
 
-        assertThat(ProjectDatabase.previousVersionOf(file)).doesNotExist();
-        try (ProjectDocument saved = ProjectDocument.open(file, otherWork())) {
+        assertThat(TimingDatabase.previousVersionOf(file)).doesNotExist();
+        try (TimingDocument saved = TimingDocument.open(file, otherWork())) {
             assertThat(saved.settings().tcpHost()).isEqualTo(S.tcpHost());
         }
     }
@@ -789,7 +789,7 @@ class AppControllerTest {
 
         controller.runAutoSave();
         assertThat(controller.document().isDirty()).isFalse();
-        assertThat(ProjectDatabase.previousVersionOf(file)).exists();
+        assertThat(TimingDatabase.previousVersionOf(file)).exists();
     }
 
     @Test
@@ -801,7 +801,7 @@ class AppControllerTest {
 
         assertThat(controller.saveAs()).isTrue();
 
-        assertThat(ProjectDatabase.previousVersionOf(file)).doesNotExist();
+        assertThat(TimingDatabase.previousVersionOf(file)).doesNotExist();
         assertThat(target).exists();
     }
 }

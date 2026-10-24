@@ -15,7 +15,7 @@ import org.lisasp.alphatimer.refinedmessages.DataHandlingMessageRefiner;
 import org.lisasp.alphatimer.serial.tcp.TcpReader;
 import org.lisasp.basics.jre.date.DateTimeFacade;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
-import org.lisasp.alphatiming.project.db.ProjectDatabase;
+import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.heats.HeatService;
 import org.lisasp.alphatiming.project.db.HeatStore;
@@ -51,7 +51,7 @@ public final class RecordingSession implements AutoCloseable {
     private static final String COMPETITION = "";
     private static final int REPLAY_BAUD_RATE = 9600;
 
-    private final ProjectDatabase db;
+    private final TimingDatabase db;
     private final ReaderFactory readers;
     private final DateTimeFacade time;
 
@@ -72,7 +72,7 @@ public final class RecordingSession implements AutoCloseable {
     private LegacyHttpServer restServer;
     private volatile LegacyService legacy;
 
-    public RecordingSession(ProjectDatabase db, ReaderFactory readers, DateTimeFacade time) {
+    public RecordingSession(TimingDatabase db, ReaderFactory readers, DateTimeFacade time) {
         this.db = db;
         this.readers = readers;
         this.time = time;

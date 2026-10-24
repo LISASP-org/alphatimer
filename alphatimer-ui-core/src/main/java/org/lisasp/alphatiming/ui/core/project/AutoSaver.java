@@ -14,7 +14,7 @@ import java.util.function.Supplier;
 @Slf4j
 public final class AutoSaver implements AutoCloseable {
 
-    private final Supplier<ProjectDocument> current;
+    private final Supplier<TimingDocument> current;
     private final Consumer<Exception> onError;
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "auto-saver");
@@ -25,7 +25,7 @@ public final class AutoSaver implements AutoCloseable {
     private final ReentrantLock running = new ReentrantLock();
     private int pauses;
 
-    public AutoSaver(Supplier<ProjectDocument> current, Consumer<Exception> onError) {
+    public AutoSaver(Supplier<TimingDocument> current, Consumer<Exception> onError) {
         this.current = current;
         this.onError = onError;
     }
@@ -78,7 +78,7 @@ public final class AutoSaver implements AutoCloseable {
     private void saveUnlessPaused() throws IOException {
         running.lock();
         try {
-            ProjectDocument doc = current.get();
+            TimingDocument doc = current.get();
             if (pauses == 0 && doc != null) {
                 doc.saveIfChanged();
             }

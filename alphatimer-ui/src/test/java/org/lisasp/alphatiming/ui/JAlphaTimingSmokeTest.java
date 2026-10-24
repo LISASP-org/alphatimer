@@ -13,7 +13,7 @@ import org.lisasp.alphatiming.heats.HeatStatus;
 import org.lisasp.alphatiming.heats.LaneDto;
 import org.lisasp.alphatiming.heats.LaneStatus;
 import org.lisasp.alphatiming.heats.Penalty;
-import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
+import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 import org.lisasp.alphatiming.ui.core.settings.SettingsProblem;
@@ -56,7 +56,7 @@ class JAlphaTimingSmokeTest {
     private static void shutDown(AppController controller, JAlphaTiming frame) throws Exception {
         controller.stopRecording();
         onEdt(frame::dispose);
-        ProjectDocument document = controller.document();
+        TimingDocument document = controller.document();
         controller.close();
         if (document != null) {
             document.close();
@@ -470,7 +470,7 @@ class JAlphaTimingSmokeTest {
 
     private static Path savedProject(Path dir, String name) throws Exception {
         Path file = dir.resolve(name);
-        try (ProjectDocument saved = ProjectDocument.create(Files.createDirectories(dir.resolve("saving")), Settings.defaults())) {
+        try (TimingDocument saved = TimingDocument.create(Files.createDirectories(dir.resolve("saving")), Settings.defaults())) {
             saved.saveAs(file);
         }
         return file;
@@ -565,7 +565,7 @@ class JAlphaTimingSmokeTest {
             holder[0].setVisible(true);
         });
         JAlphaTiming frame = holder[0];
-        ProjectDocument before = controller.document();
+        TimingDocument before = controller.document();
         try {
             SwingUtilities.invokeLater(() -> frame.open(bad));
             String title = I18n.get("error.open.title");
@@ -617,7 +617,7 @@ class JAlphaTimingSmokeTest {
             holder[0].setVisible(true);
         });
         JAlphaTiming frame = holder[0];
-        ProjectDocument before = controller.document();
+        TimingDocument before = controller.document();
         String title = I18n.get("dialog.save.title");
         try {
             onEdt(() -> {

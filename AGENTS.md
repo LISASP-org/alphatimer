@@ -30,8 +30,8 @@ that solve problems this application does not have:
 | `alphatimer-serial-core` | The `SerialPortReader` implementations: `TcpReader` (`serial.tcp`, copied from `../alphatimer`; `close()` waits up to 5 s for the reader thread to end) and `NrSerialReader`, `SerialPorts`, `SerialConnectionException` (`serial.com`, on nrjavaserial as in AlphaServer; line settings from `SerialConfiguration`; a read error or vanished port closes it and is reported to its connection-lost listeners, never reconnected). Never depends on the UI modules. |
 | `alphatimer-heats` | Heat model, placing, `HeatService`, `RunningClock`, `LiveHeats`, the heat/lane DTOs and enums. Works on refined messages only; stores through the `HeatRepository` interface. No database. |
 | `alphatimer-legacy-server` | alphatimer-compatible heats (`LegacyService`, `legacy.dto`) and the JDK `HttpServer` endpoints (`LegacyHttpServer`; its requests run on the bounded `HandlerPool`, which closes connections beyond its queue and those over the time limit). Stores `LaneTime`s through the `LaneTimeRepository` interface. No database. |
-| `alphatimer-project-db` | The `.timing` project file: Hibernate on SQLite (`ProjectDatabase`, entities) and the stores that implement the repositories (`HeatStore`, `LaneTimeStore`) or write the recording (`MessageStore`, `RawDataRecorder`). `replay` (`FileReplayReader`: binary file or the raw data of a `.timing` file, paced like 9600 baud; reads the `rawdata` table with plain JDBC). The only module with Hibernate/SQLite. |
-| `alphatimer-ui-core` | No Swing. The application layer: `settings` (`SerialMode` maps to a `SerialConfiguration`), `project` (`ProjectDocument`, `AutoSaver`), `recording` (`RecordingSession` wires reader, parser, heats, stores and the legacy server; its `WriteListener` hears which `RecordedData` could not be stored and when it is stored again; a lost serial connection stops it and is reported to its connection-lost listeners). |
+| `alphatimer-project-db` | The `.timing` project file: Hibernate on SQLite (`TimingDatabase`, entities) and the stores that implement the repositories (`HeatStore`, `LaneTimeStore`) or write the recording (`MessageStore`, `RawDataRecorder`). `replay` (`FileReplayReader`: binary file or the raw data of a `.timing` file, paced like 9600 baud; reads the `rawdata` table with plain JDBC). The only module with Hibernate/SQLite. |
+| `alphatimer-ui-core` | No Swing. The application layer: `settings` (`SerialMode` maps to a `SerialConfiguration`), `project` (`TimingDocument`, `AutoSaver`), `recording` (`RecordingSession` wires reader, parser, heats, stores and the legacy server; its `WriteListener` hears which `RecordedData` could not be stored and when it is stored again; a lost serial connection stops it and is reported to its connection-lost listeners). |
 | `alphatimer-ui-common` | What every front end shares, no Swing: `AppController` (document workflow), `SavePrompt` (the questions it asks, implemented per front end; `RecoveryTexts` builds the texts of the recovery questions), `ProjectFiles` (file extensions; the Save As path choice the prompts share: default extension, then the overwrite question), `I18n` with the `messages*.properties`, `AppStatus` (title, file, state text, warning summary and details, Start/Stop), `StatusWarnings` (the active status-bar warnings, each kind with its own clearing rule; `WriteFailures` raises and clears the write-error warning; the lost serial connection is cleared by the next start), `SettingsFormRules` (required/editable fields, record button), `LaneRows`, `TimeFormat`, `MessageText`, `LogFileCleanup` (old log files, run by every launcher). |
 | `alphatimer-ui` | Swing UI on the JUtils `JButtonBar` in the layout of the JAuswertung plugin window (`JAlphaTiming.createBody`: `SelectorScrollPane` with the bar left, 4 dlu gap, the panel right with a labeled border of its name, 5 px space around; window sized like `JPFrame`), `SwingSavePrompt`, `AlphaTimingLauncher`. Panels: "Settings & Recording" and "Live View" (lane rows built from `LaneRows`, no `JTable`). Builds `alphatiming.jar` with its dependencies in `target/lib/`. |
 | `alphatimer-tui` | Text UI on Lanterna with the structure of the GUI (`TuiMainWindow`: menu bar, panel buttons left, status line; `TuiSettingsPanel`, `TuiLiveViewPanel`, `TuiSavePrompt` with text dialogs). All logic comes from `alphatimer-ui-common`; listeners go through `gui.getGUIThread().invokeLater`. Shortcuts are function keys (F2 save, F5/F6 panels, F10 exit), Ctrl+N/O, and Ctrl+C asks like Exit — never Ctrl+S/Ctrl+Q, which terminals use for flow control. Logs to the file only. Builds `alphatiming-tui.jar` with `target/lib/`. |
@@ -53,11 +53,11 @@ that solve problems this application does not have:
 - Swing components are only accessed on the EDT. Callbacks from the reader thread (`RecordingSession` listeners) must
   go through `SwingUtilities.invokeLater`, as `JAlphaTiming` does; `AppController` itself contains no Swing code and calls
   its listeners on whatever thread caused the change.
-- All database access goes through `ProjectDatabase.read/write` (one lock, one connection). Never open sessions on the
+- All database access goes through `TimingDatabase.read/write` (one lock, one connection). Never open sessions on the
   side. Lock order: component locks (`RecordingSession`, `HeatService`, `RawDataRecorder`) first, the database lock
-  second. Saves (Save, Save As, auto-save) run one after another on the save lock of `ProjectDatabase`, which
+  second. Saves (Save, Save As, auto-save) run one after another on the save lock of `TimingDatabase`, which
   `snapshotTo` takes before the database lock; it holds the database lock only while copying the database, so the
-  recording keeps writing while the copy is moved to the target. `ProjectDocument` switches to a new file (Save As), records the
+  recording keeps writing while the copy is moved to the target. `TimingDocument` switches to a new file (Save As), records the
   work file's origin note and closes under the same save lock, so a running save finishes before the database closes.
 - `AppController` pauses the `AutoSaver` while it asks the user about the document (stop recording, Save / Discard /
   Cancel, Save As path, recovery) and until a discarded document is closed; `pause()` waits for a running auto-save.
@@ -76,7 +76,7 @@ that solve problems this application does not have:
 
 - A `.timing` project file (earlier versions saved `.heat`; the Open dialog still accepts it) is a SQLite file written through JPA/Hibernate (native bootstrap, no `persistence.xml`,
   `hibernate-community-dialects`). Tables: `settings`, `rawdata`, `aresmessage`, `lanetime`, `heat`, `lane`. Columns added later (e.g. the connection type in `settings`) are nullable and read as the earlier behavior (TCP), so files of earlier versions still open.
-- Save (`ProjectDatabase.snapshotTo`) = under the database lock, `VACUUM INTO` a temp file next to the work file, flushed
+- Save (`TimingDatabase.snapshotTo`) = under the database lock, `VACUUM INTO` a temp file next to the work file, flushed
   to disk; then, outside the database lock, that file is moved to a temp file next to the target (across filesystems,
   where an atomic move fails, copied and flushed), the existing file is renamed to `<name>-previous.timing` (replacing
   an older one), the temp file moved into place and the directory flushed. The document is marked clean only if nothing
@@ -103,7 +103,7 @@ that solve problems this application does not have:
 - Enum attributes are stored as their name through an `EnumNameConverter` (`EnumNameConverters`), never with
   `@Enumerated`: Hibernate writes a CHECK with the enum's values for `@Enumerated`, so a value added later could not be
   stored in existing files. Files of the first versions have such CHECKs; step 1 (`RemoveCheckConstraints`) removes them.
-- Hibernate's SQLite dialect silently skips unique keys over several columns, so `ProjectDatabase` creates them itself
+- Hibernate's SQLite dialect silently skips unique keys over several columns, so `TimingDatabase` creates them itself
   for a new file (`HeatEntity.UNIQUE_KEY`); an older file gets them from its migration step. Step 2
   (`RemoveHeatCompetition`) rebuilds `heat` without its `competition` column and with the unique key (event, heatNumber);
   a heat stored under several competition tags keeps only its most recently changed row (`changeSeq`) and that row's lanes.
@@ -127,7 +127,7 @@ untrusted input:
   fields and a failing start ends in the ERROR state, never in an exception dialog.
 - A serial port that is missing or in use ends the start in the ERROR state (`SerialConnectionException`), never in a crash.
 - Bytes from the device are validated by the copied parsers; unknown or garbled data is dropped and logged, never fatal.
-- Files from disk are checked before use (`ProjectDatabase.openCopy`, `DefaultSettingsStore.load`).
+- Files from disk are checked before use (`TimingDatabase.openCopy`, `DefaultSettingsStore.load`).
 - The REST server is intentionally without authentication: it serves read-only heat data to JAuswertung on the local
   network, as alphatimer did. Do not add authentication unless JAuswertung supports it.
 
@@ -187,7 +187,7 @@ untrusted input:
 ## Tests
 
 - JUnit 5 (Jupiter) with AssertJ and Awaitility. Name test classes `*Test`; there are no integration-test conventions —
-  tests that need a database use `ProjectDatabase.createNew(@TempDir)`, tests that need a device use a local
+  tests that need a database use `TimingDatabase.createNew(@TempDir)`, tests that need a device use a local
   `ServerSocket` or a fake `SerialPortReader`. `HeatServiceTest` and `LegacyServiceTest` run against the real stores and
   therefore live in `alphatimer-project-db`.
 - Shared test helpers are published as test-jars: `TestMessageCreator` from `alphatimer-heats`,

@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatimer.api.serial.SerialPortReader;
 import org.lisasp.alphatiming.ui.common.AppController;
-import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
+import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
@@ -100,7 +100,7 @@ class RecordCommandTest {
 
     private Path project(Settings settings) throws IOException {
         Path file = dir.resolve("competition.timing");
-        try (ProjectDocument doc = ProjectDocument.create(work, settings)) {
+        try (TimingDocument doc = TimingDocument.create(work, settings)) {
             doc.saveAs(file);
         }
         Files.setLastModifiedTime(file, FileTime.fromMillis(0));

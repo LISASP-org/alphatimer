@@ -21,7 +21,7 @@ class RawDataRecorderTest {
 
     @Test
     void flushesBufferedBytesIntoChunksInOrder() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             RawDataRecorder rec = new RawDataRecorder(db, () -> LocalDateTime.of(2026, 1, 1, 10, 0), 4, 60_000, e -> { }, () -> { });
             for (byte b = 1; b <= 10; b++) {
                 rec.accept(b);
@@ -38,7 +38,7 @@ class RawDataRecorderTest {
 
     @Test
     void aStoreThatKeepsFailingIsReportedOnceAndTheBytesStayBuffered() throws Exception {
-        ProjectDatabase db = ProjectDatabase.createNew(dir);
+        TimingDatabase db = TimingDatabase.createNew(dir);
         List<Exception> errors = new ArrayList<>();
         RawDataRecorder rec = new RawDataRecorder(db, LocalDateTime::now, 1000, 60_000, errors::add, () -> { });
         db.close();
@@ -48,12 +48,12 @@ class RawDataRecorderTest {
         rec.close();
         assertThat(errors).hasSize(1);
         assertThat(rec.bufferedBytes()).isEqualTo(1);
-        ProjectDatabase.discard(db.workFile());
+        TimingDatabase.discard(db.workFile());
     }
 
     @Test
     void everySuccessfulWriteIsReportedAlsoAfterAFailure() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             AtomicInteger calls = new AtomicInteger();
             List<Exception> errors = new ArrayList<>();
             AtomicInteger stored = new AtomicInteger();
@@ -80,7 +80,7 @@ class RawDataRecorderTest {
 
     @Test
     void timerFlushesPartialBuffer() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             RawDataRecorder rec = new RawDataRecorder(db, LocalDateTime::now, 1000, 50, e -> { }, () -> { });
             rec.accept((byte) 7);
             await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> assertThat(RawDataRecorder.readAll(db)).hasSize(1));

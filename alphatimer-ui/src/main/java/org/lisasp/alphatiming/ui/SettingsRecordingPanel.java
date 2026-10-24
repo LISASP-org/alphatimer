@@ -10,7 +10,7 @@ import de.df.jutils.gui.border.BorderUtils;
 import de.df.jutils.gui.layout.SimpleFormBuilder;
 import org.lisasp.swing.filechooser.FileChooserUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
+import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatimer.serial.com.SerialPorts;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
@@ -267,7 +267,7 @@ public final class SettingsRecordingPanel extends JPanel {
 
     /** Brings the fields, buttons and labels in line with the document and the recording state. Call on the EDT. */
     public void refresh() {
-        ProjectDocument doc = controller.document();
+        TimingDocument doc = controller.document();
         updating = true;
         try {
             if (doc != null) {

@@ -32,7 +32,7 @@ import java.util.function.Function;
  * additionally serialized by a save lock, taken before the database lock, because they share the temp and -previous files.
  */
 @Slf4j
-public final class ProjectDatabase implements AutoCloseable {
+public final class TimingDatabase implements AutoCloseable {
 
     public static final String WORK_FILE_SUFFIX = ".work.sqlite";
 
@@ -52,7 +52,7 @@ public final class ProjectDatabase implements AutoCloseable {
     private LockFile workLock;
     private volatile FileMover mover = (source, target) -> Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
 
-    private ProjectDatabase(Path workFile, boolean isNew) throws IOException {
+    private TimingDatabase(Path workFile, boolean isNew) throws IOException {
         this.workFile = workFile;
         acquireLock();
         try {
@@ -98,27 +98,27 @@ public final class ProjectDatabase implements AutoCloseable {
         }
     }
 
-    public static ProjectDatabase createNew(Path workDir) throws IOException {
+    public static TimingDatabase createNew(Path workDir) throws IOException {
         Files.createDirectories(workDir);
-        return new ProjectDatabase(newWorkFile(workDir), true);
+        return new TimingDatabase(newWorkFile(workDir), true);
     }
 
-    public static ProjectDatabase openCopy(Path projectFile, Path workDir) throws IOException {
+    public static TimingDatabase openCopy(Path projectFile, Path workDir) throws IOException {
         checkIsSqlite(projectFile);
         Files.createDirectories(workDir);
         Path work = newWorkFile(workDir);
         try {
             Files.copy(projectFile, work, StandardCopyOption.REPLACE_EXISTING);
-            checkIsProjectDatabase(work, projectFile);
-            return new ProjectDatabase(work, false);
+            checkIsTimingDatabase(work, projectFile);
+            return new TimingDatabase(work, false);
         } catch (IOException | RuntimeException ex) {
             discard(work);
             throw ex instanceof IOException io ? io : new InvalidProjectFileException(projectFile, ex);
         }
     }
 
-    public static ProjectDatabase adopt(Path workFile) throws IOException {
-        return new ProjectDatabase(workFile, false);
+    public static TimingDatabase adopt(Path workFile) throws IOException {
+        return new TimingDatabase(workFile, false);
     }
 
     private static Path newWorkFile(Path workDir) {
@@ -136,7 +136,7 @@ public final class ProjectDatabase implements AutoCloseable {
     }
 
     /** Hibernate would silently add its tables to any SQLite file, so foreign files are rejected before it sees them. */
-    private static void checkIsProjectDatabase(Path file, Path shownName) throws IOException {
+    private static void checkIsTimingDatabase(Path file, Path shownName) throws IOException {
         try (java.sql.Connection c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + file.toAbsolutePath());
              Statement st = c.createStatement();
              java.sql.ResultSet rs = st.executeQuery("select count(*) from sqlite_master where type = 'table' and name in ('settings', 'heat', 'rawdata', 'aresmessage')")) {

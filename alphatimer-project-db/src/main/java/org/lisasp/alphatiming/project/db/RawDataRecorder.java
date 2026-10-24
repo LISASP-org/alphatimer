@@ -14,7 +14,7 @@ import java.util.function.Consumer;
 @Slf4j
 public final class RawDataRecorder implements ByteConsumer, AutoCloseable {
 
-    private final ProjectDatabase db;
+    private final TimingDatabase db;
     private final DateTimeFacade time;
     private final int flushBytes;
     private final Consumer<RuntimeException> onError;
@@ -26,7 +26,7 @@ public final class RawDataRecorder implements ByteConsumer, AutoCloseable {
     private boolean failing;
 
     /** Bytes that cannot be stored stay buffered until the store works again; only the first failure in a row is reported. */
-    public RawDataRecorder(ProjectDatabase db, DateTimeFacade time, int flushBytes, long flushMillis, Consumer<RuntimeException> onError, Runnable onStored) {
+    public RawDataRecorder(TimingDatabase db, DateTimeFacade time, int flushBytes, long flushMillis, Consumer<RuntimeException> onError, Runnable onStored) {
         this.db = db;
         this.time = time;
         this.flushBytes = flushBytes;
@@ -89,7 +89,7 @@ public final class RawDataRecorder implements ByteConsumer, AutoCloseable {
         flush();
     }
 
-    public static List<byte[]> readAll(ProjectDatabase db) {
+    public static List<byte[]> readAll(TimingDatabase db) {
         return db.read(em -> em.createQuery("select r from RawDataChunkEntity r order by r.id", RawDataChunkEntity.class)
                                .getResultList()
                                .stream()

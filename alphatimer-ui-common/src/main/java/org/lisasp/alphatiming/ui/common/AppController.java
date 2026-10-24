@@ -9,7 +9,7 @@ import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.ui.core.project.AutoSaver;
 import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
-import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
+import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.recording.RecordedData;
 import org.lisasp.alphatiming.ui.core.recording.RecordingSession;
 import org.lisasp.alphatiming.ui.core.recording.RecordingState;
@@ -42,7 +42,7 @@ public final class AppController implements AutoCloseable {
     private final List<Consumer<String>> messageListeners = new CopyOnWriteArrayList<>();
     private final List<Runnable> pingListeners = new CopyOnWriteArrayList<>();
 
-    private volatile ProjectDocument document;
+    private volatile TimingDocument document;
     private volatile RecordingSession session;
     private volatile LiveHeats lastHeats = LiveHeats.NONE;
     private final StatusWarnings warnings = new StatusWarnings();
@@ -58,7 +58,7 @@ public final class AppController implements AutoCloseable {
     }
 
     public void init() {
-        for (CrashLeftover leftover : ProjectDocument.findRecoverable(workDir)) {
+        for (CrashLeftover leftover : TimingDocument.findRecoverable(workDir)) {
             if (document != null) {
                 break; // keep the remaining leftovers for the next start
             }
@@ -74,7 +74,7 @@ public final class AppController implements AutoCloseable {
             switch (prompt.askRecover(leftover)) {
                 case RECOVER -> {
                     try {
-                        install(ProjectDocument.recover(leftover.workFile()));
+                        install(TimingDocument.recover(leftover.workFile()));
                         return;
                     } catch (IOException | RuntimeException ex) {
                         log.warn("Could not recover {}", leftover.workFile().getFileName(), ex);
@@ -83,7 +83,7 @@ public final class AppController implements AutoCloseable {
                 }
                 case DISCARD -> {
                     if (prompt.confirmDiscard(leftover)) {
-                        ProjectDocument.discard(leftover.workFile());
+                        TimingDocument.discard(leftover.workFile());
                         return;
                     }
                 }
@@ -100,7 +100,7 @@ public final class AppController implements AutoCloseable {
                 return;
             }
             try {
-                replaceDocument(ProjectDocument.create(workDir, defaults.load()));
+                replaceDocument(TimingDocument.create(workDir, defaults.load()));
             } catch (IOException ex) {
                 prompt.showError(I18n.get("error.new.title"), describe(ex));
             }
@@ -115,9 +115,9 @@ public final class AppController implements AutoCloseable {
         if (!prepareToLeaveDocument()) {
             return;
         }
-        ProjectDocument current = document;
+        TimingDocument current = document;
         try {
-            ProjectDocument opened = current != null && current.isSavedAs(file) ? current.reopen(workDir) : ProjectDocument.open(file, workDir);
+            TimingDocument opened = current != null && current.isSavedAs(file) ? current.reopen(workDir) : TimingDocument.open(file, workDir);
             defaults.save(opened.settings());
             replaceDocument(opened);
         } catch (ProjectFileInUseException ex) {
@@ -130,7 +130,7 @@ public final class AppController implements AutoCloseable {
     }
 
     public boolean save() {
-        ProjectDocument doc = document;
+        TimingDocument doc = document;
         if (doc == null) {
             return false;
         }
@@ -153,7 +153,7 @@ public final class AppController implements AutoCloseable {
     }
 
     private boolean askPathAndSave() {
-        ProjectDocument doc = document;
+        TimingDocument doc = document;
         if (doc == null) {
             return false;
         }
@@ -181,7 +181,7 @@ public final class AppController implements AutoCloseable {
             if (!prepareToLeaveDocument()) {
                 return false;
             }
-            ProjectDocument doc = document;
+            TimingDocument doc = document;
             document = null;
             session = null;
             if (doc != null) {
@@ -192,7 +192,7 @@ public final class AppController implements AutoCloseable {
     }
 
     public void startRecording() {
-        ProjectDocument doc = document;
+        TimingDocument doc = document;
         RecordingSession s = session;
         if (doc == null || s == null) {
             return;
@@ -211,7 +211,7 @@ public final class AppController implements AutoCloseable {
     }
 
     public void applySettings(Settings settings) {
-        ProjectDocument doc = document;
+        TimingDocument doc = document;
         RecordingSession s = session;
         if (doc == null) {
             return;
@@ -226,7 +226,7 @@ public final class AppController implements AutoCloseable {
 
     /** Applies settings entered in a form unless they are unchanged or a recording runs; true when they were applied. */
     public boolean applySettingsIfChanged(Settings settings) {
-        ProjectDocument doc = document;
+        TimingDocument doc = document;
         if (doc == null || isRecording() || settings.equals(doc.settings())) {
             return false;
         }
@@ -239,7 +239,7 @@ public final class AppController implements AutoCloseable {
         return s != null && s.state() == RecordingState.RUNNING;
     }
 
-    public ProjectDocument document() {
+    public TimingDocument document() {
         return document;
     }
 
@@ -327,7 +327,7 @@ public final class AppController implements AutoCloseable {
             }
             stopRecording();
         }
-        ProjectDocument doc = document;
+        TimingDocument doc = document;
         if (doc == null || !doc.isDirty()) {
             return true;
         }
@@ -338,15 +338,15 @@ public final class AppController implements AutoCloseable {
         };
     }
 
-    private void replaceDocument(ProjectDocument next) {
-        ProjectDocument old = document;
+    private void replaceDocument(TimingDocument next) {
+        TimingDocument old = document;
         install(next);
         if (old != null) {
             old.close();
         }
     }
 
-    private void install(ProjectDocument doc) {
+    private void install(TimingDocument doc) {
         RecordingSession next = new RecordingSession(doc.database(), readers.get(), time);
         next.addHeatListener(h -> {
             lastHeats = h;

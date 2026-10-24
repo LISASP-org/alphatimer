@@ -26,7 +26,7 @@ class HeatServiceTest {
 
     @Test
     void sameHeatNumberInDifferentEventsStaysSeparate() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService service = new HeatService(store);
             service.accept(TestMessageCreator.used(1, 1, "1100000000"));
@@ -40,7 +40,7 @@ class HeatServiceTest {
 
     @Test
     void listenersGetCurrentHeatOnRegistrationAndChangesAfterwards() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatService service = new HeatService(new HeatStore(db));
             service.accept(TestMessageCreator.used(1, 1, "1100000000"));
             List<HeatDto> seen = new ArrayList<>();
@@ -57,7 +57,7 @@ class HeatServiceTest {
 
     @Test
     void theHeatThatWasCurrentBeforeBecomesThePreviousHeatWithItsLastState() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService service = new HeatService(store);
             List<LiveHeats> seen = new ArrayList<>();
@@ -88,7 +88,7 @@ class HeatServiceTest {
 
     @Test
     void aNewServiceStartsWithTheCurrentAndPreviousHeatOfTheProject() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService first = new HeatService(store);
             first.accept(TestMessageCreator.used(1, 1, "1100000000"));
@@ -107,7 +107,7 @@ class HeatServiceTest {
 
     @Test
     void lanesThatWereUsedOnceStayKnownForTheLiveView() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService service = new HeatService(store);
             List<LiveHeats> seen = new ArrayList<>();
@@ -130,7 +130,7 @@ class HeatServiceTest {
 
     @Test
     void findRecentReturnsTheLatestChangedHeatsNewestFirst() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             assertThat(store.findRecent(2)).isEmpty();
             HeatService service = new HeatService(store);
@@ -145,7 +145,7 @@ class HeatServiceTest {
 
     @Test
     void messagesWithoutEventOrHeatAndBadLanesAreIgnored() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService service = new HeatService(store);
             List<HeatDto> seen = new ArrayList<>();
@@ -163,7 +163,7 @@ class HeatServiceTest {
 
     @Test
     void heatsHaveTheTenLanesOfTheProtocol() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService service = new HeatService(store);
             service.accept(TestMessageCreator.used(1, 1, "0000000011"));
@@ -179,18 +179,18 @@ class HeatServiceTest {
 
     @Test
     void aMessageThatCannotBeStoredIsReportedAsAnError() throws Exception {
-        ProjectDatabase db = ProjectDatabase.createNew(dir);
+        TimingDatabase db = TimingDatabase.createNew(dir);
         List<Exception> errors = new ArrayList<>();
         HeatService service = new HeatService(new HeatStore(db), errors::add);
         db.close();
         service.accept(TestMessageCreator.used(1, 1, "1100000000"));
         assertThat(errors).hasSize(1);
-        ProjectDatabase.discard(db.workFile());
+        TimingDatabase.discard(db.workFile());
     }
 
     @Test
     void aTimeAfterADidNotStartKeepsThePenaltyAndGetsNoPlace() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService service = new HeatService(store);
             service.accept(TestMessageCreator.used(1, 1, "1100000000"));
@@ -207,7 +207,7 @@ class HeatServiceTest {
 
     @Test
     void aSecondFinishForTheSameLaneReplacesTheTimeAndALaterSplitIsIgnored() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService service = new HeatService(store);
             service.accept(TestMessageCreator.used(1, 1, "1100000000"));
@@ -224,7 +224,7 @@ class HeatServiceTest {
 
     @Test
     void aRejectedMessageForAnUnknownHeatLeavesNoEmptyHeatBehind() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService service = new HeatService(store);
             service.accept(TestMessageCreator.used(1, 1, "1100000000"));
@@ -238,7 +238,7 @@ class HeatServiceTest {
     @Test
     void stateSurvivesSaveAndReopen() throws Exception {
         Path file = dir.resolve("x.heat");
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatService service = new HeatService(new HeatStore(db));
             service.accept(TestMessageCreator.used(1, 1, "1100000000"));
             service.accept(TestMessageCreator.start(1, 1, T0));
@@ -248,7 +248,7 @@ class HeatServiceTest {
             db.closeAndDelete();
         }
         Path work = Files.createDirectories(dir.resolve("w"));
-        try (ProjectDatabase db = ProjectDatabase.openCopy(file, work)) {
+        try (TimingDatabase db = TimingDatabase.openCopy(file, work)) {
             HeatDto heat = new HeatStore(db).find(1, 1).orElseThrow();
             assertThat(heat.status()).isEqualTo(HeatStatus.Finished);
             assertThat(heat.ended()).isEqualTo(T0.plusSeconds(20));
@@ -260,7 +260,7 @@ class HeatServiceTest {
 
     @Test
     void findLatestReturnsTheMostRecentlyChangedHeat() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService service = new HeatService(store);
             service.accept(TestMessageCreator.used(1, 1, "1100000000"));
@@ -273,7 +273,7 @@ class HeatServiceTest {
 
     @Test
     void repeatedResultsOfPreviousRacesDoNotReselectOrChangeOlderHeats() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService service = new HeatService(store);
             service.accept(TestMessageCreator.used(1, 1, "1100000000"));

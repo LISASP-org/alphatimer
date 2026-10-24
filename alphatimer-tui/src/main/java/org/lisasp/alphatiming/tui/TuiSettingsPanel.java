@@ -18,7 +18,7 @@ import org.lisasp.alphatiming.ui.common.AppController;
 import org.lisasp.alphatiming.ui.common.I18n;
 import org.lisasp.alphatiming.ui.common.SettingsFormRules;
 import org.lisasp.alphatiming.ui.common.TimeFormat;
-import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
+import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
@@ -229,7 +229,7 @@ final class TuiSettingsPanel extends Panel {
 
     /** Brings the fields in line with the document; fields being edited keep their text. */
     void refresh() {
-        ProjectDocument doc = controller.document();
+        TimingDocument doc = controller.document();
         updating = true;
         try {
             if (doc != null) {

@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatiming.project.db.InvalidProjectFileException;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
-import org.lisasp.alphatiming.project.db.ProjectDatabase;
+import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.HeatService;
 import org.lisasp.alphatiming.heats.HeatStatus;
@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
-class ProjectDocumentTest {
+class TimingDocumentTest {
 
     private static final Settings SETTINGS = new Settings("host", 8585, 60, 1999).withCompetitionKey("WK");
 
@@ -58,7 +58,7 @@ class ProjectDocumentTest {
 
     @Test
     void newProjectIsCleanUntilSomethingChangesAndStaysFileless() throws Exception {
-        try (ProjectDocument doc = ProjectDocument.create(work(), SETTINGS)) {
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
             assertThat(doc.isDirty()).isFalse();
             assertThat(doc.file()).isEmpty();
             doc.updateSettings(SETTINGS.withTcp("changed", 1));
@@ -76,11 +76,11 @@ class ProjectDocumentTest {
     @Test
     void openRestoresSettingsAndCloseRemovesWorkFile() throws Exception {
         Path file = dir.resolve("x.heat");
-        try (ProjectDocument doc = ProjectDocument.create(work(), SETTINGS)) {
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
             doc.saveAs(file);
         }
         assertThat(workFiles()).isZero();
-        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
             assertThat(doc.settings()).isEqualTo(SETTINGS);
             assertThat(doc.isDirty()).isFalse();
             assertThat(doc.file()).contains(file);
@@ -90,14 +90,14 @@ class ProjectDocumentTest {
 
     @Test
     void saveWithoutFileIsRejected() throws Exception {
-        try (ProjectDocument doc = ProjectDocument.create(work(), SETTINGS)) {
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
             assertThatThrownBy(doc::save).isInstanceOf(IllegalStateException.class);
         }
     }
 
     @Test
     void failedSaveKeepsDocumentDirtyAndLeavesNoTempFile() throws Exception {
-        try (ProjectDocument doc = ProjectDocument.create(work(), SETTINGS)) {
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
             doc.updateSettings(SETTINGS.withTcp("changed", 1));
             Path target = dir.resolve("missing/x.heat");
             assertThatThrownBy(() -> doc.saveAs(target)).isInstanceOf(IOException.class);
@@ -109,7 +109,7 @@ class ProjectDocumentTest {
 
     @Test
     void writeAfterSaveKeepsDocumentDirty() throws Exception {
-        try (ProjectDocument doc = ProjectDocument.create(work(), SETTINGS)) {
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
             doc.saveAs(dir.resolve("x.heat"));
             assertThat(doc.isDirty()).isFalse();
             long before = doc.database().writeCount();
@@ -123,7 +123,7 @@ class ProjectDocumentTest {
     void openRejectsForeignFileWithoutLeavingWorkFiles() throws Exception {
         Path bad = dir.resolve("bad.heat");
         Files.writeString(bad, "nope");
-        assertThatThrownBy(() -> ProjectDocument.open(bad, work())).isInstanceOfSatisfying(InvalidProjectFileException.class, ex -> assertThat(ex.file()).isEqualTo(bad));
+        assertThatThrownBy(() -> TimingDocument.open(bad, work())).isInstanceOfSatisfying(InvalidProjectFileException.class, ex -> assertThat(ex.file()).isEqualTo(bad));
         assertThat(workFiles()).isZero();
     }
 
@@ -134,32 +134,32 @@ class ProjectDocumentTest {
             st.execute("create table results (id integer primary key, name text)");
         }
         long size = Files.size(other);
-        assertThatThrownBy(() -> ProjectDocument.open(other, work())).isInstanceOf(InvalidProjectFileException.class);
+        assertThatThrownBy(() -> TimingDocument.open(other, work())).isInstanceOf(InvalidProjectFileException.class);
         assertThat(workFiles()).isZero();
         assertThat(Files.size(other)).isEqualTo(size);
     }
 
     @Test
     void crashLeftoversCanBeFoundAndRecovered() throws Exception {
-        ProjectDocument doc = ProjectDocument.create(work(), SETTINGS);
+        TimingDocument doc = TimingDocument.create(work(), SETTINGS);
         doc.database().close(); // simulate a crash: the work file stays
-        var found = ProjectDocument.findRecoverable(work());
+        var found = TimingDocument.findRecoverable(work());
         assertThat(found).hasSize(1);
-        try (ProjectDocument recovered = ProjectDocument.recover(found.get(0).workFile())) {
+        try (TimingDocument recovered = TimingDocument.recover(found.get(0).workFile())) {
             assertThat(recovered.settings()).isEqualTo(SETTINGS);
             assertThat(recovered.isDirty()).isTrue();
             assertThat(recovered.file()).isEmpty();
         }
-        assertThat(ProjectDocument.findRecoverable(work())).isEmpty();
+        assertThat(TimingDocument.findRecoverable(work())).isEmpty();
     }
 
     @Test
     void leftoverNamesTheProjectFileItBelongsTo() throws Exception {
         Path file = dir.resolve("crashed.timing");
-        try (ProjectDocument doc = ProjectDocument.create(work(), SETTINGS)) {
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
             doc.saveAs(file);
             doc.database().close();
-            var found = ProjectDocument.findRecoverable(work());
+            var found = TimingDocument.findRecoverable(work());
             assertThat(found).hasSize(1);
             CrashLeftover leftover = found.get(0);
             assertThat(leftover.projectFile()).contains(file);
@@ -168,7 +168,7 @@ class ProjectDocumentTest {
     }
 
     private Path leftoverOf(Path projectFile) throws IOException {
-        ProjectDocument crashed = ProjectDocument.create(work(), SETTINGS);
+        TimingDocument crashed = TimingDocument.create(work(), SETTINGS);
         Path workFile = crashed.database().workFile();
         WorkFileOrigin.record(workFile, projectFile);
         crashed.database().close();
@@ -178,9 +178,9 @@ class ProjectDocumentTest {
     @Test
     void recoveredDocumentKeepsItsUnchangedProjectFile() throws Exception {
         Path file = savedProject("x.timing");
-        try (ProjectDocument recovered = ProjectDocument.recover(leftoverOf(file))) {
+        try (TimingDocument recovered = TimingDocument.recover(leftoverOf(file))) {
             assertThat(recovered.file()).contains(file);
-            assertThatThrownBy(() -> ProjectDocument.open(file, work())).isInstanceOf(ProjectFileInUseException.class);
+            assertThatThrownBy(() -> TimingDocument.open(file, work())).isInstanceOf(ProjectFileInUseException.class);
         }
     }
 
@@ -189,10 +189,10 @@ class ProjectDocumentTest {
         Path file = savedProject("x.timing");
         Path leftover = leftoverOf(file);
         Files.setLastModifiedTime(file, FileTime.from(Files.getLastModifiedTime(file).toInstant().plusSeconds(60)));
-        try (ProjectDocument recovered = ProjectDocument.recover(leftover)) {
+        try (TimingDocument recovered = TimingDocument.recover(leftover)) {
             assertThat(recovered.file()).isEmpty();
             assertThat(recovered.isDirty()).isTrue();
-            ProjectDocument.open(file, work()).close();
+            TimingDocument.open(file, work()).close();
         }
     }
 
@@ -200,8 +200,8 @@ class ProjectDocumentTest {
     void recoveredDocumentDropsAProjectFileOpenElsewhere() throws Exception {
         Path file = savedProject("x.timing");
         Path leftover = leftoverOf(file);
-        try (ProjectDocument elsewhere = ProjectDocument.open(file, work());
-             ProjectDocument recovered = ProjectDocument.recover(leftover)) {
+        try (TimingDocument elsewhere = TimingDocument.open(file, work());
+             TimingDocument recovered = TimingDocument.recover(leftover)) {
             assertThat(recovered.file()).isEmpty();
             assertThat(recovered.isDirty()).isTrue();
         }
@@ -212,12 +212,12 @@ class ProjectDocumentTest {
         Path file = savedProject("x.timing");
         Path leftover = leftoverOf(file);
         corruptSettingsTable(leftover);
-        assertThatThrownBy(() -> ProjectDocument.recover(leftover)).isInstanceOf(RuntimeException.class);
-        assertThat(ProjectDocument.findRecoverable(work())).singleElement()
+        assertThatThrownBy(() -> TimingDocument.recover(leftover)).isInstanceOf(RuntimeException.class);
+        assertThat(TimingDocument.findRecoverable(work())).singleElement()
                                                            .satisfies(l -> assertThat(l.workFile()).isEqualTo(leftover))
                                                            .satisfies(l -> assertThat(l.projectFile()).contains(file));
-        ProjectDocument.open(file, work()).close();
-        ProjectDocument.discard(leftover);
+        TimingDocument.open(file, work()).close();
+        TimingDocument.discard(leftover);
         assertThat(workFiles()).isZero();
     }
 
@@ -237,25 +237,25 @@ class ProjectDocumentTest {
 
     @Test
     void workFilesOfOpenDocumentsAreNotOfferedForRecovery() throws Exception {
-        try (ProjectDocument live = ProjectDocument.create(work(), SETTINGS)) {
-            assertThat(ProjectDocument.findRecoverable(work())).isEmpty();
+        try (TimingDocument live = TimingDocument.create(work(), SETTINGS)) {
+            assertThat(TimingDocument.findRecoverable(work())).isEmpty();
             live.database().close();
-            assertThat(ProjectDocument.findRecoverable(work())).hasSize(1);
+            assertThat(TimingDocument.findRecoverable(work())).hasSize(1);
         }
     }
 
     @Test
     void discardRemovesWorkFileAndItsLock() throws Exception {
-        ProjectDocument doc = ProjectDocument.create(work(), SETTINGS);
+        TimingDocument doc = TimingDocument.create(work(), SETTINGS);
         doc.database().close();
-        ProjectDocument.discard(ProjectDocument.findRecoverable(work()).get(0).workFile());
+        TimingDocument.discard(TimingDocument.findRecoverable(work()).get(0).workFile());
         assertThat(workFiles()).isZero();
     }
 
     @Test
     void discardRemovesTheNoteOfTheProjectFile() throws Exception {
         Path leftover = leftoverOf(savedProject("x.timing"));
-        ProjectDocument.discard(leftover);
+        TimingDocument.discard(leftover);
         assertThat(workFiles()).isZero();
     }
 
@@ -263,10 +263,10 @@ class ProjectDocumentTest {
     void serialSettingsSurviveSaveAndOpen() throws Exception {
         Settings serial = new Settings(ConnectionType.SERIAL, "host", 8585, "COM3", SerialMode.QUANTUM, 60, 1999, true).withCompetitionKey("WK");
         Path file = dir.resolve("serial.heat");
-        try (ProjectDocument doc = ProjectDocument.create(work(), serial)) {
+        try (TimingDocument doc = TimingDocument.create(work(), serial)) {
             doc.saveAs(file);
         }
-        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
             assertThat(doc.settings()).isEqualTo(serial);
         }
     }
@@ -275,10 +275,10 @@ class ProjectDocumentTest {
     void replayFileSurvivesSaveAndOpen() throws Exception {
         Settings s = new Settings("host", 8585, 60, 1999).withCompetitionKey("WK").withConnectionType(ConnectionType.FILE).withReplayFile("/data/run.serial");
         Path file = dir.resolve("replay.heat");
-        try (ProjectDocument doc = ProjectDocument.create(work(), s)) {
+        try (TimingDocument doc = TimingDocument.create(work(), s)) {
             doc.saveAs(file);
         }
-        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
             assertThat(doc.settings()).isEqualTo(s);
         }
     }
@@ -287,10 +287,10 @@ class ProjectDocumentTest {
     void serverSettingSurvivesSaveAndOpen() throws Exception {
         Settings s = new Settings("host", 8585, 60, 1999).withCompetitionKey("WK").withRest(2222, false);
         Path file = dir.resolve("rest.heat");
-        try (ProjectDocument doc = ProjectDocument.create(work(), s)) {
+        try (TimingDocument doc = TimingDocument.create(work(), s)) {
             doc.saveAs(file);
         }
-        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
             assertThat(doc.settings().restEnabled()).isFalse();
             assertThat(doc.settings().restPort()).isEqualTo(2222);
         }
@@ -306,7 +306,7 @@ class ProjectDocumentTest {
             st.execute("create table aresmessage (id integer primary key autoincrement)");
             st.execute("insert into settings (tcpHost, tcpPort, competitionKey, autoSaveSeconds, restPort) values ('timing', 9000, 'OLD', 30, 0)");
         }
-        try (ProjectDocument doc = ProjectDocument.open(old, work())) {
+        try (TimingDocument doc = TimingDocument.open(old, work())) {
             assertThat(doc.settings().restEnabled()).isFalse();
             assertThat(doc.settings().restPort()).isEqualTo(Settings.DEFAULT_REST_PORT);
             assertThat(doc.isDirty()).isFalse();
@@ -319,7 +319,7 @@ class ProjectDocumentTest {
         ByteArrayOutputStream recorded = new ByteArrayOutputStream();
         recorded.writeBytes(DataHandlingMessageTestData.message1);
         recorded.writeBytes(DataHandlingMessageTestData.message2);
-        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
             assertThat(doc.isDirty()).isFalse();
             Settings s = doc.settings();
             assertThat(s.connectionType()).isEqualTo(ConnectionType.TCP);
@@ -348,7 +348,7 @@ class ProjectDocumentTest {
             doc.saveAs(dir.resolve("resaved.heat"));
             assertThat(doc.isDirty()).isFalse();
         }
-        try (ProjectDocument doc = ProjectDocument.open(dir.resolve("resaved.heat"), work())) {
+        try (TimingDocument doc = TimingDocument.open(dir.resolve("resaved.heat"), work())) {
             assertThat(doc.settings().tcpHost()).isEqualTo("other");
             assertThat(new HeatStore(doc.database()).find(1, 1)).isPresent();
         }
@@ -424,7 +424,7 @@ class ProjectDocumentTest {
         Map<String, List<List<Object>>> before = contentOf(file, columns);
         assertThat(schemaOf(file)).anyMatch(sql -> sql.contains("check"));
 
-        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
             Path workFile = doc.database().workFile();
             assertThat(schemaOf(workFile)).noneMatch(sql -> sql.toLowerCase(Locale.ROOT).contains("check"));
             assertThat(columnsOf(workFile).get("heat")).doesNotContain("competition");
@@ -447,7 +447,7 @@ class ProjectDocumentTest {
     @Test
     void recordingIntoAProjectFileOfTheFirstVersionUpdatesItsTaggedHeat() throws Exception {
         Path file = Files.copy(Path.of("src/test/resources/compat/first-version.heat"), dir.resolve("first-version.heat"));
-        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
             HeatService heats = new HeatService(new HeatStore(doc.database()));
 
             heats.accept(TestMessageCreator.split(1, 1, 3, 1, 12_340));
@@ -470,7 +470,7 @@ class ProjectDocumentTest {
             st.execute("create table aresmessage (id integer primary key autoincrement)");
             st.execute("insert into settings (tcpHost, tcpPort, competitionKey, autoSaveSeconds, restPort) values ('timing', 9000, 'OLD', 30, 0)");
         }
-        try (ProjectDocument doc = ProjectDocument.open(old, work())) {
+        try (TimingDocument doc = TimingDocument.open(old, work())) {
             assertThat(doc.settings()).isEqualTo(new Settings("timing", 9000, 30, 0).withCompetitionKey("OLD"));
             doc.updateSettings(doc.settings().withTcp("other", 1));
             assertThat(doc.settings().tcpHost()).isEqualTo("other");
@@ -480,22 +480,22 @@ class ProjectDocumentTest {
     @Test
     void theCompetitionKeyIsSavedOncePerProjectFile() throws Exception {
         Path file = dir.resolve("keyed.timing");
-        try (ProjectDocument doc = ProjectDocument.create(work(), Settings.defaults().withCompetitionKey("WK 2026"))) {
+        try (TimingDocument doc = TimingDocument.create(work(), Settings.defaults().withCompetitionKey("WK 2026"))) {
             doc.saveAs(file);
         }
-        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
             assertThat(doc.settings().competitionKey()).isEqualTo("WK 2026");
             doc.updateSettings(doc.settings().withCompetitionKey("DM 2026"));
             doc.save();
         }
-        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
             assertThat(doc.settings().competitionKey()).isEqualTo("DM 2026");
         }
     }
 
     private Path savedProject(String name) throws IOException {
         Path file = dir.resolve(name);
-        try (ProjectDocument doc = ProjectDocument.create(work(), SETTINGS)) {
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
             doc.saveAs(file);
         }
         return file;
@@ -504,8 +504,8 @@ class ProjectDocumentTest {
     @Test
     void aProjectFileOpenInOneDocumentIsRefusedToAnother() throws Exception {
         Path file = savedProject("x.timing");
-        try (ProjectDocument first = ProjectDocument.open(file, work())) {
-            assertThatThrownBy(() -> ProjectDocument.open(file, work())).isInstanceOfSatisfying(ProjectFileInUseException.class, ex -> assertThat(ex.file()).isEqualTo(file));
+        try (TimingDocument first = TimingDocument.open(file, work())) {
+            assertThatThrownBy(() -> TimingDocument.open(file, work())).isInstanceOfSatisfying(ProjectFileInUseException.class, ex -> assertThat(ex.file()).isEqualTo(file));
             assertThat(workFiles()).isEqualTo(3); // the first document's work file, its lock and its project note
         }
     }
@@ -514,11 +514,11 @@ class ProjectDocumentTest {
     void closingTheDocumentReleasesTheProjectFileAndRemovesItsLockFile() throws Exception {
         Path file = savedProject("x.timing");
         Path lock = dir.resolve("x.timing.lock");
-        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
             assertThat(lock).exists();
         }
         assertThat(lock).doesNotExist();
-        try (ProjectDocument again = ProjectDocument.open(file, work())) {
+        try (TimingDocument again = TimingDocument.open(file, work())) {
             assertThat(again.file()).contains(file);
         }
     }
@@ -527,8 +527,8 @@ class ProjectDocumentTest {
     void saveAsToAProjectFileOpenElsewhereIsRefusedAndLeavesItUntouched() throws Exception {
         Path file = savedProject("x.timing");
         byte[] before = Files.readAllBytes(file);
-        try (ProjectDocument holder = ProjectDocument.open(file, work());
-             ProjectDocument other = ProjectDocument.create(work(), SETTINGS)) {
+        try (TimingDocument holder = TimingDocument.open(file, work());
+             TimingDocument other = TimingDocument.create(work(), SETTINGS)) {
             other.updateSettings(SETTINGS.withTcp("changed", 1));
             assertThatThrownBy(() -> other.saveAs(file)).isInstanceOfSatisfying(ProjectFileInUseException.class, ex -> assertThat(ex.file()).isEqualTo(file));
             assertThat(Files.readAllBytes(file)).isEqualTo(before);
@@ -541,11 +541,11 @@ class ProjectDocumentTest {
     void saveAsMovesTheLockToTheNewFile() throws Exception {
         Path a = savedProject("a.timing");
         Path b = dir.resolve("b.timing");
-        try (ProjectDocument doc = ProjectDocument.open(a, work())) {
+        try (TimingDocument doc = TimingDocument.open(a, work())) {
             doc.saveAs(b);
-            assertThatThrownBy(() -> ProjectDocument.open(b, work())).isInstanceOf(ProjectFileInUseException.class);
+            assertThatThrownBy(() -> TimingDocument.open(b, work())).isInstanceOf(ProjectFileInUseException.class);
             assertThat(dir.resolve("a.timing.lock")).doesNotExist();
-            try (ProjectDocument other = ProjectDocument.open(a, work())) {
+            try (TimingDocument other = TimingDocument.open(a, work())) {
                 assertThat(other.file()).contains(a);
             }
         }
@@ -554,10 +554,10 @@ class ProjectDocumentTest {
     @Test
     void saveAsToItsOwnFileKeepsTheLock() throws Exception {
         Path file = savedProject("x.timing");
-        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
             doc.saveAs(file);
             assertThat(doc.file()).contains(file);
-            assertThatThrownBy(() -> ProjectDocument.open(file, work())).isInstanceOf(ProjectFileInUseException.class);
+            assertThatThrownBy(() -> TimingDocument.open(file, work())).isInstanceOf(ProjectFileInUseException.class);
         }
     }
 
@@ -565,7 +565,7 @@ class ProjectDocumentTest {
     void aLockFileLeftBehindByACrashDoesNotBlockOpening() throws Exception {
         Path file = savedProject("x.timing");
         Files.writeString(dir.resolve("x.timing.lock"), "");
-        try (ProjectDocument doc = ProjectDocument.open(file, work())) {
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
             assertThat(doc.file()).contains(file);
         }
     }
@@ -573,7 +573,7 @@ class ProjectDocumentTest {
     @Test
     void closeWaitsForARunningSaveAndLeavesNoOriginNote() throws Exception {
         Path file = dir.resolve("x.timing");
-        ProjectDocument doc = ProjectDocument.create(work(), SETTINGS);
+        TimingDocument doc = TimingDocument.create(work(), SETTINGS);
         doc.saveAs(file);
         doc.updateSettings(SETTINGS.withTcp("changed", 1));
         CountDownLatch saveBlocked = new CountDownLatch(1);
@@ -612,7 +612,7 @@ class ProjectDocumentTest {
     void aSaveWaitingForSaveAsWritesToTheNewFile() throws Exception {
         Path a = dir.resolve("a.timing");
         Path b = dir.resolve("b.timing");
-        try (ProjectDocument doc = ProjectDocument.create(work(), SETTINGS)) {
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
             doc.saveAs(a);
             doc.updateSettings(SETTINGS.withTcp("changed", 1));
             CountDownLatch saveAsBlocked = new CountDownLatch(1);
@@ -647,21 +647,21 @@ class ProjectDocumentTest {
             saving.join();
 
             assertThat(failures).isEmpty();
-            assertThat(ProjectDatabase.previousVersionOf(a)).doesNotExist();
-            assertThat(ProjectDatabase.previousVersionOf(b)).exists();
+            assertThat(TimingDatabase.previousVersionOf(a)).doesNotExist();
+            assertThat(TimingDatabase.previousVersionOf(b)).exists();
             assertThat(WorkFileOrigin.read(doc.database().workFile())).map(WorkFileOrigin::projectFile).contains(b.toAbsolutePath());
         }
     }
 
     @Test
     void aClosedDocumentRefusesToSave() throws Exception {
-        ProjectDocument doc = ProjectDocument.create(work(), SETTINGS);
+        TimingDocument doc = TimingDocument.create(work(), SETTINGS);
         doc.saveAs(dir.resolve("x.timing"));
         doc.updateSettings(SETTINGS.withTcp("changed", 1));
         doc.close();
 
         assertThatThrownBy(doc::save).isInstanceOf(IllegalStateException.class);
-        assertThat(ProjectDatabase.previousVersionOf(dir.resolve("x.timing"))).doesNotExist();
+        assertThat(TimingDatabase.previousVersionOf(dir.resolve("x.timing"))).doesNotExist();
     }
 
     static void awaitParkedOrTerminated(Thread thread) {

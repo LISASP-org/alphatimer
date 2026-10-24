@@ -23,18 +23,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
-class ProjectDatabaseTest {
+class TimingDatabaseTest {
 
     @TempDir
     Path dir;
 
-    private static long countSettings(ProjectDatabase db) {
+    private static long countSettings(TimingDatabase db) {
         return db.read(em -> em.createQuery("select count(s) from SettingsEntity s", Long.class).getSingleResult());
     }
 
     @Test
     void aNewProjectIdentifiesAHeatByEventAndHeatNumberOnly() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             List<Object> heatColumns = db.read(em -> em.createNativeQuery("select name from pragma_table_info('heat')").getResultList());
             List<Object> uniqueKeys = db.read(em -> em.createNativeQuery(
                     "select group_concat(ii.name, ',') from pragma_index_list('heat') il, pragma_index_info(il.name) ii where il.\"unique\" = 1 group by il.name")
@@ -49,7 +49,7 @@ class ProjectDatabaseTest {
     @Test
     void writeSetsDirtyAndSnapshotRoundTrips() throws Exception {
         Path file = dir.resolve("a.heat");
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             assertThat(db.isDirty()).isFalse();
             db.write(em -> {
                 em.persist(new SettingsEntity("host", 1234, 60, 1999));
@@ -60,7 +60,7 @@ class ProjectDatabaseTest {
             assertThat(db.isDirty()).isFalse();
             db.closeAndDelete();
         }
-        try (ProjectDatabase db = ProjectDatabase.openCopy(file, dir)) {
+        try (TimingDatabase db = TimingDatabase.openCopy(file, dir)) {
             assertThat(countSettings(db)).isEqualTo(1);
             assertThat(db.isDirty()).isFalse();
             db.closeAndDelete();
@@ -70,7 +70,7 @@ class ProjectDatabaseTest {
     @Test
     void snapshotReplacesExistingFileAtomicallyAndLeavesNoTempFile() throws Exception {
         Path file = dir.resolve("a.heat");
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             db.snapshotTo(file);
             db.write(em -> {
                 em.persist(new SettingsEntity("h", 1, 60, 0));
@@ -84,7 +84,7 @@ class ProjectDatabaseTest {
         }
     }
 
-    private void saveWithSettings(ProjectDatabase db, Path file, int count) throws IOException {
+    private void saveWithSettings(TimingDatabase db, Path file, int count) throws IOException {
         db.write(em -> {
             em.createQuery("delete from SettingsEntity").executeUpdate();
             for (int i = 0; i < count; i++) {
@@ -96,7 +96,7 @@ class ProjectDatabaseTest {
     }
 
     private long settingsIn(Path file) throws IOException {
-        try (ProjectDatabase db = ProjectDatabase.openCopy(file, dir)) {
+        try (TimingDatabase db = TimingDatabase.openCopy(file, dir)) {
             long count = countSettings(db);
             db.closeAndDelete();
             return count;
@@ -107,7 +107,7 @@ class ProjectDatabaseTest {
     void savingAgainKeepsThePreviousStateNextToTheFile() throws Exception {
         Path projects = Files.createDirectory(dir.resolve("projects"));
         Path file = projects.resolve("wk.timing");
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             saveWithSettings(db, file, 1);
             saveWithSettings(db, file, 2);
             db.closeAndDelete();
@@ -122,7 +122,7 @@ class ProjectDatabaseTest {
     void aFurtherSaveReplacesThePreviousFile() throws Exception {
         Path projects = Files.createDirectory(dir.resolve("projects"));
         Path file = projects.resolve("wk.timing");
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             saveWithSettings(db, file, 1);
             saveWithSettings(db, file, 2);
             saveWithSettings(db, file, 3);
@@ -139,7 +139,7 @@ class ProjectDatabaseTest {
         Path projects = Files.createDirectory(dir.resolve("projects"));
         Path file = projects.resolve("wk.timing");
         Path previous = projects.resolve("wk-previous.timing");
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             saveWithSettings(db, file, 1);
             db.write(em -> {
                 em.persist(new SettingsEntity("h", 1, 60, 0));
@@ -173,7 +173,7 @@ class ProjectDatabaseTest {
     void aWriteDuringTheMoveOfASaveIsNotBlocked() throws Exception {
         Path projects = Files.createDirectory(dir.resolve("projects"));
         Path file = projects.resolve("wk.timing");
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             saveWithSettings(db, file, 1);
             db.write(em -> {
                 em.persist(new SettingsEntity("h", 1, 60, 0));
@@ -217,7 +217,7 @@ class ProjectDatabaseTest {
     void aSaveToAnotherFileSystemCopiesTheFileAndLeavesNoTempFiles() throws Exception {
         Path projects = Files.createDirectory(dir.resolve("projects"));
         Path file = projects.resolve("wk.timing");
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             db.useMover((source, target) -> {
                 throw new AtomicMoveNotSupportedException(source.toString(), target.toString(), "other file system");
             });
@@ -237,7 +237,7 @@ class ProjectDatabaseTest {
     void aSaveFailingToMoveTheFileKeepsTheOldFileAndLeavesNoTempFiles() throws Exception {
         Path projects = Files.createDirectory(dir.resolve("projects"));
         Path file = projects.resolve("wk.timing");
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             saveWithSettings(db, file, 1);
             db.useMover((source, target) -> {
                 throw new IOException("disk full");
@@ -258,14 +258,14 @@ class ProjectDatabaseTest {
         }
     }
 
-    private static FutureTask<Void> snapshotTask(ProjectDatabase db, Path file) {
+    private static FutureTask<Void> snapshotTask(TimingDatabase db, Path file) {
         return new FutureTask<>(() -> {
             db.snapshotTo(file);
             return null;
         });
     }
 
-    private static void pauseWhenTempFileAppears(ProjectDatabase db, Path workDir, CountDownLatch reached, CountDownLatch release) {
+    private static void pauseWhenTempFileAppears(TimingDatabase db, Path workDir, CountDownLatch reached, CountDownLatch release) {
         AtomicBoolean paused = new AtomicBoolean();
         db.read(em -> {
             em.unwrap(Session.class).doWork(connection -> ProgressHandler.setHandler(connection, 1, new ProgressHandler() {
@@ -302,7 +302,7 @@ class ProjectDatabaseTest {
     @Test
     void theFirstSaveCreatesNoPreviousFile() throws Exception {
         Path projects = Files.createDirectory(dir.resolve("projects"));
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             saveWithSettings(db, projects.resolve("wk.timing"), 1);
             db.closeAndDelete();
         }
@@ -313,7 +313,7 @@ class ProjectDatabaseTest {
 
     @Test
     void aNewProjectHasNoCheckConstraintsAndTheCurrentSchemaVersion() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir);
+        try (TimingDatabase db = TimingDatabase.createNew(dir);
              var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + db.workFile());
              var st = connection.createStatement()) {
             List<String> tables = new ArrayList<>();
@@ -332,7 +332,7 @@ class ProjectDatabaseTest {
     @Test
     void aSavedProjectKeepsItsSchemaVersion() throws Exception {
         Path file = dir.resolve("a.timing");
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             db.snapshotTo(file);
             db.closeAndDelete();
         }
@@ -348,7 +348,7 @@ class ProjectDatabaseTest {
         Path bad = dir.resolve("bad.heat");
         Files.writeString(bad, "this is not a database");
         Path work = Files.createDirectory(dir.resolve("work"));
-        assertThatThrownBy(() -> ProjectDatabase.openCopy(bad, work)).isInstanceOf(InvalidProjectFileException.class);
+        assertThatThrownBy(() -> TimingDatabase.openCopy(bad, work)).isInstanceOf(InvalidProjectFileException.class);
         try (var files = Files.list(work)) {
             assertThat(files).isEmpty();
         }
@@ -356,7 +356,7 @@ class ProjectDatabaseTest {
 
     @Test
     void concurrentWritersAreSerialized() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             var pool = Executors.newFixedThreadPool(4);
             List<Future<?>> futures = new ArrayList<>();
             for (int i = 0; i < 40; i++) {

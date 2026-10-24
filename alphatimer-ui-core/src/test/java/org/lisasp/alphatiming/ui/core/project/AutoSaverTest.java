@@ -2,7 +2,7 @@ package org.lisasp.alphatiming.ui.core.project;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.lisasp.alphatiming.project.db.ProjectDatabase;
+import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
 import java.nio.file.Files;
@@ -26,14 +26,14 @@ class AutoSaverTest {
 
     @Test
     void savesDirtyDocumentWithFile() throws Exception {
-        try (ProjectDocument doc = ProjectDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
+        try (TimingDocument doc = TimingDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
              AutoSaver saver = new AutoSaver(() -> doc, e -> { })) {
             doc.saveAs(dir.resolve("x.heat"));
             doc.updateSettings(SETTINGS.withTcp("b", 2));
             saver.runOnce();
             assertThat(doc.isDirty()).isFalse();
         }
-        try (ProjectDocument reopened = ProjectDocument.open(dir.resolve("x.heat"), Files.createDirectories(dir.resolve("w2")))) {
+        try (TimingDocument reopened = TimingDocument.open(dir.resolve("x.heat"), Files.createDirectories(dir.resolve("w2")))) {
             assertThat(reopened.settings().tcpHost()).isEqualTo("b");
         }
     }
@@ -41,7 +41,7 @@ class AutoSaverTest {
     @Test
     void doesNothingForCleanOrFilelessDocuments() throws Exception {
         List<Exception> errors = new ArrayList<>();
-        try (ProjectDocument doc = ProjectDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
+        try (TimingDocument doc = TimingDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
              AutoSaver saver = new AutoSaver(() -> doc, errors::add)) {
             doc.updateSettings(SETTINGS.withTcp("changed", 1));
             saver.runOnce(); // dirty but no file
@@ -58,7 +58,7 @@ class AutoSaverTest {
 
     @Test
     void anInvalidIntervalIsRejectedAndTheCurrentScheduleKeepsRunning() throws Exception {
-        try (ProjectDocument doc = ProjectDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
+        try (TimingDocument doc = TimingDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
              AutoSaver saver = new AutoSaver(() -> doc, e -> { })) {
             saver.setIntervalSeconds(1);
             assertThatThrownBy(() -> saver.setIntervalSeconds(0)).isInstanceOf(IllegalArgumentException.class);
@@ -71,7 +71,7 @@ class AutoSaverTest {
     @Test
     void reportsFailuresAndKeepsDocumentDirty() throws Exception {
         List<Exception> errors = new ArrayList<>();
-        try (ProjectDocument doc = ProjectDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
+        try (TimingDocument doc = TimingDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
              AutoSaver saver = new AutoSaver(() -> doc, errors::add)) {
             Path target = dir.resolve("sub/x.heat");
             Files.createDirectories(target.getParent());
@@ -88,7 +88,7 @@ class AutoSaverTest {
 
     @Test
     void aPausedAutoSaverWritesNothingUntilResumed() throws Exception {
-        try (ProjectDocument doc = ProjectDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
+        try (TimingDocument doc = TimingDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
              AutoSaver saver = new AutoSaver(() -> doc, e -> { })) {
             doc.saveAs(dir.resolve("x.timing"));
             doc.updateSettings(SETTINGS.withTcp("b", 2));
@@ -103,7 +103,7 @@ class AutoSaverTest {
 
     @Test
     void pauseWaitsForARunningAutoSave() throws Exception {
-        try (ProjectDocument doc = ProjectDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
+        try (TimingDocument doc = TimingDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
              AutoSaver saver = new AutoSaver(() -> doc, e -> { })) {
             doc.saveAs(dir.resolve("x.timing"));
             doc.updateSettings(SETTINGS.withTcp("b", 2));
@@ -113,14 +113,14 @@ class AutoSaverTest {
             doc.addDirtyListener(dirty -> {
                 if (!dirty && Thread.currentThread() == autoSave) {
                     saveBlocked.countDown();
-                    ProjectDocumentTest.awaitQuietly(releaseSave);
+                    TimingDocumentTest.awaitQuietly(releaseSave);
                 }
             });
             autoSave.start();
             saveBlocked.await();
             Thread pausing = new Thread(saver::pause);
             pausing.start();
-            ProjectDocumentTest.awaitParkedOrTerminated(pausing);
+            TimingDocumentTest.awaitParkedOrTerminated(pausing);
             boolean pauseWaited = pausing.isAlive();
             releaseSave.countDown();
             autoSave.join();
@@ -134,7 +134,7 @@ class AutoSaverTest {
     void aClosedDocumentIsNotSavedAndReportsNoError() throws Exception {
         List<Exception> errors = new CopyOnWriteArrayList<>();
         Path target = dir.resolve("x.timing");
-        ProjectDocument doc = ProjectDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
+        TimingDocument doc = TimingDocument.create(Files.createDirectories(dir.resolve("w")), SETTINGS);
         try (AutoSaver saver = new AutoSaver(() -> doc, errors::add)) {
             doc.saveAs(target);
             doc.updateSettings(SETTINGS.withTcp("b", 2));
@@ -142,6 +142,6 @@ class AutoSaverTest {
             saver.runOnce();
         }
         assertThat(errors).isEmpty();
-        assertThat(ProjectDatabase.previousVersionOf(target)).doesNotExist();
+        assertThat(TimingDatabase.previousVersionOf(target)).doesNotExist();
     }
 }

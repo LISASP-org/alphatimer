@@ -10,7 +10,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.lisasp.alphatimer.api.serial.SerialPortReader;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
-import org.lisasp.alphatiming.project.db.ProjectDatabase;
+import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatimer.serial.com.NrSerialReader;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
@@ -81,7 +81,7 @@ class RecordingSessionTest {
     @TempDir
     Path dir;
 
-    private ProjectDatabase db;
+    private TimingDatabase db;
     private final List<FakeReader> created = new ArrayList<>();
     private RecordingSession session;
 
@@ -91,7 +91,7 @@ class RecordingSessionTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        db = ProjectDatabase.createNew(dir);
+        db = TimingDatabase.createNew(dir);
         session = new RecordingSession(db, s -> {
             FakeReader r = new FakeReader();
             created.add(r);

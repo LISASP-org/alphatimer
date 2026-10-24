@@ -15,7 +15,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public final class HeatStore implements HeatRepository {
 
-    private final ProjectDatabase db;
+    private final TimingDatabase db;
 
     @Override
     public Optional<HeatDto> find(int event, int heat) {

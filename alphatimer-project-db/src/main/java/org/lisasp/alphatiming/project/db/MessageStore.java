@@ -10,7 +10,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MessageStore implements DataHandlingMessageRepository {
 
-    private final ProjectDatabase db;
+    private final TimingDatabase db;
 
     @Override
     public void put(DataHandlingMessage m) {
