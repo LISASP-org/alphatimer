@@ -57,7 +57,8 @@ consumers before the session closes the raw data recorder, and a connect in prog
 - **`ProjectFile` / `ProjectDocument`**: owns the working database (EntityManagerFactory), the current file path
   (optional), the dirty flag and listeners. Operations: `create()`, `open(path)`, `save()`, `saveAs(path)`, `close()`.
   Any write (incoming data, settings change) sets dirty. After a crash the temp working database remains; at next start
-  the app offers to recover it. While a document has a project file, it holds an OS lock on `<file>.lock` next to it, so
+  the app offers to recover it, naming the project file the work file was last opened from or saved to (a
+  `<work file>.project` note next to it) and its last change; discarding needs a second confirmation. While a document has a project file, it holds an OS lock on `<file>.lock` next to it, so
   a second program instance refuses to open the file or to save over it.
 - **`RecordingSession`**: `start()` snapshots the settings and builds a fresh pipeline (`TcpReader` → raw-data
   storage + `InputCollector` → `MessageConverter` → aggregator → message storage, refiner, heat service); `stop()`

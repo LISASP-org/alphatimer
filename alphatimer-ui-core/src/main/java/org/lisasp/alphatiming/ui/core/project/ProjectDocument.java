@@ -81,10 +81,11 @@ public final class ProjectDocument implements AutoCloseable {
             db.closeAndDelete();
             throw new InvalidProjectFileException(file, ex);
         }
+        WorkFileOrigin.record(db.workFile(), file);
         return doc;
     }
 
-    public static List<Path> findRecoverable(Path workDir) {
+    public static List<CrashLeftover> findRecoverable(Path workDir) {
         if (!Files.isDirectory(workDir)) {
             return List.of();
         }
@@ -92,6 +93,8 @@ public final class ProjectDocument implements AutoCloseable {
             return files.filter(p -> p.getFileName().toString().endsWith(ProjectDatabase.WORK_FILE_SUFFIX))
                         .filter(p -> !ProjectDatabase.isInUse(p))
                         .sorted()
+                        .map(ProjectDocument::describeLeftover)
+                        .flatMap(Optional::stream)
                         .toList();
         } catch (IOException ex) {
             log.warn("Could not look for recoverable work files in {}", workDir, ex);
@@ -99,16 +102,37 @@ public final class ProjectDocument implements AutoCloseable {
         }
     }
 
-    /** Re-opens a work file left behind by a crash; the document is dirty and has no project file yet. */
-    public static ProjectDocument recover(Path workFile) throws IOException {
-        ProjectDocument doc = new ProjectDocument(ProjectDatabase.adopt(workFile), null, null);
-        doc.touch();
-        return doc;
+    private static Optional<CrashLeftover> describeLeftover(Path workFile) {
+        try {
+            return Optional.of(new CrashLeftover(workFile, Files.getLastModifiedTime(workFile).toInstant(),
+                                                 WorkFileOrigin.read(workFile).map(WorkFileOrigin::projectFile)));
+        } catch (IOException ex) {
+            log.warn("Could not read the work file {}", workFile.getFileName(), ex);
+            return Optional.empty();
+        }
     }
 
-    /** Removes a crash leftover that the user chose not to recover. */
+    /**
+     * Re-opens a work file left behind by a crash as a dirty document. It keeps its project file only while that file
+     * is free and unchanged since the crashed session last opened or saved it; otherwise Save would overwrite newer data.
+     */
+    public static ProjectDocument recover(Path workFile) throws IOException {
+        Optional<WorkFileOrigin> origin = WorkFileOrigin.read(workFile).filter(WorkFileOrigin::isUnchanged);
+        Optional<LockFile> lock = origin.isPresent() ? LockFile.tryAcquire(LockFile.besides(origin.get().projectFile())) : Optional.empty();
+        Path file = lock.isPresent() ? origin.get().projectFile() : null;
+        try {
+            ProjectDocument doc = new ProjectDocument(ProjectDatabase.adopt(workFile), file, lock.orElse(null));
+            doc.touch();
+            return doc;
+        } catch (IOException | RuntimeException ex) {
+            lock.ifPresent(LockFile::closeAndDelete);
+            throw ex;
+        }
+    }
+
     public static void discard(Path workFile) {
         ProjectDatabase.discard(workFile);
+        WorkFileOrigin.delete(workFile);
     }
 
     private void touch() {
@@ -213,6 +237,7 @@ public final class ProjectDocument implements AutoCloseable {
         long version = database.writeCount();
         database.snapshotTo(target);
         log.info("Saved project {}", target.getFileName());
+        WorkFileOrigin.record(database.workFile(), target);
         if (database.writeCount() == version) {
             database.markClean();
         }
@@ -221,6 +246,7 @@ public final class ProjectDocument implements AutoCloseable {
     @Override
     public void close() {
         database.closeAndDelete();
+        WorkFileOrigin.delete(database.workFile());
         LockFile lock = fileLock;
         fileLock = null;
         if (lock != null) {

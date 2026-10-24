@@ -1,6 +1,7 @@
 package org.lisasp.alphatiming.cli;
 
 import org.lisasp.alphatiming.ui.common.SavePrompt;
+import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
 
 import java.io.PrintStream;
 import java.nio.file.Path;
@@ -38,7 +39,12 @@ public final class CliSavePrompt implements SavePrompt {
     }
 
     @Override
-    public RecoveryChoice askRecover(Path workFile) {
+    public RecoveryChoice askRecover(CrashLeftover leftover) {
         return RecoveryChoice.LATER;
+    }
+
+    @Override
+    public boolean confirmDiscard(CrashLeftover leftover) {
+        return false;
     }
 }

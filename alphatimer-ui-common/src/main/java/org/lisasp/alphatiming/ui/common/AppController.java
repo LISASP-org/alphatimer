@@ -8,6 +8,7 @@ import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.ui.core.project.AutoSaver;
+import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
 import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
 import org.lisasp.alphatiming.ui.core.recording.RecordingSession;
 import org.lisasp.alphatiming.ui.core.recording.RecordingState;
@@ -54,25 +55,38 @@ public final class AppController implements AutoCloseable {
     }
 
     public void init() {
-        for (Path leftover : ProjectDocument.findRecoverable(workDir)) {
+        for (CrashLeftover leftover : ProjectDocument.findRecoverable(workDir)) {
             if (document != null) {
                 break; // keep the remaining leftovers for the next start
             }
-            switch (prompt.askRecover(leftover)) {
-                case RECOVER -> {
-                    try {
-                        install(ProjectDocument.recover(leftover));
-                    } catch (IOException | RuntimeException ex) {
-                        prompt.showError(I18n.get("error.recovery.title"), describe(ex));
-                    }
-                }
-                case DISCARD -> ProjectDocument.discard(leftover);
-                case LATER -> {
-                }
-            }
+            offerRecovery(leftover);
         }
         if (document == null) {
             newProject();
+        }
+    }
+
+    private void offerRecovery(CrashLeftover leftover) {
+        while (true) {
+            switch (prompt.askRecover(leftover)) {
+                case RECOVER -> {
+                    try {
+                        install(ProjectDocument.recover(leftover.workFile()));
+                    } catch (IOException | RuntimeException ex) {
+                        prompt.showError(I18n.get("error.recovery.title"), describe(ex));
+                    }
+                    return;
+                }
+                case DISCARD -> {
+                    if (prompt.confirmDiscard(leftover)) {
+                        ProjectDocument.discard(leftover.workFile());
+                        return;
+                    }
+                }
+                case LATER -> {
+                    return;
+                }
+            }
         }
     }
 

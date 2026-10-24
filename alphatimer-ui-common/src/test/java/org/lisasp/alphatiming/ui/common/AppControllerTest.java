@@ -9,6 +9,7 @@ import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.heats.LiveHeats;
+import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
 import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
 import org.lisasp.alphatiming.ui.core.recording.RecordingState;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
@@ -33,6 +34,8 @@ class AppControllerTest {
         final Queue<Choice> choices = new ArrayDeque<>();
         final Queue<Optional<Path>> paths = new ArrayDeque<>();
         final Queue<RecoveryChoice> recoveries = new ArrayDeque<>();
+        final Queue<Boolean> discards = new ArrayDeque<>();
+        final List<CrashLeftover> leftovers = new ArrayList<>();
         final Queue<Boolean> stops = new ArrayDeque<>();
         final List<String> errors = new ArrayList<>();
         final List<String> events;
@@ -65,9 +68,16 @@ class AppControllerTest {
         }
 
         @Override
-        public RecoveryChoice askRecover(Path workFile) {
+        public RecoveryChoice askRecover(CrashLeftover leftover) {
             events.add("askRecover");
+            leftovers.add(leftover);
             return recoveries.remove();
+        }
+
+        @Override
+        public boolean confirmDiscard(CrashLeftover leftover) {
+            events.add("confirmDiscard");
+            return discards.remove();
         }
     }
 
@@ -362,6 +372,7 @@ class AppControllerTest {
         ProjectDocument crashed2 = ProjectDocument.create(work, S);
         crashed2.database().close();
         prompt.recoveries.add(SavePrompt.RecoveryChoice.DISCARD);
+        prompt.discards.add(true);
         AppController second = new AppController(work, defaults, prompt, () -> s -> fakeReader(), LocalDateTime::now);
         second.init();
         assertThat(second.document().settings()).isNotEqualTo(S);
@@ -382,6 +393,31 @@ class AppControllerTest {
         controller.open(file);
         assertThat(controller.currentHeat()).contains(created);
         assertThat(seen).containsExactly(new LiveHeats(created, null));
+    }
+
+    @Test
+    void discardingALeftoverNeedsASecondConfirmation() throws Exception {
+        ProjectDocument crashed = ProjectDocument.create(work, S);
+        crashed.database().close();
+        prompt.recoveries.add(SavePrompt.RecoveryChoice.DISCARD);
+        prompt.discards.add(false);
+        prompt.recoveries.add(SavePrompt.RecoveryChoice.LATER);
+        controller.init();
+        assertThat(events).containsExactly("askRecover", "confirmDiscard", "askRecover");
+        assertThat(prompt.leftovers).extracting(CrashLeftover::workFile).containsOnly(crashed.database().workFile());
+        assertThat(workFiles()).isEqualTo(2); // the leftover and the new project
+    }
+
+    @Test
+    void recoveryQuestionNamesTheProjectFileOfTheLeftover() throws Exception {
+        Path file = dir.resolve("crashed.timing");
+        try (ProjectDocument crashed = ProjectDocument.create(work, S)) {
+            crashed.saveAs(file);
+            crashed.database().close();
+            prompt.recoveries.add(SavePrompt.RecoveryChoice.LATER);
+            controller.init();
+            assertThat(prompt.leftovers).singleElement().satisfies(l -> assertThat(l.projectFile()).contains(file));
+        }
     }
 
     @Test

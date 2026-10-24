@@ -20,6 +20,7 @@ import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.heats.Penalty;
 import org.lisasp.alphatiming.ui.common.AppController;
 import org.lisasp.alphatiming.ui.common.SavePrompt;
+import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
@@ -94,8 +95,13 @@ class TuiMainWindowTest {
         }
 
         @Override
-        public RecoveryChoice askRecover(Path workFile) {
+        public RecoveryChoice askRecover(CrashLeftover leftover) {
             return RecoveryChoice.LATER;
+        }
+
+        @Override
+        public boolean confirmDiscard(CrashLeftover leftover) {
+            return false;
         }
     }
 

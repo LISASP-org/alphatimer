@@ -20,6 +20,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -138,12 +139,66 @@ class ProjectDocumentTest {
         doc.database().close(); // simulate a crash: the work file stays
         var found = ProjectDocument.findRecoverable(work());
         assertThat(found).hasSize(1);
-        try (ProjectDocument recovered = ProjectDocument.recover(found.get(0))) {
+        try (ProjectDocument recovered = ProjectDocument.recover(found.get(0).workFile())) {
             assertThat(recovered.settings()).isEqualTo(SETTINGS);
             assertThat(recovered.isDirty()).isTrue();
             assertThat(recovered.file()).isEmpty();
         }
         assertThat(ProjectDocument.findRecoverable(work())).isEmpty();
+    }
+
+    @Test
+    void leftoverNamesTheProjectFileItBelongsTo() throws Exception {
+        Path file = dir.resolve("crashed.timing");
+        try (ProjectDocument doc = ProjectDocument.create(work(), SETTINGS)) {
+            doc.saveAs(file);
+            doc.database().close();
+            var found = ProjectDocument.findRecoverable(work());
+            assertThat(found).hasSize(1);
+            CrashLeftover leftover = found.get(0);
+            assertThat(leftover.projectFile()).contains(file);
+            assertThat(leftover.lastModified()).isEqualTo(Files.getLastModifiedTime(leftover.workFile()).toInstant());
+        }
+    }
+
+    private Path leftoverOf(Path projectFile) throws IOException {
+        ProjectDocument crashed = ProjectDocument.create(work(), SETTINGS);
+        Path workFile = crashed.database().workFile();
+        WorkFileOrigin.record(workFile, projectFile);
+        crashed.database().close();
+        return workFile;
+    }
+
+    @Test
+    void recoveredDocumentKeepsItsUnchangedProjectFile() throws Exception {
+        Path file = savedProject("x.timing");
+        try (ProjectDocument recovered = ProjectDocument.recover(leftoverOf(file))) {
+            assertThat(recovered.file()).contains(file);
+            assertThatThrownBy(() -> ProjectDocument.open(file, work())).isInstanceOf(ProjectFileInUseException.class);
+        }
+    }
+
+    @Test
+    void recoveredDocumentDropsAProjectFileSavedAfterTheCrash() throws Exception {
+        Path file = savedProject("x.timing");
+        Path leftover = leftoverOf(file);
+        Files.setLastModifiedTime(file, FileTime.from(Files.getLastModifiedTime(file).toInstant().plusSeconds(60)));
+        try (ProjectDocument recovered = ProjectDocument.recover(leftover)) {
+            assertThat(recovered.file()).isEmpty();
+            assertThat(recovered.isDirty()).isTrue();
+            ProjectDocument.open(file, work()).close();
+        }
+    }
+
+    @Test
+    void recoveredDocumentDropsAProjectFileOpenElsewhere() throws Exception {
+        Path file = savedProject("x.timing");
+        Path leftover = leftoverOf(file);
+        try (ProjectDocument elsewhere = ProjectDocument.open(file, work());
+             ProjectDocument recovered = ProjectDocument.recover(leftover)) {
+            assertThat(recovered.file()).isEmpty();
+            assertThat(recovered.isDirty()).isTrue();
+        }
     }
 
     @Test
@@ -159,7 +214,14 @@ class ProjectDocumentTest {
     void discardRemovesWorkFileAndItsLock() throws Exception {
         ProjectDocument doc = ProjectDocument.create(work(), SETTINGS);
         doc.database().close();
-        ProjectDocument.discard(ProjectDocument.findRecoverable(work()).get(0));
+        ProjectDocument.discard(ProjectDocument.findRecoverable(work()).get(0).workFile());
+        assertThat(workFiles()).isZero();
+    }
+
+    @Test
+    void discardRemovesTheNoteOfTheProjectFile() throws Exception {
+        Path leftover = leftoverOf(savedProject("x.timing"));
+        ProjectDocument.discard(leftover);
         assertThat(workFiles()).isZero();
     }
 
@@ -380,7 +442,7 @@ class ProjectDocumentTest {
         Path file = savedProject("x.timing");
         try (ProjectDocument first = ProjectDocument.open(file, work())) {
             assertThatThrownBy(() -> ProjectDocument.open(file, work())).isInstanceOfSatisfying(ProjectFileInUseException.class, ex -> assertThat(ex.file()).isEqualTo(file));
-            assertThat(workFiles()).isEqualTo(2);
+            assertThat(workFiles()).isEqualTo(3); // the first document's work file, its lock and its project note
         }
     }
 

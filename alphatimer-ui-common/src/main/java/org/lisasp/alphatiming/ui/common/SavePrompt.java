@@ -1,5 +1,7 @@
 package org.lisasp.alphatiming.ui.common;
 
+import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
+
 import java.nio.file.Path;
 import java.util.Optional;
 
@@ -22,5 +24,8 @@ public interface SavePrompt {
     void showError(String title, String message);
 
     /** A work file of an earlier run was left behind (crash). */
-    RecoveryChoice askRecover(Path workFile);
+    RecoveryChoice askRecover(CrashLeftover leftover);
+
+    /** Discarding deletes the leftover for good; false goes back to {@link #askRecover}. */
+    boolean confirmDiscard(CrashLeftover leftover);
 }

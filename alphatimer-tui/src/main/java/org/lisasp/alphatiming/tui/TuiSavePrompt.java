@@ -7,7 +7,9 @@ import com.googlecode.lanterna.gui2.dialogs.MessageDialogBuilder;
 import com.googlecode.lanterna.gui2.dialogs.MessageDialogButton;
 import org.lisasp.alphatiming.ui.common.I18n;
 import org.lisasp.alphatiming.ui.common.ProjectFiles;
+import org.lisasp.alphatiming.ui.common.RecoveryTexts;
 import org.lisasp.alphatiming.ui.common.SavePrompt;
+import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -57,11 +59,18 @@ final class TuiSavePrompt implements SavePrompt {
     }
 
     @Override
-    public RecoveryChoice askRecover(Path workFile) {
-        return choose(I18n.get("dialog.recover.title"), I18n.get("dialog.recover.message"), RecoveryChoice.LATER,
+    public RecoveryChoice askRecover(CrashLeftover leftover) {
+        return choose(I18n.get("dialog.recover.title"), RecoveryTexts.question(leftover), RecoveryChoice.LATER,
                       I18n.get("button.recover"), RecoveryChoice.RECOVER,
                       I18n.get("button.discard"), RecoveryChoice.DISCARD,
                       I18n.get("button.later"), RecoveryChoice.LATER);
+    }
+
+    @Override
+    public boolean confirmDiscard(CrashLeftover leftover) {
+        return choose(I18n.get("dialog.discard.title"), RecoveryTexts.discardQuestion(leftover), false,
+                      I18n.get("button.back"), false,
+                      I18n.get("button.delete"), true);
     }
 
     /** Alternating labels and answers; Escape gives {@code onCancel}. */

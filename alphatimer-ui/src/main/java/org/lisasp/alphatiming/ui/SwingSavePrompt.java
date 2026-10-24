@@ -3,6 +3,8 @@ package org.lisasp.alphatiming.ui;
 import org.lisasp.alphatiming.ui.common.SavePrompt;
 import org.lisasp.alphatiming.ui.common.I18n;
 import org.lisasp.alphatiming.ui.common.ProjectFiles;
+import org.lisasp.alphatiming.ui.common.RecoveryTexts;
+import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
 import lombok.Setter;
 
 import org.lisasp.swing.filechooser.FileChooserUtils;
@@ -72,10 +74,10 @@ public final class SwingSavePrompt implements SavePrompt {
     }
 
     @Override
-    public RecoveryChoice askRecover(Path workFile) {
+    public RecoveryChoice askRecover(CrashLeftover leftover) {
         Object[] options = {I18n.get("button.recover"), I18n.get("button.discard"), I18n.get("button.later")};
         int answer = JOptionPane.showOptionDialog(parent,
-                                                  I18n.get("dialog.recover.message"),
+                                                  RecoveryTexts.question(leftover),
                                                   I18n.get("dialog.recover.title"),
                                                   JOptionPane.DEFAULT_OPTION,
                                                   JOptionPane.QUESTION_MESSAGE,
@@ -87,5 +89,19 @@ public final class SwingSavePrompt implements SavePrompt {
             case 1 -> RecoveryChoice.DISCARD;
             default -> RecoveryChoice.LATER;
         };
+    }
+
+    @Override
+    public boolean confirmDiscard(CrashLeftover leftover) {
+        Object[] options = {I18n.get("button.delete"), I18n.get("button.back")};
+        int answer = JOptionPane.showOptionDialog(parent,
+                                                  RecoveryTexts.discardQuestion(leftover),
+                                                  I18n.get("dialog.discard.title"),
+                                                  JOptionPane.YES_NO_OPTION,
+                                                  JOptionPane.WARNING_MESSAGE,
+                                                  null,
+                                                  options,
+                                                  options[1]);
+        return answer == 0;
     }
 }
