@@ -145,12 +145,6 @@ class AppControllerTest {
     }
 
     @Test
-    void errorTextsFallBackToTheExceptionTypeInsteadOfNull() {
-        assertThat(AppController.describe(new IllegalStateException())).isEqualTo("java.lang.IllegalStateException");
-        assertThat(AppController.describe(new IllegalStateException("boom"))).isEqualTo("boom");
-    }
-
-    @Test
     void pingsReachThePingListenersButNeverTheMessageLog() {
         java.util.List<ByteConsumer> consumers = new ArrayList<>();
         AppController capturing = new AppController(work, defaults, prompt, () -> s -> new SerialPortReader() {
@@ -454,6 +448,60 @@ class AppControllerTest {
         assertThat(prompt.leftovers).extracting(CrashLeftover::workFile).containsOnly(leftover);
         assertThat(leftover).doesNotExist();
         assertThat(controller.document()).isNotNull();
+    }
+
+    private String errorOfRecoveringALeftoverThatIsNoDatabase(Locale locale) throws IOException {
+        Path leftover = Files.writeString(work.resolve("heat-broken" + TimingWorkFolder.WORK_FILE_SUFFIX), "not a database");
+        prompt.recoveries.add(SavePrompt.RecoveryChoice.RECOVER);
+        prompt.recoveries.add(SavePrompt.RecoveryChoice.LATER);
+        Locale original = Locale.getDefault();
+        Locale.setDefault(locale);
+        try {
+            controller.init();
+        } finally {
+            Locale.setDefault(original);
+        }
+        assertThat(prompt.errors).hasSize(1);
+        return prompt.errors.getFirst().replace(leftover.toString(), "<leftover>");
+    }
+
+    @Test
+    void recoveringALeftoverThatIsNoDatabaseSaysItIsDamaged() throws Exception {
+        assertThat(errorOfRecoveringALeftoverThatIsNoDatabase(Locale.ENGLISH))
+                .startsWith("Recovery failed: The unsaved data could not be recovered: <leftover> is damaged or not a database\n");
+    }
+
+    @Test
+    void recoveringALeftoverThatIsNoDatabaseSaysItIsDamagedInGerman() throws Exception {
+        assertThat(errorOfRecoveringALeftoverThatIsNoDatabase(Locale.GERMANY))
+                .startsWith("Wiederherstellung fehlgeschlagen: Die ungespeicherten Daten konnten nicht wiederhergestellt werden: <leftover> ist beschädigt oder keine Datenbank\n");
+    }
+
+    private String errorOfSavingIntoAMissingFolder(Locale locale) {
+        Path target = dir.resolve("missing").resolve("wk.timing");
+        controller.init();
+        controller.applySettings(S);
+        prompt.paths.add(Optional.of(target));
+        Locale original = Locale.getDefault();
+        Locale.setDefault(locale);
+        try {
+            assertThat(controller.saveAs()).isFalse();
+        } finally {
+            Locale.setDefault(original);
+        }
+        assertThat(prompt.errors).hasSize(1);
+        return prompt.errors.getFirst().replace(target.toString(), "<target>");
+    }
+
+    @Test
+    void savingIntoAMissingFolderSaysTheFolderDoesNotExist() {
+        assertThat(errorOfSavingIntoAMissingFolder(Locale.ENGLISH)).isEqualTo("Save project: Could not save <target>: <target> or its folder does not exist");
+    }
+
+    @Test
+    void savingIntoAMissingFolderSaysTheFolderDoesNotExistInGerman() {
+        assertThat(errorOfSavingIntoAMissingFolder(Locale.GERMANY))
+                .isEqualTo("Projekt speichern: <target> konnte nicht gespeichert werden: <target> oder sein Ordner existiert nicht");
     }
 
     @Test

@@ -2,6 +2,7 @@ package org.lisasp.alphatiming.ui.common;
 
 import org.lisasp.alphatiming.ui.core.recording.RecordedData;
 
+import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -13,7 +14,7 @@ import java.util.stream.Collectors;
  */
 final class WriteFailures {
 
-    private record Failure(Exception cause, boolean storedAgain, long droppedBytes) {
+    private record Failure(Exception cause, Path file, boolean storedAgain, long droppedBytes) {
     }
 
     private final StatusWarnings warnings;
@@ -23,19 +24,19 @@ final class WriteFailures {
         this.warnings = warnings;
     }
 
-    synchronized void failed(RecordedData data, Exception cause) {
+    synchronized void failed(RecordedData data, Exception cause, Path file) {
         Failure previous = failures.get(data);
-        failures.put(data, new Failure(cause, false, previous == null ? 0 : previous.droppedBytes()));
+        failures.put(data, new Failure(cause, file, false, previous == null ? 0 : previous.droppedBytes()));
         publish();
     }
 
     synchronized void storedAgain(RecordedData data) {
-        failures.computeIfPresent(data, (d, failure) -> new Failure(failure.cause(), true, failure.droppedBytes()));
+        failures.computeIfPresent(data, (d, failure) -> new Failure(failure.cause(), failure.file(), true, failure.droppedBytes()));
         publish();
     }
 
     synchronized void dropped(RecordedData data, int bytes) {
-        failures.computeIfPresent(data, (d, failure) -> new Failure(failure.cause(), failure.storedAgain(), failure.droppedBytes() + bytes));
+        failures.computeIfPresent(data, (d, failure) -> new Failure(failure.cause(), failure.file(), failure.storedAgain(), failure.droppedBytes() + bytes));
         publish();
     }
 
@@ -49,20 +50,12 @@ final class WriteFailures {
         publish();
     }
 
-    static String describe(RecordedData data, Exception cause) {
-        return I18n.get("warn.writeFailed.detail", I18n.describe(data), AppController.describe(rootCause(cause)));
+    static String describe(RecordedData data, Exception cause, Path file) {
+        return I18n.get("warn.writeFailed.detail", I18n.describe(data), I18n.describe(FileFailure.of(cause, file)));
     }
 
     static String describeDropped(RecordedData data, int bytes) {
         return I18n.get("log.dataDropped", I18n.describe(data), bytes);
-    }
-
-    private static Exception rootCause(Exception cause) {
-        Throwable root = cause;
-        while (root.getCause() != null && root.getCause() != root) {
-            root = root.getCause();
-        }
-        return root instanceof Exception ex ? ex : cause;
     }
 
     private void publish() {
@@ -75,7 +68,7 @@ final class WriteFailures {
     }
 
     private static String describe(RecordedData data, Failure failure) {
-        String text = describe(data, failure.cause());
+        String text = describe(data, failure.cause(), failure.file());
         if (failure.droppedBytes() > 0) {
             text += " " + I18n.get("warn.writeFailed.dropped", failure.droppedBytes());
         }

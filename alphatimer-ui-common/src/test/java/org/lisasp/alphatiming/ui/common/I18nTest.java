@@ -121,6 +121,9 @@ class I18nTest {
         for (org.lisasp.alphatiming.ui.core.recording.RecordedData data : org.lisasp.alphatiming.ui.core.recording.RecordedData.values()) {
             used.add("data." + data.name());
         }
+        for (FileFailure.Kind kind : FileFailure.Kind.values()) {
+            used.add("failure." + kind.name());
+        }
         assertThat(defined).as("keys used in code but not defined").containsAll(used);
         assertThat(used).as("defined but never used").containsAll(defined);
     }

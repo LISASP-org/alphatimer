@@ -34,6 +34,10 @@ public final class I18n {
         return get("data." + data.name());
     }
 
+    public static String describe(FileFailure failure) {
+        return get("failure." + failure.kind().name(), failure.file(), failure.detail());
+    }
+
     public static String label(ConnectionType type) {
         return get("input.type." + type.name());
     }

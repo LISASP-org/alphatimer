@@ -79,7 +79,7 @@ public final class AppController implements AutoCloseable {
                         return;
                     } catch (IOException | RuntimeException ex) {
                         log.warn("Could not recover {}", leftover.workFile().getFileName(), ex);
-                        prompt.showError(I18n.get("error.recovery.title"), I18n.get("error.recovery.message", describe(ex)));
+                        prompt.showError(I18n.get("error.recovery.title"), I18n.get("error.recovery.message", describe(ex, leftover.workFile())));
                     }
                 }
                 case DISCARD -> {
@@ -104,7 +104,8 @@ public final class AppController implements AutoCloseable {
             try {
                 replaceDocument(TimingDocument.create(workDir, defaults.load()));
             } catch (IOException ex) {
-                prompt.showError(I18n.get("error.new.title"), describe(ex));
+                log.warn("Could not create a new project", ex);
+                prompt.showError(I18n.get("error.new.title"), I18n.get("error.new.message", describe(ex, workDir)));
                 revertIfDiscarded(leaving);
             }
         });
@@ -130,7 +131,8 @@ public final class AppController implements AutoCloseable {
         } catch (InvalidProjectFileException ex) {
             prompt.showError(I18n.get("error.open.title"), I18n.get("error.open.invalid", file));
         } catch (IOException | RuntimeException ex) {
-            prompt.showError(I18n.get("error.open.title"), I18n.get("error.open.message", file, describe(ex)));
+            log.warn("Could not open {}", file.getFileName(), ex);
+            prompt.showError(I18n.get("error.open.title"), I18n.get("error.open.message", file, describe(ex, file)));
         }
         revertIfDiscarded(leaving);
     }
@@ -145,7 +147,7 @@ public final class AppController implements AutoCloseable {
             replaceDocument(discarded.file().isPresent() ? discarded.reopen(workDir) : TimingDocument.create(workDir, defaults.load()));
         } catch (IOException | RuntimeException ex) {
             log.warn("Could not load the saved state after discarding changes", ex);
-            prompt.showError(I18n.get("error.revert.title"), I18n.get("error.revert.message", describe(ex)));
+            prompt.showError(I18n.get("error.revert.title"), I18n.get("error.revert.message", describe(ex, discarded.file().orElse(workDir))));
             closeDocument();
             fireChange();
         }
@@ -156,7 +158,8 @@ public final class AppController implements AutoCloseable {
         if (doc == null) {
             return false;
         }
-        if (doc.file().isEmpty()) {
+        Optional<Path> file = doc.file();
+        if (file.isEmpty()) {
             return saveAs();
         }
         try {
@@ -165,7 +168,8 @@ public final class AppController implements AutoCloseable {
             fireChange();
             return true;
         } catch (IOException ex) {
-            prompt.showError(I18n.get("error.save.title"), I18n.get("error.save.message", describe(ex)));
+            log.warn("Could not save {}", file.get().getFileName(), ex);
+            prompt.showError(I18n.get("error.save.title"), I18n.get("error.save.message", describe(ex, file.get())));
             return false;
         }
     }
@@ -192,7 +196,8 @@ public final class AppController implements AutoCloseable {
             prompt.showError(I18n.get("error.save.title"), I18n.get("error.saveTo.inUse", target.get()));
             return false;
         } catch (IOException ex) {
-            prompt.showError(I18n.get("error.save.title"), I18n.get("error.saveTo.message", target.get(), describe(ex)));
+            log.warn("Could not save {}", target.get().getFileName(), ex);
+            prompt.showError(I18n.get("error.save.title"), I18n.get("error.saveTo.message", target.get(), describe(ex, target.get())));
             return false;
         }
     }
@@ -280,7 +285,8 @@ public final class AppController implements AutoCloseable {
     }
 
     void onAutoSaveError(Exception ex) {
-        String text = I18n.get("warn.autoSaveFailed", describe(ex));
+        TimingDocument doc = document;
+        String text = I18n.get("warn.autoSaveFailed", describe(ex, doc == null ? workDir : doc.file().orElse(workDir)));
         warnings.raise(StatusWarnings.Kind.AUTO_SAVE, new StatusWarnings.Warning(text, text));
         announce(text);
         fireChange();
@@ -398,8 +404,8 @@ public final class AppController implements AutoCloseable {
         next.addWriteListener(new WriteListener() {
             @Override
             public void writeFailed(RecordedData data, Exception cause) {
-                writeFailures.failed(data, cause);
-                announce(WriteFailures.describe(data, cause));
+                writeFailures.failed(data, cause, doc.database().workFile());
+                announce(WriteFailures.describe(data, cause, doc.database().workFile()));
                 fireChange();
             }
 
@@ -443,8 +449,8 @@ public final class AppController implements AutoCloseable {
         }
     }
 
-    static String describe(Exception ex) {
-        return ex.getMessage() == null ? ex.toString() : ex.getMessage();
+    private static String describe(Exception ex, Path file) {
+        return I18n.describe(FileFailure.of(ex, file));
     }
 
     private void announce(String text) {
