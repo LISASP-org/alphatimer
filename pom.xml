@@ -17,6 +17,7 @@
         <module>alphatimer-refinedmessages</module>
         <module>alphatimer-serial-api</module>
         <module>alphatimer-serial-core</module>
+        <module>alphatimer-heats</module>
     </modules>
 
     <properties>
