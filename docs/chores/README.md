@@ -12,5 +12,4 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Chore | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [An unused accessor in JAlphaTiming](unused-status-warning-label.md) | Low | S | `statusWarningLabel()` is not used |
 | [Mutation testing with PIT](mutation-testing-pit.md) | Low | S | No PIT setup; add a `mutation` profile as in JAuswertung |

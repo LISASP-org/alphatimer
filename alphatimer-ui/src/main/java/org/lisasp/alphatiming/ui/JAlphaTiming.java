@@ -288,10 +288,6 @@ public final class JAlphaTiming extends JFrame {
         return "<html>" + escaped.replace("\n", "<br>") + "</html>";
     }
 
-    JLabel statusWarningLabel() {
-        return statusWarning;
-    }
-
     PingMarker pingMarker() {
         return pingMarker;
     }
