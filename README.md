@@ -77,6 +77,8 @@ ARES messages and the heats. While a project is open, the app works on a tempora
 
 - **File → Save** writes a consistent snapshot of that copy (atomic replace of the `.timing` file); auto-save does the same
   periodically for projects that already have a file.
+- **File → Save As** adds `.timing` to a name typed without it (a name ending in `.heat` is kept) and asks before
+  overwriting the file that will actually be written.
 - Each save keeps the state before it as `<name>-previous.timing` next to the project file (replacing an older one). Open
   it like any project to go back one save.
 - Closing (or New/Open) during a recording first asks whether to stop it; Cancel keeps the recording running and the

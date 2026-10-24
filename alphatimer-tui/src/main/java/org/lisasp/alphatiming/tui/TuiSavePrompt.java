@@ -10,7 +10,6 @@ import org.lisasp.alphatiming.ui.common.ProjectFiles;
 import org.lisasp.alphatiming.ui.common.SavePrompt;
 
 import java.io.File;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -41,17 +40,10 @@ final class TuiSavePrompt implements SavePrompt {
 
     @Override
     public Optional<Path> askSavePath() {
-        File chosen;
-        while ((chosen = new FileDialogBuilder().setTitle(I18n.get("menu.saveAs")).setActionLabel(I18n.get("button.save")).build().showDialog(gui)) != null) {
-            Path path = ProjectFiles.withDefaultExtension(chosen.toPath());
-            if (!Files.exists(path)
-                    || choose(I18n.get("dialog.overwrite.title"), I18n.get("dialog.overwrite.message", path.getFileName()), false,
-                              I18n.get("button.overwrite"), true,
-                              I18n.get("button.cancel"), false)) {
-                return Optional.of(path);
-            }
-        }
-        return Optional.empty();
+        return ProjectFiles.chooseSavePath(() -> Optional.ofNullable(new FileDialogBuilder().setTitle(I18n.get("menu.saveAs")).setActionLabel(I18n.get("button.save")).build().showDialog(gui)).map(File::toPath),
+                                           path -> choose(I18n.get("dialog.overwrite.title"), I18n.get("dialog.overwrite.message", path.getFileName()), false,
+                                                          I18n.get("button.overwrite"), true,
+                                                          I18n.get("button.cancel"), false));
     }
 
     Optional<Path> askOpenPath() {

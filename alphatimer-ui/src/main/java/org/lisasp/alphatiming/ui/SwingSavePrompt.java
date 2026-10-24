@@ -10,7 +10,6 @@ import org.lisasp.swing.filechooser.filefilter.SimpleFileFilter;
 
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 
@@ -54,16 +53,9 @@ public final class SwingSavePrompt implements SavePrompt {
 
     @Override
     public Optional<Path> askSavePath() {
-        String name;
-        while ((name = FileChooserUtils.saveFile(parent, projectFilter())) != null) {
-            Path path = Path.of(name);
-            if (!Files.exists(path)
-                    || JOptionPane.showConfirmDialog(parent, I18n.get("dialog.overwrite.message", path.getFileName()), I18n.get("dialog.overwrite.title"), JOptionPane.YES_NO_OPTION)
-                    == JOptionPane.YES_OPTION) {
-                return Optional.of(path);
-            }
-        }
-        return Optional.empty();
+        return ProjectFiles.chooseSavePath(() -> Optional.ofNullable(FileChooserUtils.saveFile(parent, projectFilter())).map(Path::of),
+                                           path -> JOptionPane.showConfirmDialog(parent, I18n.get("dialog.overwrite.message", path.getFileName()), I18n.get("dialog.overwrite.title"), JOptionPane.YES_NO_OPTION)
+                                                   == JOptionPane.YES_OPTION);
     }
 
     public Optional<Path> askOpenPath() {

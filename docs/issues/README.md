@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [Save in the Swing UI does not add the file extension](swing-save-without-extension.md) | Medium | S | Projects saved without `.timing` are hidden by the Open dialog |
 | [The recovery dialog does not say what it would recover](recovery-dialog-without-details.md) | Medium | S | No file or date shown; Discard deletes the work file without a second question |
 | [Write errors during a recording only reach the message log](recording-write-errors-not-shown.md) | Medium | S | A recording that cannot store data shows no warning in the status bar |
 | [Serial reader does not reconnect](serial-reader-no-reconnect.md) | Medium | M | After an unplugged USB adapter the recording stays running without data until it is stopped and started again |
