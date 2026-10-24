@@ -7,6 +7,7 @@ import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 
 import java.time.LocalDateTime;
+import java.util.OptionalInt;
 
 @Value
 public class TakeOverTimeMessage implements RefinedMessage {
@@ -19,4 +20,10 @@ public class TakeOverTimeMessage implements RefinedMessage {
     private final byte currentLap;
     private final TimeMarker timeMarker;
     private final TimeType timeType;
+    private final int timeInMillis;
+
+    @Override
+    public OptionalInt getDeviceTimeInMillis() {
+        return timeInMillis > 0 ? OptionalInt.of(timeInMillis) : OptionalInt.empty();
+    }
 }

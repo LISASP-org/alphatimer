@@ -6,6 +6,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageTy
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
 import java.time.LocalDateTime;
+import java.util.OptionalInt;
 
 @Value
 public class StartMessage implements RefinedMessage {
@@ -18,4 +19,9 @@ public class StartMessage implements RefinedMessage {
     private final byte lane;
     private final int timeOfDayInMillis;
     private final RefinedTimeType timeType;
+
+    @Override
+    public OptionalInt getDeviceTimeInMillis() {
+        return timeOfDayInMillis > 0 ? OptionalInt.of(timeOfDayInMillis) : OptionalInt.empty();
+    }
 }

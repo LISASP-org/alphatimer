@@ -24,7 +24,8 @@ public class TakeOverTimeParser implements Parser {
                                                                message.getLane(),
                                                                message.getCurrentLap(),
                                                                message.getTimeMarker(),
-                                                               message.getTimeType()));
+                                                               message.getTimeType(),
+                                                               message.getTimeInMillis()));
             } else {
                 resultCollector.accept(new DroppedTakeOverTimeMessage(message));
             }

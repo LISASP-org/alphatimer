@@ -65,7 +65,8 @@ class TakeOverTimeMessageTest {
                                          (byte) 2,
                                          (byte) 1,
                                          TimeMarker.Plus,
-                                         TimeType.PlatformTimeAfterTouchpadTime),
+                                         TimeType.PlatformTimeAfterTouchpadTime,
+                                         0),
                 new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
     }
 
