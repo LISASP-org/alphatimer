@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +20,7 @@ import java.util.stream.Stream;
 public final class TimingWorkFolder {
 
     public static final String WORK_FILE_SUFFIX = ".work.sqlite";
+    private static final String SNAPSHOT_SUFFIX = ".tmp";
 
     /**
      * The project file a work file was last opened from or saved to, kept next to the work file so that a crash leftover
@@ -44,7 +46,7 @@ public final class TimingWorkFolder {
     }
 
     public static Path newSnapshotFile(Path workFile) {
-        return workFile.resolveSibling(workFile.getFileName() + "." + UUID.randomUUID() + ".tmp");
+        return workFile.resolveSibling(workFile.getFileName() + "." + UUID.randomUUID() + SNAPSHOT_SUFFIX);
     }
 
     /** The lock tells other instances that the work file belongs to a running program, so it is not a crash leftover. */
@@ -61,6 +63,7 @@ public final class TimingWorkFolder {
         if (!Files.isDirectory(workDir)) {
             return List.of();
         }
+        removeStaleSnapshots(workDir);
         try (Stream<Path> files = Files.list(workDir)) {
             return files.filter(p -> p.getFileName().toString().endsWith(WORK_FILE_SUFFIX))
                         .filter(p -> !isInUse(p))
@@ -72,6 +75,38 @@ public final class TimingWorkFolder {
             log.warn("Could not look for recoverable work files in {}", workDir, ex);
             return List.of();
         }
+    }
+
+    /** A snapshot of a work file in use is kept: its program may be saving right now. */
+    private static void removeStaleSnapshots(Path workDir) {
+        List<Path> stale;
+        try (Stream<Path> files = Files.list(workDir)) {
+            stale = files.filter(p -> workFileOfSnapshot(p).filter(w -> !isInUse(w)).isPresent()).toList();
+        } catch (IOException ex) {
+            log.warn("Could not look for stale snapshots in {}", workDir, ex);
+            return;
+        }
+        List<String> removed = new ArrayList<>();
+        for (Path snapshot : stale) {
+            try {
+                Files.deleteIfExists(snapshot);
+                removed.add(snapshot.getFileName().toString());
+            } catch (IOException ex) {
+                log.warn("Could not delete the stale snapshot {}", snapshot.getFileName(), ex);
+            }
+        }
+        if (!removed.isEmpty()) {
+            log.info("Removed {} stale snapshot(s) from the work folder: {}", removed.size(), removed);
+        }
+    }
+
+    private static Optional<Path> workFileOfSnapshot(Path file) {
+        String name = file.getFileName().toString();
+        int end = name.indexOf(WORK_FILE_SUFFIX + ".");
+        if (end <= 0 || !name.endsWith(SNAPSHOT_SUFFIX)) {
+            return Optional.empty();
+        }
+        return Optional.of(file.resolveSibling(name.substring(0, end + WORK_FILE_SUFFIX.length())));
     }
 
     private static Optional<CrashLeftover> describeLeftover(Path workFile) {

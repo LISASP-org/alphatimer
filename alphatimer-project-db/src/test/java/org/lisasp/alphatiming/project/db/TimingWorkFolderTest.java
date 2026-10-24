@@ -51,4 +51,34 @@ class TimingWorkFolderTest {
         TimingWorkFolder.discard(leftover);
         assertThat(workFiles()).isZero();
     }
+
+    @Test
+    void scanRemovesSnapshotsOfCrashedAndVanishedWorkFiles() throws Exception {
+        Path projectFile = Files.writeString(dir.resolve("x.timing"), "saved");
+        TimingDatabase crashed = TimingDatabase.createNew(work());
+        Path leftover = crashed.workFile();
+        TimingWorkFolder.recordOrigin(leftover, projectFile);
+        crashed.close();
+        Path snapshot = Files.writeString(TimingWorkFolder.newSnapshotFile(leftover), "half");
+        Path orphan = Files.writeString(TimingWorkFolder.newSnapshotFile(work().resolve("heat-gone" + TimingWorkFolder.WORK_FILE_SUFFIX)), "half");
+        Path unrelated = Files.writeString(work().resolve("other.tmp"), "keep");
+
+        assertThat(TimingWorkFolder.findLeftovers(work())).singleElement().satisfies(l -> assertThat(l.workFile()).isEqualTo(leftover));
+
+        assertThat(snapshot).doesNotExist();
+        assertThat(orphan).doesNotExist();
+        assertThat(leftover).exists();
+        assertThat(LockFile.besides(leftover)).exists();
+        assertThat(TimingWorkFolder.origin(leftover)).isPresent();
+        assertThat(unrelated).exists();
+    }
+
+    @Test
+    void scanKeepsTheSnapshotOfAWorkFileInUse() throws Exception {
+        try (TimingDatabase live = TimingDatabase.createNew(work())) {
+            Path snapshot = Files.writeString(TimingWorkFolder.newSnapshotFile(live.workFile()), "saving");
+            assertThat(TimingWorkFolder.findLeftovers(work())).isEmpty();
+            assertThat(snapshot).exists();
+        }
+    }
 }

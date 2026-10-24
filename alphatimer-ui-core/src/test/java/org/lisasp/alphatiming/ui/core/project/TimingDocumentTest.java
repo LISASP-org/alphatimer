@@ -233,6 +233,41 @@ class TimingDocumentTest {
         assertThat(workFiles()).isZero();
     }
 
+    private static Path staleTempFileOf(Path file) throws IOException {
+        return Files.writeString(file.resolveSibling(file.getFileName() + ".tmp"), "half");
+    }
+
+    @Test
+    void openRemovesTheTempFileOfASaveThatCrashed() throws Exception {
+        Path file = savedProject("x.timing");
+        Path stale = staleTempFileOf(file);
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
+            assertThat(stale).doesNotExist();
+            assertThat(doc.settings()).isEqualTo(SETTINGS);
+        }
+    }
+
+    @Test
+    void recoveryThatKeepsItsProjectFileRemovesTheTempFileOfASaveThatCrashed() throws Exception {
+        Path file = savedProject("x.timing");
+        Path leftover = leftoverOf(file);
+        Path stale = staleTempFileOf(file);
+        try (TimingDocument recovered = TimingDocument.recover(leftover)) {
+            assertThat(recovered.file()).contains(file);
+            assertThat(stale).doesNotExist();
+        }
+    }
+
+    @Test
+    void theTempFileOfAProjectFileOpenElsewhereIsKept() throws Exception {
+        Path file = savedProject("x.timing");
+        try (TimingDocument elsewhere = TimingDocument.open(file, work())) {
+            Path saving = staleTempFileOf(file);
+            assertThatThrownBy(() -> TimingDocument.open(file, work())).isInstanceOf(ProjectFileInUseException.class);
+            assertThat(saving).exists();
+        }
+    }
+
     /** Leaves the schema intact, so adopting the work file succeeds and only reading the settings fails. */
     private static void corruptSettingsTable(Path workFile) throws Exception {
         long offset;

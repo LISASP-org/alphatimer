@@ -1,5 +1,7 @@
 package org.lisasp.alphatiming.project.db;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -10,6 +12,7 @@ import java.nio.file.StandardCopyOption;
  * Puts a finished snapshot of a project in place of its project file. The snapshot is consumed, also when writing fails;
  * a failure keeps the old project file, at worst as {@link #previousVersionOf(Path)}.
  */
+@Slf4j
 public final class TimingFileWriter {
 
     @FunctionalInterface
@@ -28,7 +31,7 @@ public final class TimingFileWriter {
     }
 
     public void write(Path snapshot, Path target) throws IOException {
-        Path targetTmp = target.resolveSibling(target.getFileName() + ".tmp");
+        Path targetTmp = tempFileOf(target);
         try {
             Files.deleteIfExists(targetTmp);
             moveToTargetFolder(snapshot, targetTmp);
@@ -53,6 +56,22 @@ public final class TimingFileWriter {
             Files.copy(snapshot, targetTmp);
             FileSync.force(targetTmp);
             FileSync.deleteTempFile(snapshot);
+        }
+    }
+
+    private static Path tempFileOf(Path target) {
+        return target.resolveSibling(target.getFileName() + ".tmp");
+    }
+
+    /** Only safe while holding the lock of the project file: otherwise another program may be saving into it. */
+    public static void removeStaleTempFile(Path target) {
+        Path targetTmp = tempFileOf(target);
+        try {
+            if (Files.deleteIfExists(targetTmp)) {
+                log.info("Removed the stale temporary file {}", targetTmp.getFileName());
+            }
+        } catch (IOException ex) {
+            log.warn("Could not delete the stale temporary file {}", targetTmp.getFileName(), ex);
         }
     }
 

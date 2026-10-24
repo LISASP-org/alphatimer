@@ -101,6 +101,8 @@ ARES messages and the heats. While a project is open, the app works on a tempora
   use Save As). Discard asks a second time before it deletes the data; Back returns to the recovery question. If the
   data cannot be recovered, an error names the reason and the question comes back, so the data can be discarded or
   kept for a later start.
+  Temporary files of a save interrupted by the crash are removed: in the work folder at the next start, next to the
+  project file when it is opened again.
 - A project file can be open in only one running AlphaTiming (window, text UI or command line) at a time; another one
   refuses to open it or to save over it. While it is open, a `<name>.timing.lock` file lies next to it.
 - The settings of the last opened/saved project are kept in `~/.alphatiming/defaults.json` and used for new projects and

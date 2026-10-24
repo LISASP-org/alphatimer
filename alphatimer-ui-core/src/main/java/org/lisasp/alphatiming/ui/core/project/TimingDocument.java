@@ -55,6 +55,7 @@ public final class TimingDocument implements AutoCloseable {
 
     public static TimingDocument open(Path file, Path workDir) throws IOException {
         LockFile lock = lockProjectFile(file);
+        TimingFileWriter.removeStaleTempFile(file);
         try {
             return load(file, workDir, lock);
         } catch (IOException | RuntimeException ex) {
@@ -112,6 +113,9 @@ public final class TimingDocument implements AutoCloseable {
         Optional<TimingWorkFolder.Origin> origin = TimingWorkFolder.origin(workFile).filter(TimingWorkFolder.Origin::isUnchanged);
         Optional<LockFile> lock = origin.isPresent() ? LockFile.tryAcquire(LockFile.besides(origin.get().projectFile())) : Optional.empty();
         Path file = lock.isPresent() ? origin.get().projectFile() : null;
+        if (file != null) {
+            TimingFileWriter.removeStaleTempFile(file);
+        }
         TimingDatabase db = null;
         try {
             db = TimingDatabase.adopt(workFile);
