@@ -7,6 +7,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageTy
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
 import java.time.LocalDateTime;
+import java.util.OptionalInt;
 
 @Value
 public class TimeMessage implements RefinedMessage {
@@ -22,4 +23,9 @@ public class TimeMessage implements RefinedMessage {
     private final byte rank;
     private final int timeInMillis;
     private final RefinedTimeType timeType;
+
+    @Override
+    public OptionalInt getDeviceTimeInMillis() {
+        return timeInMillis > 0 ? OptionalInt.of(timeInMillis) : OptionalInt.empty();
+    }
 }

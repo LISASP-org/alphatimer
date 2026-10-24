@@ -1,0 +1,114 @@
+package org.lisasp.alphatiming.heats;
+
+import lombok.extern.slf4j.Slf4j;
+import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
+import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedRefinedMessage;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.SortedSet;
+import java.util.TreeSet;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
+
+@Slf4j
+public final class HeatService implements Consumer<RefinedMessage> {
+
+    private static final int LANE_COUNT = 10;
+
+    private final HeatRepository store;
+    private final Consumer<RuntimeException> onError;
+
+    private final List<Consumer<LiveHeats>> listeners = new CopyOnWriteArrayList<>();
+    private final SortedSet<Integer> usedLanes = new TreeSet<>();
+    private volatile LiveHeats live = LiveHeats.NONE;
+
+    public HeatService(HeatRepository store) {
+        this(store, ex -> { });
+    }
+
+    public HeatService(HeatRepository store, Consumer<RuntimeException> onError) {
+        this.store = store;
+        this.onError = onError;
+        usedLanes.addAll(store.findUsedLanes());
+        List<HeatDto> recent = store.findRecent(2);
+        if (!recent.isEmpty()) {
+            live = new LiveHeats(recent.get(0), recent.size() > 1 ? recent.get(1) : null, usedLanes);
+        }
+    }
+
+    private static boolean isRepeatOfAPreviousRace(RefinedMessage message) {
+        return (message instanceof StartMessage m && m.getMessageType() == RefinedMessageType.PreviousRaceResult)
+                || (message instanceof TimeMessage t && t.getMessageType() == RefinedMessageType.PreviousRaceResult);
+    }
+
+    private static boolean sameHeat(HeatDto a, HeatDto b) {
+        return a.competition().equals(b.competition()) && a.event() == b.event() && a.heat() == b.heat();
+    }
+
+    public synchronized void register(Consumer<LiveHeats> listener) {
+        LiveHeats snapshot = live;
+        if (snapshot.current() != null) {
+            listener.accept(snapshot);
+        }
+        listeners.add(listener);
+    }
+
+    @Override
+    public synchronized void accept(RefinedMessage message) {
+        if (message instanceof DroppedRefinedMessage) {
+            return;
+        }
+        if (message.getEvent() <= 0 || message.getHeat() <= 0) {
+            return;
+        }
+        if (isRepeatOfAPreviousRace(message)) {
+            return;
+        }
+        try {
+            Optional<HeatDto> stored = store.find(message.getCompetition(), message.getEvent(), message.getHeat());
+            HeatDto before = stored.orElseGet(() -> HeatDto.empty(message.getCompetition(), message.getEvent(), message.getHeat(), LANE_COUNT));
+            Heat heat = new Heat(before);
+            if (message instanceof StartMessage m) {
+                heat.start(m);
+            } else if (message instanceof UsedLanesMessage m) {
+                heat.usedLanes(m);
+            } else if (message instanceof TimeMessage m) {
+                heat.touch(m);
+            } else if (message instanceof DidNotStartMessage m) {
+                heat.didNotStart(m);
+            } else if (message instanceof DidNotFinishMessage m) {
+                heat.didNotFinish(m);
+            } else if (message instanceof OfficialEndMessage m) {
+                heat.finish(m);
+            } else {
+                log.debug("Did not apply message '{}'.", message);
+                return;
+            }
+            HeatDto after = heat.createDto();
+            if (!after.equals(before)) {
+                if (stored.isPresent()) {
+                    store.save(after);
+                } else {
+                    store.create(after);
+                }
+                LiveHeats shown = live;
+                HeatDto previous = shown.current() != null && !sameHeat(shown.current(), after) ? shown.current() : shown.previous();
+                after.lanes().stream().filter(l -> l.status() == LaneStatus.Used).forEach(l -> usedLanes.add(l.number()));
+                live = new LiveHeats(after, previous, usedLanes);
+                LiveHeats announced = live;
+                listeners.forEach(l -> l.accept(announced));
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Could not apply message '{}'.", message, ex);
+            onError.accept(ex);
+        }
+    }
+}
