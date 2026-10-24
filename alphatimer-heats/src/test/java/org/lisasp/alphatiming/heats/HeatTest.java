@@ -6,7 +6,6 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -207,7 +206,12 @@ class HeatTest {
     void unknownLaneIsRejectedWithoutChangingTheHeat() {
         Heat heat = prepared();
         HeatDto before = heat.createDto();
-        assertThatThrownBy(() -> heat.touch(TestMessageCreator.split(1, 1, 9, 1, 1000))).isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> heat.touch(TestMessageCreator.split(1, 1, 9, 1, 1000))).isInstanceOfSatisfying(UnknownLaneException.class, ex -> {
+            assertThat(ex.competition()).isEqualTo("WK");
+            assertThat(ex.event()).isEqualTo(1);
+            assertThat(ex.heat()).isEqualTo(1);
+            assertThat(ex.lane()).isEqualTo(9);
+        });
         assertThat(heat.createDto()).isEqualTo(before);
     }
 

@@ -26,7 +26,6 @@ public final class HeatStore implements HeatRepository {
         return findRecent(1).stream().findFirst();
     }
 
-    /** Every lane number that is used in at least one heat of the project. */
     @Override
     public SortedSet<Integer> findUsedLanes() {
         return db.read(em -> new TreeSet<>(em.createQuery("select distinct l.number from LaneEntity l where l.status = :used", Integer.class)
@@ -34,7 +33,6 @@ public final class HeatStore implements HeatRepository {
                                               .getResultList()));
     }
 
-    /** The most recently changed heats, newest first. */
     @Override
     public List<HeatDto> findRecent(int count) {
         return db.read(em -> em.createQuery("select h from HeatEntity h order by h.changeSeq desc", HeatEntity.class)

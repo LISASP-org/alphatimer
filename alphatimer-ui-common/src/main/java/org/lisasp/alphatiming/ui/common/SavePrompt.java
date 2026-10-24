@@ -15,7 +15,6 @@ public interface SavePrompt {
     /** Leaving the document would end the running recording; false keeps both. */
     boolean askStopRecording();
 
-    /** The current project has unsaved changes. */
     Choice askSaveChanges();
 
     /** Where to save a project that has no file yet (or Save As); empty = cancelled. */
@@ -23,7 +22,6 @@ public interface SavePrompt {
 
     void showError(String title, String message);
 
-    /** A work file of an earlier run was left behind (crash). */
     RecoveryChoice askRecover(CrashLeftover leftover);
 
     /** Discarding deletes the leftover for good; false goes back to {@link #askRecover}. */

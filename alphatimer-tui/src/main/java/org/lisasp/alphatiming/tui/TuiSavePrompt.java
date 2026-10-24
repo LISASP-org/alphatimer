@@ -16,7 +16,6 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** The dialogs behind {@link SavePrompt}, as text dialogs. */
 final class TuiSavePrompt implements SavePrompt {
 
     private final WindowBasedTextGUI gui;

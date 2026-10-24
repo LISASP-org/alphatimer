@@ -15,7 +15,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.NoSuchElementException;
 
 final class Heat {
 
@@ -160,7 +159,7 @@ final class Heat {
         return lanes.stream()
                     .filter(l -> l.number() == number)
                     .findFirst()
-                    .orElseThrow(() -> new NoSuchElementException(String.format("%s %d %d: Lane %d not found.", competition, event, heat, number)));
+                    .orElseThrow(() -> new UnknownLaneException(competition, event, heat, number));
     }
 
     private void assureStarted(RefinedMessage message) {

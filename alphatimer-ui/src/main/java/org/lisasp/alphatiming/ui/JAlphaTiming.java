@@ -108,7 +108,6 @@ public final class JAlphaTiming extends JFrame {
         setExtendedState(MAXIMIZED_BOTH);
     }
 
-    /** The layout of the JAuswertung plugin window: the button bar left, the selected panel right, a small space around both. */
     private JPanel createBody() {
         FormLayout layout = new FormLayout("0dlu,fill:max(70dlu;default),4dlu,fill:0px:grow,0dlu", "0dlu,fill:0dlu:grow,0dlu");
         JPanel body = new JPanel(layout);

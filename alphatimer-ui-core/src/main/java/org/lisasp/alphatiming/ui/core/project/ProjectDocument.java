@@ -19,7 +19,6 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
-/** An open AlphaTiming project: the working database, the project file (once saved) and the dirty state. */
 @Slf4j
 public final class ProjectDocument implements AutoCloseable {
 

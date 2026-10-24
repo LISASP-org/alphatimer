@@ -328,7 +328,6 @@ public final class RecordingSession implements AutoCloseable {
         messageListeners.add(listener);
     }
 
-    /** Called for every ping the device sends. */
     public void addPingListener(Runnable listener) {
         pingListeners.add(listener);
     }

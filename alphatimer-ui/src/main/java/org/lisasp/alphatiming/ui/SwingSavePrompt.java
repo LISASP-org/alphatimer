@@ -15,7 +15,6 @@ import javax.swing.JOptionPane;
 import java.nio.file.Path;
 import java.util.Optional;
 
-/** The dialogs behind {@link SavePrompt}. */
 public final class SwingSavePrompt implements SavePrompt {
 
     @Setter
