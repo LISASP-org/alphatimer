@@ -13,4 +13,3 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [Lanes have no foreign key to their heat](missing-foreign-keys.md) | Low | M | The SQLite dialect drops foreign and multi-column keys; other entities unchecked |

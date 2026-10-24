@@ -39,6 +39,28 @@ class TimingDatabaseTest {
     }
 
     @Test
+    void aNewProjectKeepsEveryLaneWithItsHeatAndOneRowPerLaneNumber() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            db.write(em -> em.createNativeQuery("insert into heat (id, event, heatNumber, lapCount, changeSeq) values (7, 1, 2, 1, 1)").executeUpdate());
+
+            assertThatThrownBy(() -> db.write(em -> em.createNativeQuery(
+                    "insert into lane (heat_id, number, timeInMillis, lap, place, finished) values (99, 1, 0, 0, 0, false)").executeUpdate()))
+                    .hasStackTraceContaining("FOREIGN KEY");
+            assertThatThrownBy(() -> db.write(em -> em.createNativeQuery(
+                    "insert into lane (heat_id, number, timeInMillis, lap, place, finished) values (null, 1, 0, 0, 0, false)").executeUpdate()))
+                    .hasStackTraceContaining("NOT NULL");
+            db.write(em -> em.createNativeQuery("insert into lane (heat_id, number, timeInMillis, lap, place, finished) values (7, 1, 0, 0, 0, false)").executeUpdate());
+            assertThatThrownBy(() -> db.write(em -> em.createNativeQuery(
+                    "insert into lane (heat_id, number, timeInMillis, lap, place, finished) values (7, 1, 0, 0, 0, false)").executeUpdate()))
+                    .hasStackTraceContaining("UNIQUE");
+            List<Object> foreignKeys = db.read(em -> em.createNativeQuery(
+                    "select \"table\" || '|' || \"from\" || '|' || \"to\" from pragma_foreign_key_list('lane')").getResultList());
+            assertThat(foreignKeys).containsExactly("heat|heat_id|id");
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
     void writesAreCountedAndHeardAndSnapshotRoundTrips() throws Exception {
         Path file = dir.resolve("a.heat");
         try (TimingDatabase db = TimingDatabase.createNew(dir)) {

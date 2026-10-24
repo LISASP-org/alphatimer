@@ -113,10 +113,17 @@ that solve problems this application does not have:
 - Enum attributes are stored as their name through an `EnumNameConverter` (`EnumNameConverters`), never with
   `@Enumerated`: Hibernate writes a CHECK with the enum's values for `@Enumerated`, so a value added later could not be
   stored in existing files. Files of the first versions have such CHECKs; step 1 (`RemoveCheckConstraints`) removes them.
-- Hibernate's SQLite dialect silently skips unique keys over several columns, so `TimingDatabase` creates them itself
-  for a new file (`HeatEntity.UNIQUE_KEY`); an older file gets them from its migration step. Step 2
-  (`RemoveHeatCompetition`) rebuilds `heat` without its `competition` column and with the unique key (event, heatNumber);
-  a heat stored under several competition tags keeps only its most recently changed row (`changeSeq`) and that row's lanes.
+- Hibernate's SQLite dialect silently skips foreign keys and unique keys over several columns, so `TimingDatabase`
+  creates them itself for a new file (`HeatEntity.UNIQUE_KEY`, `AddLaneKeys.addTo`); an older file gets them from its
+  migration step. Step 2 (`RemoveHeatCompetition`) rebuilds `heat` without its `competition` column and with the unique
+  key (event, heatNumber); a heat stored under several competition tags keeps only its most recently changed row
+  (`changeSeq`) and that row's lanes. Step 3 (`AddLaneKeys`) rebuilds `lane` with `heat_id` not null, a foreign key to
+  `heat` (no `ON DELETE` action: lanes are deleted before their heat) and the unique key (heat_id, number); lanes without
+  an existing heat and, of lanes sharing a number, all but the oldest row are removed first. The other tables have no
+  keys besides their id: `settings` is read as its first row, `rawdata` and `aresmessage` record what arrived, and
+  `lanetime` legitimately holds the same finish several times (one row per result message).
+- Hibernate's connections enforce foreign keys (`foreign_keys`); the migration connection does not, as `TableRebuild`
+  requires.
 - The settings of the last opened/saved project are kept in `~/.alphatiming/defaults.json` (`DefaultSettingsStore`);
   unknown or corrupt content falls back to the built-in defaults.
 - A project holds exactly one competition. Its key is a setting (`Settings.competitionKey`, the `competitionKey` column of

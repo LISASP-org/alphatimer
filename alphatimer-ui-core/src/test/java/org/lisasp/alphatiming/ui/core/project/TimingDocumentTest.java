@@ -445,16 +445,23 @@ class TimingDocumentTest {
         return columns;
     }
 
-    private static List<String> uniqueKeysOfHeat(Path file) throws SQLException {
-        List<String> keys = new ArrayList<>();
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + file); var st = connection.createStatement();
-             var rs = st.executeQuery("select group_concat(ii.name, ',') from pragma_index_list('heat') il, pragma_index_info(il.name) ii "
-                     + "where il.\"unique\" = 1 group by il.name")) {
+    private static List<String> uniqueKeysOf(Path file, String table) throws SQLException {
+        return rowsOf(file, "select group_concat(ii.name, ',') from pragma_index_list('" + table + "') il, pragma_index_info(il.name) ii "
+                + "where il.\"unique\" = 1 group by il.name");
+    }
+
+    private static List<String> foreignKeysOf(Path file, String table) throws SQLException {
+        return rowsOf(file, "select \"from\" || '->' || \"table\" || '.' || \"to\" from pragma_foreign_key_list('" + table + "')");
+    }
+
+    private static List<String> rowsOf(Path file, String sql) throws SQLException {
+        List<String> rows = new ArrayList<>();
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + file); var st = connection.createStatement(); var rs = st.executeQuery(sql)) {
             while (rs.next()) {
-                keys.add(rs.getString(1));
+                rows.add(rs.getString(1));
             }
         }
-        return keys;
+        return rows;
     }
 
     private static List<String> schemaOf(Path file) throws SQLException {
@@ -480,8 +487,13 @@ class TimingDocumentTest {
             Path workFile = doc.database().workFile();
             assertThat(schemaOf(workFile)).noneMatch(sql -> sql.toLowerCase(Locale.ROOT).contains("check"));
             assertThat(columnsOf(workFile).get("heat")).doesNotContain("competition");
-            assertThat(uniqueKeysOfHeat(workFile)).containsExactly("event,heatNumber");
+            assertThat(uniqueKeysOf(workFile, "heat")).containsExactly("event,heatNumber");
+            assertThat(uniqueKeysOf(workFile, "lane")).containsExactly("heat_id,number");
+            assertThat(foreignKeysOf(workFile, "lane")).containsExactly("heat_id->heat.id");
             assertThat(contentOf(workFile, columns)).isEqualTo(before);
+            assertThatThrownBy(() -> doc.database().write(em -> em.createNativeQuery(
+                    "insert into lane (heat_id, number, timeInMillis, lap, place, finished) values (99, 9, 0, 0, 0, false)").executeUpdate()))
+                    .hasStackTraceContaining("FOREIGN KEY");
 
             doc.database().write(em -> {
                 em.createNativeQuery("update heat set status = 'NewStatus'").executeUpdate();

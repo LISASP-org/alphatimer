@@ -27,7 +27,7 @@ public class LaneEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "heat_id")
+    @JoinColumn(name = "heat_id", nullable = false)
     private HeatEntity heat;
 
     private int number;

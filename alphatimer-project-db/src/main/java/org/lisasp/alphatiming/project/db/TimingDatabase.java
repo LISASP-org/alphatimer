@@ -47,7 +47,7 @@ public final class TimingDatabase implements AutoCloseable {
             }
             SessionFactory built = buildFactory(workFile);
             if (isNew) {
-                createUniqueKeys(built);
+                createKeys(built);
             }
             this.factory = built;
         } catch (IOException | RuntimeException ex) {
@@ -107,9 +107,13 @@ public final class TimingDatabase implements AutoCloseable {
         }
     }
 
-    private static void createUniqueKeys(SessionFactory built) {
+    private static void createKeys(SessionFactory built) {
         try {
-            built.inTransaction(session -> session.createNativeMutationQuery(HeatEntity.UNIQUE_KEY).executeUpdate());
+            built.inTransaction(session -> {
+                session.createNativeMutationQuery(HeatEntity.UNIQUE_KEY).executeUpdate();
+                // TableRebuild needs foreign keys off only for a referenced table; no table references lane.
+                session.doWork(AddLaneKeys::addTo);
+            });
         } catch (RuntimeException ex) {
             built.close();
             throw ex;
@@ -123,6 +127,7 @@ public final class TimingDatabase implements AutoCloseable {
         c.setProperty("hibernate.dialect", "org.hibernate.community.dialect.SQLiteDialect");
         c.setProperty("hibernate.hbm2ddl.auto", "update");
         c.setProperty("hibernate.connection.pool_size", "1");
+        c.setProperty("hibernate.connection.foreign_keys", "true");
         c.setProperty("hibernate.show_sql", "false");
         for (Class<?> e : ENTITIES) {
             c.addAnnotatedClass(e);
