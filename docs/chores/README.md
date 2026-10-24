@@ -12,4 +12,3 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Chore | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [Mutation testing with PIT](mutation-testing-pit.md) | Low | S | No PIT setup; add a `mutation` profile as in JAuswertung |
