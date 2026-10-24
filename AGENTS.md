@@ -160,8 +160,11 @@ untrusted input:
   change.
 - `docs/chores/` tracks planned clean-ups of code or data model that are not bugs, with the same rules: one file per
   chore, listed in `docs/chores/README.md`, deleted once done.
-- Every row in both tables has a severity (High/Medium/Low) and a size (S/M/L) as defined in the respective
-  `README.md`; keep the rows ordered by severity, then by size. Rate new entries when you add them.
+- `docs/features/` tracks planned features, with the same rules: one file per feature, listed in
+  `docs/features/README.md`, deleted once implemented.
+- Every row in the issue and chore tables has a severity (High/Medium/Low), every feature a priority (High/Medium/Low),
+  and every row a size (S/M/L), as defined in the respective `README.md`; keep the rows ordered by severity or priority,
+  then by size. Rate new entries when you add them.
 
 ## Build, Test, Run
 
@@ -183,7 +186,7 @@ untrusted input:
   `org.lisasp.alphatiming.cli.RecordLauncher`.
 - `alphatiming.jar` references its dependencies in `lib/` through the manifest class path (no fat jar); keep `lib/`
   next to the jar when copying it.
-- Captured event data (`../alphatimer/data/*.serial`) contains personal data: never commit it or paste its content.
+- Captured event data (`data/*.dat`, ignored by Git) contains personal data: never commit it or paste its content.
   Use it only locally, e.g. replayed through a fake TCP server; tests use the sample bytes in
   `alphatimer-project-db/src/test/java/org/lisasp/alphatiming/project/db/testdata/`.
 

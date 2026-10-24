@@ -12,3 +12,8 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Chore | Severity | Size | Summary |
 | --- | --- | --- | --- |
+| [The design spec still says the competition key was dropped](spec-competition-key-outdated.md) | Low | S | The key is a project setting again |
+| [AGENTS.md does not list all data-only exceptions](agents-data-exceptions-list.md) | Low | S | `ProjectFileInUseException` is missing |
+| [The single-test command in AGENTS.md fails for some modules](agents-single-test-command.md) | Low | S | `-am test` misses test-jars of other modules; `package` works |
+| [An unused accessor in JAlphaTiming](unused-status-warning-label.md) | Low | S | `statusWarningLabel()` is not used |
+| [Mutation testing with PIT](mutation-testing-pit.md) | Low | S | No PIT setup; add a `mutation` profile as in JAuswertung |
