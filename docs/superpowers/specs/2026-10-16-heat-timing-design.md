@@ -53,8 +53,8 @@ consumers before the session closes the raw data recorder, and a connect in prog
 
 ## Core components
 
-- **`Settings`** (immutable record): TCP host, TCP port, auto-save interval, server port with an on/off switch (the competition key of alphatimer was dropped: a project is one
-  competition). Validation: non-blank host, ports 1–65535. Stored in the project file; defaults in `defaults.json`.
+- **`Settings`** (immutable record): TCP host, TCP port, auto-save interval, server port with an on/off switch, and the competition key (a project is one competition; the key
+  is stored once per project file and required to start a recording). Validation: non-blank host, ports 1–65535. Stored in the project file; defaults in `defaults.json`.
 - **`ProjectFile` / `TimingDocument`**: owns the working database (EntityManagerFactory), the current file path
   (optional), the dirty flag and listeners. Operations: `create()`, `open(path)`, `save()`, `saveAs(path)`, `close()`.
   Any write (incoming data, settings change) sets dirty. After a crash the temp working database remains; at next start
