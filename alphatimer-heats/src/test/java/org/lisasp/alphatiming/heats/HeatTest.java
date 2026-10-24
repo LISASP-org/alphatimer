@@ -208,6 +208,31 @@ class HeatTest {
         heat.finish(TestMessageCreator.end(1, 1, T0.plusSeconds(30)));
         heat.touch(TestMessageCreator.splitAt(1, 1, 1, 1, 12_000, T0.plusSeconds(200)));
         assertThat(heat.createDto().started()).isEqualTo(synced);
+        assertThat(lane(heat, 1).timeInMillis()).isEqualTo(25_000);
+    }
+
+    @Test
+    void aSplitAfterTheFinishKeepsTheFinalTimeAndThePlaces() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 25_000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 26_000));
+
+        heat.touch(TestMessageCreator.split(1, 1, 1, 1, 12_000));
+
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 25_000, 2, LaneStatus.Used, Penalty.None, 1, true));
+        assertThat(lane(heat, 2).place()).isEqualTo(2);
+    }
+
+    @Test
+    void aCorrectedFinishReplacesTheFinalTime() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 25_000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 24_950));
+
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 24_900));
+
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 24_900, 2, LaneStatus.Used, Penalty.None, 1, true));
+        assertThat(lane(heat, 2).place()).isEqualTo(2);
     }
 
     @Test

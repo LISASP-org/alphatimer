@@ -73,6 +73,9 @@ final class Lane {
         if (message.getTimeInMillis() <= 0) {
             return;
         }
+        if (finished && message.getKindOfTime() != RefinedKindOfTime.Finish) {
+            return;
+        }
         timeInMillis = message.getTimeInMillis();
         lap = message.getCurrentLap();
         finished = message.getKindOfTime() == RefinedKindOfTime.Finish;

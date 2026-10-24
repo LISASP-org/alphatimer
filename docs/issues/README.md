@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [A split time after the finish overwrites the final time](split-after-finish-overwrites-time.md) | High | S | A later split replaces a lane's final time and changes the placings |
 | [A repeated or corrected start resets a finished heat](repeated-start-resets-finished-heat.md) | High | S | A non-live start after the finish clears all times and penalties and restarts the clock |
 | [Save does not flush the file before replacing the project file](save-not-flushed.md) | High | S | After a power loss the project file can be incomplete while the old version is gone |
 | [Deleted times are applied as real times](deleted-time-applied.md) | High | S | `DeletedTime` messages overwrite a lane's time; inherited from alphatimer |

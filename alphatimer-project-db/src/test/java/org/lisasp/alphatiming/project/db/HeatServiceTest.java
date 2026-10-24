@@ -206,7 +206,7 @@ class HeatServiceTest {
     }
 
     @Test
-    void aSecondFinishForTheSameLaneReplacesTheTimeAndASplitAfterItReopensTheLane() throws Exception {
+    void aSecondFinishForTheSameLaneReplacesTheTimeAndALaterSplitIsIgnored() throws Exception {
         try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService service = new HeatService(store);
@@ -217,7 +217,7 @@ class HeatServiceTest {
             assertThat(store.find("WK", 1, 1).orElseThrow().lanes().get(0)).isEqualTo(new LaneDto(1, 2050, 2, LaneStatus.Used, Penalty.None, 1, true));
 
             service.accept(TestMessageCreator.split(1, 1, 1, 1, 1000));
-            assertThat(store.find("WK", 1, 1).orElseThrow().lanes().get(0)).isEqualTo(new LaneDto(1, 1000, 1, LaneStatus.Used, Penalty.None, 0, false));
+            assertThat(store.find("WK", 1, 1).orElseThrow().lanes().get(0)).isEqualTo(new LaneDto(1, 2050, 2, LaneStatus.Used, Penalty.None, 1, true));
             db.closeAndDelete();
         }
     }
