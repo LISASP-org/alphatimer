@@ -55,7 +55,8 @@ that solve problems this application does not have:
   its listeners on whatever thread caused the change.
 - All database access goes through `ProjectDatabase.read/write` (one lock, one connection). Never open sessions on the
   side. Lock order: component locks (`RecordingSession`, `HeatService`, `RawDataRecorder`) first, the database lock
-  second.
+  second. Saves (Save, Save As, auto-save) run one after another on the save lock of `ProjectDatabase`, which
+  `snapshotTo` takes before the database lock.
 - An exception inside the recording pipeline must never reach the reader thread (`RecordingSession.safe`); a failing
   listener must not affect the others.
 - Long-running work (saving, opening) must not be added to the EDT without thought — saving takes the database lock

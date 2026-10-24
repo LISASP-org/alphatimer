@@ -26,7 +26,10 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-/** All access is serialized by one lock because SQLite allows a single writer and there is a single connection. */
+/**
+ * All access is serialized by one lock because SQLite allows a single writer and there is a single connection. Saves are
+ * additionally serialized by a save lock, taken before the database lock, because they share the temp and -previous files.
+ */
 @Slf4j
 public final class ProjectDatabase implements AutoCloseable {
 
@@ -37,6 +40,7 @@ public final class ProjectDatabase implements AutoCloseable {
     private static final Class<?>[] ENTITIES = {SettingsEntity.class, RawDataChunkEntity.class, AresMessageEntity.class, LaneTimeEntity.class, HeatEntity.class, LaneEntity.class};
 
     private final ReentrantLock lock = new ReentrantLock();
+    private final ReentrantLock saveLock = new ReentrantLock();
     private final AtomicBoolean dirty = new AtomicBoolean();
     private final AtomicLong writeCount = new AtomicLong();
     private final List<Consumer<Boolean>> dirtyListeners = new CopyOnWriteArrayList<>();
@@ -185,9 +189,18 @@ public final class ProjectDatabase implements AutoCloseable {
 
     /**
      * Writes a consistent copy of the database to target (via a temp file and an atomic rename); an existing target becomes
-     * {@link #previousVersionOf(Path)}. Does not clear the dirty flag.
+     * {@link #previousVersionOf(Path)}. Concurrent calls run one after another. Does not clear the dirty flag.
      */
     public void snapshotTo(Path target) throws IOException {
+        saveLock.lock();
+        try {
+            snapshotUnderSaveLock(target);
+        } finally {
+            saveLock.unlock();
+        }
+    }
+
+    private void snapshotUnderSaveLock(Path target) throws IOException {
         Path tmp = target.resolveSibling(target.getFileName() + ".tmp");
         Files.deleteIfExists(tmp);
         lock.lock();
