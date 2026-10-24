@@ -18,6 +18,7 @@ import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 import org.lisasp.alphatiming.ui.core.settings.SettingsProblem;
 
+import javax.swing.AbstractButton;
 import javax.swing.JToggleButton;
 import javax.swing.SwingUtilities;
 import java.awt.Component;
@@ -49,6 +50,19 @@ class JAlphaTimingSmokeTest {
         }
     }
 
+    /** JButtonBar wraps a label that is too wide for the bar into centered HTML lines (the German texts are). */
+    private static String shownText(AbstractButton button) {
+        String text = button.getText();
+        if (!text.startsWith("<html>")) {
+            return text;
+        }
+        return text.replace("<br>", " ")
+                   .replaceAll("<[^>]+>", "")
+                   .replace("&lt;", "<")
+                   .replace("&gt;", ">")
+                   .replace("&amp;", "&");
+    }
+
     @Test
     void layoutAndLocking() throws Exception {
         Assumptions.assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display (run with xvfb-run)");
@@ -77,8 +91,8 @@ class JAlphaTimingSmokeTest {
             onEdt(() -> {
                 Component[] buttons = frame.buttonBar().getComponents();
                 assertThat(buttons).hasSize(2);
-                assertThat(((JToggleButton) buttons[0]).getText()).isEqualTo(I18n.get("nav.settings"));
-                assertThat(((JToggleButton) buttons[1]).getText()).isEqualTo(I18n.get("nav.live"));
+                assertThat(shownText((JToggleButton) buttons[0])).isEqualTo(I18n.get("nav.settings"));
+                assertThat(shownText((JToggleButton) buttons[1])).isEqualTo(I18n.get("nav.live"));
                 assertThat(frame.settingsPanel().isShowing()).isTrue();
                 assertThat(frame.liveViewPanel().isShowing()).isFalse();
                 assertThat(frame.settingsPanel().recordToggle().isEnabled()).isFalse();
