@@ -315,4 +315,80 @@ class HeatTest {
         heat.finish(TestMessageCreator.end(1, 1, T0.plusSeconds(30)));
         assertThat(heat.createDto().lastMessage()).isEqualTo(T0.plusSeconds(30));
     }
+
+    @Test
+    void aDeletedFinalTimeClearsTheLaneUntilTheNextFinish() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 25_000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 26_000));
+
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 2, 25_000, T0.plusSeconds(40)));
+
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 0, 0, LaneStatus.Used, Penalty.None, 0, false));
+        assertThat(lane(heat, 2).place()).isEqualTo(1);
+
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 27_000));
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 27_000, 2, LaneStatus.Used, Penalty.None, 2, true));
+    }
+
+    @Test
+    void aDeletedSplitClearsTheLane() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.split(1, 1, 1, 1, 12_000));
+
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 1, 12_000, T0.plusSeconds(40)));
+
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 0, 0, LaneStatus.Used, Penalty.None, 0, false));
+    }
+
+    @Test
+    void aDeletedTimeThatIsNotTheCurrentTimeOfTheLaneChangesNothing() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.split(1, 1, 1, 2, 25_000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 26_000));
+
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 1, 12_000, T0.plusSeconds(40)));
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 2, 2, 25_000, T0.plusSeconds(41)));
+
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 25_000, 2, LaneStatus.Used, Penalty.None, 0, false));
+        assertThat(lane(heat, 2)).isEqualTo(new LaneDto(2, 26_000, 2, LaneStatus.Used, Penalty.None, 1, true));
+    }
+
+    @Test
+    void aDeletedTimeDoesNotMoveTheStart() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.splitAt(1, 1, 1, 1, 12_000, T0.plusSeconds(12)));
+
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 1, 12_000, T0.plusSeconds(40)));
+
+        assertThat(heat.createDto().started()).isEqualTo(T0);
+    }
+
+    @Test
+    void deletingTheFinalTimeOfTheLastLaneLetsTheClockRunAgain() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+        heat.touch(TestMessageCreator.fin(1, 1, 3, 0, 2200));
+        assertThat(heat.createDto().ended()).isNotNull();
+
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 3, 2, 2200, T0.plusSeconds(40)));
+
+        assertThat(heat.createDto().ended()).isNull();
+        assertThat(heat.createDto().status()).isEqualTo(HeatStatus.Started);
+    }
+
+    @Test
+    void deletingTheTimeOfALaneWithAPenaltyKeepsTheClockStopped() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+        heat.touch(TestMessageCreator.split(1, 1, 3, 1, 900));
+        heat.didNotFinish(TestMessageCreator.dnf(1, 1, 3));
+
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 3, 1, 900, T0.plusSeconds(40)));
+
+        assertThat(lane(heat, 3)).isEqualTo(new LaneDto(3, 0, 0, LaneStatus.Used, Penalty.DidNotFinish, 0, false));
+        assertThat(heat.createDto().ended()).isEqualTo(T0);
+    }
 }

@@ -62,6 +62,11 @@ public final class TestMessageCreator {
         return timeAt(event, heat, lane, 2, 1, millis, RefinedKindOfTime.Finish, at, RefinedMessageType.CurrentRaceResult);
     }
 
+    /** The device marks a deleted final time as a split time of the last lap, with the value it deletes. */
+    public static TimeMessage deletedAt(int event, int heat, int lane, int lap, int millis, LocalDateTime at) {
+        return new TimeMessage(at, "WK", (short) event, (byte) heat, RefinedMessageType.Live, RefinedKindOfTime.SplitTime, (byte) lane, (byte) lap, (byte) 2, (byte) 0, millis, RefinedTimeType.DeletedTime);
+    }
+
     private static TimeMessage timeAt(int event, int heat, int lane, int lap, int rank, int millis, RefinedKindOfTime kind, LocalDateTime at, RefinedMessageType type) {
         return new TimeMessage(at, "WK", (short) event, (byte) heat, type, kind, (byte) lane, (byte) lap, (byte) 2, (byte) rank, millis, RefinedTimeType.Normal);
     }

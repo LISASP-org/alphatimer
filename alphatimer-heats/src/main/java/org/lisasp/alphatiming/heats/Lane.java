@@ -82,6 +82,15 @@ final class Lane {
         enforceStatus();
     }
 
+    boolean deleteTime(TimeMessage message) {
+        if (timeInMillis <= 0 || message.getTimeInMillis() != timeInMillis || message.getCurrentLap() != lap) {
+            return false;
+        }
+        timeInMillis = 0;
+        enforceStatus();
+        return true;
+    }
+
     void didNotStart() {
         penalty = Penalty.DidNotStart;
         timeInMillis = 0;

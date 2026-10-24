@@ -74,12 +74,30 @@ final class Heat {
 
     void touch(TimeMessage message) {
         Lane lane = lane(message.getLane());
+        if (message.getTimeType() == RefinedTimeType.DeletedTime) {
+            deleteTime(lane, message);
+            return;
+        }
         assureStarted(message);
         lastMessage = message.getTimestamp();
         syncStart(message);
         lapCount = message.getLapCount();
         lane.touch(message);
         update(message);
+    }
+
+    /**
+     * The device withdraws a time by sending it again as deleted, after the race time has moved on; a deleted final time
+     * comes as a split time of the last lap. Only the lane's current time can be withdrawn, older ones are already gone.
+     */
+    private void deleteTime(Lane lane, TimeMessage message) {
+        lastMessage = message.getTimestamp();
+        if (lane.deleteTime(message)) {
+            computePlaces();
+            if (status != HeatStatus.Finished && !lane.isDone()) {
+                ended = null;
+            }
+        }
     }
 
     /**

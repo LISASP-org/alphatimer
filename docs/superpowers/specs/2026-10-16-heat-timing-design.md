@@ -67,6 +67,9 @@ many times.
   finishes; the device's rank data is ignored because it is provisional while the race runs and was found to be
   inconsistent with the times in captured data. Repeated results of previous races (RefinedMessageType
   PreviousRaceResult) are ignored by the heat service so they cannot re-select or change an older heat.
+  A deleted time (time type DeletedTime; the device sends a deleted final time as a split time of the last lap) clears
+  the lane's time, finish and place if it is the lane's current time, and lets a stopped clock run again; it is never
+  applied as a time.
 
 ## UI
 
@@ -137,7 +140,7 @@ interpreted messages and not the raw lines; pings only switch a green marker (da
 Every live split or finish time carries the race time of the device and, as message timestamp, its arrival on the local
 clock. The start of the heat is set to `timestamp − race time` with every such message, so the running clock follows the
 device clock instead of drifting from the local arrival of the start message. Repeats of results (message type
-CurrentRaceResult) and times after the official end are not used for this.
+CurrentRaceResult), deleted times and times after the official end are not used for this.
 
 ### Running time model
 
