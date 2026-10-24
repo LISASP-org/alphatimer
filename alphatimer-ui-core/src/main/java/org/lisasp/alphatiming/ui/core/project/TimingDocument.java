@@ -14,15 +14,24 @@ import org.lisasp.alphatiming.ui.core.settings.Settings;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
+/**
+ * Saves (Save, Save As, auto-save) run one after another on the save lock, taken before the database lock; switching to
+ * another file, the origin note and closing run under it too, so a running save finishes before the database closes.
+ */
 @Slf4j
 public final class TimingDocument implements AutoCloseable {
 
     private final TimingDatabase database;
+    private final ReentrantLock saveLock = new ReentrantLock();
+    private final AtomicBoolean dirty = new AtomicBoolean();
+    private final List<Consumer<Boolean>> dirtyListeners = new CopyOnWriteArrayList<>();
     private volatile Path file;
     private volatile LockFile fileLock;
     private boolean closed;
@@ -32,6 +41,7 @@ public final class TimingDocument implements AutoCloseable {
         this.database = database;
         this.file = file;
         this.fileLock = fileLock;
+        database.addWriteListener(() -> setDirty(true));
     }
 
     /** A new, never saved project; it only counts as changed once something other than its initial settings is written. */
@@ -39,7 +49,7 @@ public final class TimingDocument implements AutoCloseable {
         TimingDatabase db = TimingDatabase.createNew(workDir);
         TimingDocument doc = new TimingDocument(db, null, null);
         doc.updateSettings(initial);
-        db.markClean();
+        doc.setDirty(false);
         return doc;
     }
 
@@ -55,17 +65,19 @@ public final class TimingDocument implements AutoCloseable {
 
     /** Opens the saved state of this document's file once more; the new document takes over the lock on the file. */
     public TimingDocument reopen(Path workDir) throws IOException {
-        List<TimingDocument> reopened = new ArrayList<>(1);
-        database.runWithSaveLock(() -> {
+        saveLock.lock();
+        try {
             checkOpen();
             Path current = file;
             if (current == null) {
                 throw new IllegalStateException("The project has no file yet.");
             }
-            reopened.add(load(current, workDir, fileLock));
+            TimingDocument reopened = load(current, workDir, fileLock);
             fileLock = null;
-        });
-        return reopened.getFirst();
+            return reopened;
+        } finally {
+            saveLock.unlock();
+        }
     }
 
     public boolean isSavedAs(Path candidate) {
@@ -178,36 +190,49 @@ public final class TimingDocument implements AutoCloseable {
     }
 
     public boolean isDirty() {
-        return database.isDirty();
+        return dirty.get();
     }
 
     public void addDirtyListener(Consumer<Boolean> listener) {
-        database.addDirtyListener(listener);
+        dirtyListeners.add(listener);
+    }
+
+    private void setDirty(boolean value) {
+        if (dirty.getAndSet(value) != value) {
+            dirtyListeners.forEach(l -> l.accept(value));
+        }
     }
 
     public void save() throws IOException {
-        database.runWithSaveLock(() -> {
+        saveLock.lock();
+        try {
             checkOpen();
             Path target = file;
             if (target == null) {
                 throw new IllegalStateException("The project has no file yet; use saveAs.");
             }
             snapshot(target);
-        });
+        } finally {
+            saveLock.unlock();
+        }
     }
 
     /** Saves unsaved changes to the project file; does nothing without a file or once the document is closed. */
     public void saveIfChanged() throws IOException {
-        database.runWithSaveLock(() -> {
+        saveLock.lock();
+        try {
             Path target = file;
             if (!closed && target != null && isDirty()) {
                 snapshot(target);
             }
-        });
+        } finally {
+            saveLock.unlock();
+        }
     }
 
     public void saveAs(Path target) throws IOException {
-        database.runWithSaveLock(() -> {
+        saveLock.lock();
+        try {
             checkOpen();
             if (isSavedAs(target)) {
                 snapshot(target);
@@ -226,7 +251,9 @@ public final class TimingDocument implements AutoCloseable {
             if (previous != null) {
                 previous.closeAndDelete();
             }
-        });
+        } finally {
+            saveLock.unlock();
+        }
     }
 
     void useFileWriter(TimingFileWriter writer) {
@@ -250,13 +277,14 @@ public final class TimingDocument implements AutoCloseable {
         }
         log.info("Saved project {}", target.getFileName());
         TimingWorkFolder.recordOrigin(database.workFile(), target);
-        database.markCleanIfUnchangedSince(savedWriteCount);
+        database.ifUnchangedSince(savedWriteCount, () -> setDirty(false));
     }
 
     /** Waits for a running save. */
     @Override
     public void close() {
-        database.runWithSaveLock(() -> {
+        saveLock.lock();
+        try {
             if (closed) {
                 return;
             }
@@ -267,6 +295,8 @@ public final class TimingDocument implements AutoCloseable {
             if (lock != null) {
                 lock.closeAndDelete();
             }
-        });
+        } finally {
+            saveLock.unlock();
+        }
     }
 }

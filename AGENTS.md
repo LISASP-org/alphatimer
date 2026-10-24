@@ -31,7 +31,7 @@ that solve problems this application does not have:
 | `alphatimer-heats` | Heat model, placing, `HeatService`, `RunningClock`, `LiveHeats`, the heat/lane DTOs and enums. Works on refined messages only; stores through the `HeatRepository` interface. No database. |
 | `alphatimer-legacy-server` | alphatimer-compatible heats (`LegacyService`, `legacy.dto`) and the JDK `HttpServer` endpoints (`LegacyHttpServer`; its requests run on the bounded `HandlerPool`, which closes connections beyond its queue and those over the time limit). Stores `LaneTime`s through the `LaneTimeRepository` interface. No database. |
 | `alphatimer-project-db` | The `.timing` project file: Hibernate on SQLite (`TimingDatabase`, entities), the save protocol of the project file (`TimingFileWriter`), the work folder with its work files, their locks and origin notes and the crash leftovers (`TimingWorkFolder`, `CrashLeftover`) and the stores that implement the repositories (`HeatStore`, `LaneTimeStore`) or write the recording (`MessageStore`, `RawDataRecorder`). `replay` (`FileReplayReader`: binary file or the raw data of a `.timing` file, paced like 9600 baud; reads the `rawdata` table with plain JDBC). The only module with Hibernate/SQLite. |
-| `alphatimer-ui-core` | No Swing. The application layer: `settings` (`SerialMode` maps to a `SerialConfiguration`), `project` (`TimingDocument`, `AutoSaver`), `recording` (`RecordingSession` wires reader, parser, heats, stores and the legacy server; its `WriteListener` hears which `RecordedData` could not be stored and when it is stored again; a lost serial connection stops it and is reported to its connection-lost listeners). |
+| `alphatimer-ui-core` | No Swing. The application layer: `settings` (`SerialMode` maps to a `SerialConfiguration`), `project` (`TimingDocument`: the open project with its database, project file and lock, unsaved state and save lock; `AutoSaver`), `recording` (`RecordingSession` wires reader, parser, heats, stores and the legacy server; its `WriteListener` hears which `RecordedData` could not be stored and when it is stored again; a lost serial connection stops it and is reported to its connection-lost listeners). |
 | `alphatimer-ui-common` | What every front end shares, no Swing: `AppController` (document workflow), `SavePrompt` (the questions it asks, implemented per front end; `RecoveryTexts` builds the texts of the recovery questions), `ProjectFiles` (file extensions; the Save As path choice the prompts share: default extension, then the overwrite question), `I18n` with the `messages*.properties`, `AppStatus` (title, file, state text, warning summary and details, Start/Stop), `StatusWarnings` (the active status-bar warnings, each kind with its own clearing rule; `WriteFailures` raises and clears the write-error warning; the lost serial connection is cleared by the next start), `SettingsFormRules` (required/editable fields, record button), `LaneRows`, `TimeFormat`, `MessageText`, `LogFileCleanup` (old log files, run by every launcher). |
 | `alphatimer-ui` | Swing UI on the JUtils `JButtonBar` in the layout of the JAuswertung plugin window (`JAlphaTiming.createBody`: `SelectorScrollPane` with the bar left, 4 dlu gap, the panel right with a labeled border of its name, 5 px space around; window sized like `JPFrame`), `SwingSavePrompt`, `AlphaTimingLauncher`. Panels: "Settings & Recording" and "Live View" (lane rows built from `LaneRows`, no `JTable`). Builds `alphatiming.jar` with its dependencies in `target/lib/`. |
 | `alphatimer-tui` | Text UI on Lanterna with the structure of the GUI (`TuiMainWindow`: menu bar, panel buttons left, status line; `TuiSettingsPanel`, `TuiLiveViewPanel`, `TuiSavePrompt` with text dialogs). All logic comes from `alphatimer-ui-common`; listeners go through `gui.getGUIThread().invokeLater`. Shortcuts are function keys (F2 save, F5/F6 panels, F10 exit), Ctrl+N/O, and Ctrl+C asks like Exit — never Ctrl+S/Ctrl+Q, which terminals use for flow control. Logs to the file only. Builds `alphatiming-tui.jar` with `target/lib/`. |
@@ -55,11 +55,11 @@ that solve problems this application does not have:
   its listeners on whatever thread caused the change.
 - All database access goes through `TimingDatabase.read/write` (one lock, one connection). Never open sessions on the
   side. Lock order: component locks (`RecordingSession`, `HeatService`, `RawDataRecorder`) first, the database lock
-  second. Saves (Save, Save As, auto-save) run one after another on the save lock of `TimingDatabase`
-  (`runWithSaveLock`), which `TimingDocument` takes before the database lock; `snapshotTo` holds the database lock only
-  while copying the database, so the recording keeps writing while `TimingFileWriter` moves the copy to the target.
-  `TimingDocument` switches to a new file (Save As), records the work file's origin note and closes under the same save
-  lock, so a running save finishes before the database closes.
+  second. Saves (Save, Save As, auto-save) run one after another on the save lock of `TimingDocument`, taken
+  before the database lock; `TimingDatabase.snapshotTo` holds the database lock only while copying the database, so the
+  recording keeps writing while `TimingFileWriter` moves the copy to the target. `TimingDocument` switches to a new file
+  (Save As), records the work file's origin note and closes under the same save lock, so a running save finishes before
+  the database closes. Its dirty flag is set by a write listener of `TimingDatabase`, which runs under the database lock.
 - `AppController` pauses the `AutoSaver` while it asks the user about the document (stop recording, Save / Discard /
   Cancel, Save As path, recovery) and until a discarded document is closed; `pause()` waits for a running auto-save.
 - An exception inside the recording pipeline must never reach the reader thread (`RecordingSession.safe`); a failing
@@ -81,7 +81,8 @@ that solve problems this application does not have:
   work file, flushed to disk; then, outside the database lock, `TimingFileWriter` moves that file to a temp file next to
   the target (across filesystems, where an atomic move fails, copied and flushed), renames the existing file to
   `<name>-previous.timing` (replacing an older one), moves the temp file into place and flushes the directory. The
-  document is marked clean only if nothing was written since the `VACUUM INTO` (`snapshotTo` returns that write count).
+  document is marked clean only if nothing was written since the `VACUUM INTO` (`snapshotTo` returns that write count,
+  `ifUnchangedSince` checks it under the database lock).
   A failed save keeps the old file (at worst as `-previous`) and the dirty flag and removes its temp files.
   Open copies the file to `~/.alphatiming/work/` and rejects files that are not AlphaTiming projects.
 - Work files are protected by an OS lock (`.lock` next to them); only unlocked ones are offered for crash recovery. A

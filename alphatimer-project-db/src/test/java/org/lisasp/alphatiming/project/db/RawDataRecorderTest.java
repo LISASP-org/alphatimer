@@ -31,7 +31,7 @@ class RawDataRecorderTest {
             RawDataRecorder.readAll(db).forEach(all::writeBytes);
             assertThat(all.toByteArray()).containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
             assertThat(RawDataRecorder.readAll(db)).hasSize(3);
-            assertThat(db.isDirty()).isTrue();
+            assertThat(db.writeCount()).isPositive();
             db.closeAndDelete();
         }
     }

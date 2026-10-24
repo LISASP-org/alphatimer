@@ -16,16 +16,11 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
-/**
- * All access is serialized by one lock because SQLite allows a single writer and there is a single connection. Saves are
- * additionally serialized by a save lock ({@link #runWithSaveLock}), taken before the database lock.
- */
+/** All access is serialized by one lock because SQLite allows a single writer and there is a single connection. */
 public final class TimingDatabase implements AutoCloseable {
 
     private static final byte[] SQLITE_HEADER = "SQLite format 3\0".getBytes(StandardCharsets.US_ASCII);
@@ -33,10 +28,8 @@ public final class TimingDatabase implements AutoCloseable {
     private static final Class<?>[] ENTITIES = {SettingsEntity.class, RawDataChunkEntity.class, AresMessageEntity.class, LaneTimeEntity.class, HeatEntity.class, LaneEntity.class};
 
     private final ReentrantLock lock = new ReentrantLock();
-    private final ReentrantLock saveLock = new ReentrantLock();
-    private final AtomicBoolean dirty = new AtomicBoolean();
     private final AtomicLong writeCount = new AtomicLong();
-    private final List<Consumer<Boolean>> dirtyListeners = new CopyOnWriteArrayList<>();
+    private final List<Runnable> writeListeners = new CopyOnWriteArrayList<>();
 
     private final Path workFile;
     private final SessionFactory factory;
@@ -155,7 +148,7 @@ public final class TimingDatabase implements AutoCloseable {
                 T result = work.apply(em);
                 tx.commit();
                 writeCount.incrementAndGet();
-                setDirty(true);
+                writeListeners.forEach(Runnable::run);
                 return result;
             } catch (RuntimeException ex) {
                 if (tx.isActive()) {
@@ -197,27 +190,12 @@ public final class TimingDatabase implements AutoCloseable {
         }
     }
 
-    @FunctionalInterface
-    public interface SaveWork<E extends Exception> {
-        void run() throws E;
-    }
-
-    /** Runs work while no save of this database runs; work may save itself, the save lock is reentrant. */
-    public <E extends Exception> void runWithSaveLock(SaveWork<E> work) throws E {
-        saveLock.lock();
-        try {
-            work.run();
-        } finally {
-            saveLock.unlock();
-        }
-    }
-
-    /** Marks the database clean unless it was written since the state with the given {@link #writeCount()}. */
-    public void markCleanIfUnchangedSince(long savedWriteCount) {
+    /** Runs action under the database lock unless the database was written since the state with the given {@link #writeCount()}. */
+    public void ifUnchangedSince(long savedWriteCount, Runnable action) {
         lock.lock();
         try {
             if (writeCount.get() == savedWriteCount) {
-                setDirty(false);
+                action.run();
             }
         } finally {
             lock.unlock();
@@ -228,39 +206,24 @@ public final class TimingDatabase implements AutoCloseable {
         return writeCount.get();
     }
 
-    public boolean isDirty() {
-        return dirty.get();
-    }
-
-    public void markClean() {
-        setDirty(false);
-    }
-
-    private void setDirty(boolean value) {
-        if (dirty.getAndSet(value) != value) {
-            dirtyListeners.forEach(l -> l.accept(value));
-        }
-    }
-
-    public void addDirtyListener(Consumer<Boolean> listener) {
-        dirtyListeners.add(listener);
+    /** Called under the database lock after each committed {@link #write}. */
+    public void addWriteListener(Runnable listener) {
+        writeListeners.add(listener);
     }
 
     public Path workFile() {
         return workFile;
     }
 
-    /** Waits for a running save and database access. */
+    /** Waits for a running database access. */
     @Override
     public void close() {
-        saveLock.lock();
         lock.lock();
         try {
             factory.close();
             releaseLock();
         } finally {
             lock.unlock();
-            saveLock.unlock();
         }
     }
 

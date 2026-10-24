@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,24 +39,34 @@ class TimingDatabaseTest {
     }
 
     @Test
-    void writeSetsDirtyAndSnapshotRoundTrips() throws Exception {
+    void writesAreCountedAndHeardAndSnapshotRoundTrips() throws Exception {
         Path file = dir.resolve("a.heat");
         try (TimingDatabase db = TimingDatabase.createNew(dir)) {
-            assertThat(db.isDirty()).isFalse();
+            List<Long> heard = new ArrayList<>();
+            db.addWriteListener(() -> heard.add(db.writeCount()));
+            assertThat(db.writeCount()).isZero();
             db.write(em -> {
                 em.persist(new SettingsEntity("host", 1234, 60, 1999));
                 return null;
             });
-            assertThat(db.isDirty()).isTrue();
+            assertThat(heard).containsExactly(1L);
             long saved = db.snapshotTo(file);
             assertThat(saved).isEqualTo(db.writeCount());
-            db.markCleanIfUnchangedSince(saved);
-            assertThat(db.isDirty()).isFalse();
+            AtomicBoolean unchanged = new AtomicBoolean();
+            db.ifUnchangedSince(saved, () -> unchanged.set(true));
+            assertThat(unchanged).isTrue();
+            db.write(em -> {
+                em.persist(new SettingsEntity("host", 1234, 60, 1999));
+                return null;
+            });
+            AtomicBoolean changed = new AtomicBoolean(true);
+            db.ifUnchangedSince(saved, () -> changed.set(false));
+            assertThat(changed).isTrue();
             db.closeAndDelete();
         }
         try (TimingDatabase db = TimingDatabase.openCopy(file, dir)) {
             assertThat(countSettings(db)).isEqualTo(1);
-            assertThat(db.isDirty()).isFalse();
+            assertThat(db.writeCount()).isZero();
             db.closeAndDelete();
         }
     }
