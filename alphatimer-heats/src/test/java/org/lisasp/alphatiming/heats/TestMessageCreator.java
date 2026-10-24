@@ -13,11 +13,11 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 import java.time.LocalDateTime;
 
 /** Test helper that builds refined messages for competition "WK". */
-public final class Msg {
+public final class TestMessageCreator {
 
     public static final LocalDateTime T0 = LocalDateTime.of(2026, 5, 1, 10, 0, 0);
 
-    private Msg() {
+    private TestMessageCreator() {
     }
 
     public static UsedLanesMessage used(int event, int heat, String lanes) {

@@ -155,7 +155,7 @@ untrusted input:
   tests that need a database use `ProjectDatabase.createNew(@TempDir)`, tests that need a device use a local
   `ServerSocket` or a fake `SerialPortReader`. `HeatServiceTest` and `LegacyServiceTest` run against the real stores and
   therefore live in `alphatimer-project-db`.
-- Shared test helpers are published as test-jars: `Msg` (refined messages) from `alphatimer-heats`,
+- Shared test helpers are published as test-jars: `TestMessageCreator` from `alphatimer-heats`,
   `DataHandlingMessageTestData` from `alphatimer-project-db`.
 - Prefer tests on the non-Swing modules and `AppController`; keep heat, placing and clock logic and the document workflow
   out of Swing classes so they can be tested without a GUI. Swing classes get a smoke test at most.
