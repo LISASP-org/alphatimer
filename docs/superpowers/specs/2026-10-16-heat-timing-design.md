@@ -15,7 +15,8 @@ Workflow: stop recording → change settings → start recording.
 - Persistence: **JPA with Hibernate**. Project file = **one SQLite file** (`*.heat`) holding settings, raw data,
   interpreted messages and heats. SQLite via `hibernate-community-dialects` + `sqlite-jdbc`.
 - Working database while a project is open: a temporary SQLite database. **Save** writes a consistent snapshot to the
-  project file (`VACUUM INTO` a temp file next to the target, then atomic rename).
+  project file (`VACUUM INTO` a temp file in the work folder, then moved next to the target and renamed atomically;
+  only the `VACUUM INTO` blocks the recording).
 - Dirty tracking, periodic auto-save (when dirty and the project has a file; interval is a setting, default 60 s;
   paused while a question about the project or the Save As dialog is open), explicit Save / Save As.
 - Closing (window close, File → Exit, and also File → New / Open): while a recording runs, a dialog first asks whether

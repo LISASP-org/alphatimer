@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -49,6 +50,7 @@ public final class ProjectDatabase implements AutoCloseable {
     private final SessionFactory factory;
 
     private LockFile workLock;
+    private volatile FileMover mover = (source, target) -> Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
 
     private ProjectDatabase(Path workFile, boolean isNew) throws IOException {
         this.workFile = workFile;
@@ -201,13 +203,16 @@ public final class ProjectDatabase implements AutoCloseable {
     }
 
     /**
-     * Writes a consistent copy of the database to target (via a temp file and an atomic rename); an existing target becomes
-     * {@link #previousVersionOf(Path)}. Concurrent calls run one after another. Does not clear the dirty flag.
+     * Writes a consistent copy of the database to target (via temp files and an atomic rename); an existing target becomes
+     * {@link #previousVersionOf(Path)}. Concurrent calls run one after another. Only the copy of the database blocks
+     * {@link #write}; moving it to the target does not. Does not clear the dirty flag.
+     *
+     * @return the {@link #writeCount()} of the saved state
      */
-    public void snapshotTo(Path target) throws IOException {
+    public long snapshotTo(Path target) throws IOException {
         saveLock.lock();
         try {
-            snapshotUnderSaveLock(target);
+            return snapshotUnderSaveLock(target);
         } finally {
             saveLock.unlock();
         }
@@ -228,9 +233,41 @@ public final class ProjectDatabase implements AutoCloseable {
         }
     }
 
-    private void snapshotUnderSaveLock(Path target) throws IOException {
-        Path tmp = target.resolveSibling(target.getFileName() + ".tmp");
-        Files.deleteIfExists(tmp);
+    /** Marks the database clean unless it was written since the state with the given {@link #writeCount()}. */
+    public void markCleanIfUnchangedSince(long savedWriteCount) {
+        lock.lock();
+        try {
+            if (writeCount.get() == savedWriteCount) {
+                setDirty(false);
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private long snapshotUnderSaveLock(Path target) throws IOException {
+        Path localTmp = workFile.resolveSibling(workFile.getFileName() + "." + UUID.randomUUID() + ".tmp");
+        Path targetTmp = target.resolveSibling(target.getFileName() + ".tmp");
+        try {
+            long savedWriteCount = copyTo(localTmp);
+            Files.deleteIfExists(targetTmp);
+            moveToTargetFolder(localTmp, targetTmp);
+            if (Files.exists(target)) {
+                Path previous = previousVersionOf(target);
+                Files.deleteIfExists(previous);
+                Files.move(target, previous, StandardCopyOption.ATOMIC_MOVE);
+            }
+            Files.move(targetTmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            forceDirectory(target.toAbsolutePath().getParent());
+            return savedWriteCount;
+        } catch (IOException | RuntimeException ex) {
+            deleteTempFile(localTmp);
+            deleteTempFile(targetTmp);
+            throw ex instanceof IOException io ? io : new IOException("Could not save project file " + target, ex);
+        }
+    }
+
+    private long copyTo(Path tmp) throws IOException {
         lock.lock();
         try (Session session = factory.openSession()) {
             session.doWork(connection -> {
@@ -244,23 +281,37 @@ public final class ProjectDatabase implements AutoCloseable {
             });
             // VACUUM INTO does not sync its output; without this a power loss can leave a half-written project file.
             force(tmp);
-            if (Files.exists(target)) {
-                Path previous = previousVersionOf(target);
-                Files.deleteIfExists(previous);
-                Files.move(target, previous, StandardCopyOption.ATOMIC_MOVE);
-            }
-            Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            forceDirectory(target.toAbsolutePath().getParent());
-        } catch (IOException | RuntimeException ex) {
-            try {
-                Files.deleteIfExists(tmp);
-            } catch (IOException cleanup) {
-                log.warn("Could not delete temporary file {}", tmp, cleanup);
-            }
-            throw ex instanceof IOException io ? io : new IOException("Could not save project file " + target, ex);
+            return writeCount.get();
         } finally {
             lock.unlock();
         }
+    }
+
+    private void moveToTargetFolder(Path localTmp, Path targetTmp) throws IOException {
+        try {
+            mover.moveAtomically(localTmp, targetTmp);
+        } catch (AtomicMoveNotSupportedException ex) {
+            Files.copy(localTmp, targetTmp);
+            force(targetTmp);
+            deleteTempFile(localTmp);
+        }
+    }
+
+    private static void deleteTempFile(Path tmp) {
+        try {
+            Files.deleteIfExists(tmp);
+        } catch (IOException ex) {
+            log.warn("Could not delete temporary file {}", tmp, ex);
+        }
+    }
+
+    @FunctionalInterface
+    interface FileMover {
+        void moveAtomically(Path source, Path target) throws IOException;
+    }
+
+    void useMover(FileMover mover) {
+        this.mover = mover;
     }
 
     /** The file that keeps the state before the last save: {@code wk.timing} → {@code wk-previous.timing}. */

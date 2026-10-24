@@ -56,14 +56,15 @@ that solve problems this application does not have:
 - All database access goes through `ProjectDatabase.read/write` (one lock, one connection). Never open sessions on the
   side. Lock order: component locks (`RecordingSession`, `HeatService`, `RawDataRecorder`) first, the database lock
   second. Saves (Save, Save As, auto-save) run one after another on the save lock of `ProjectDatabase`, which
-  `snapshotTo` takes before the database lock. `ProjectDocument` switches to a new file (Save As), records the
+  `snapshotTo` takes before the database lock; it holds the database lock only while copying the database, so the
+  recording keeps writing while the copy is moved to the target. `ProjectDocument` switches to a new file (Save As), records the
   work file's origin note and closes under the same save lock, so a running save finishes before the database closes.
 - `AppController` pauses the `AutoSaver` while it asks the user about the document (stop recording, Save / Discard /
   Cancel, Save As path, recovery) and until a discarded document is closed; `pause()` waits for a running auto-save.
 - An exception inside the recording pipeline must never reach the reader thread (`RecordingSession.safe`); a failing
   listener must not affect the others.
-- Long-running work (saving, opening) must not be added to the EDT without thought — saving takes the database lock
-  (see `docs/issues/`).
+- Long-running work (saving, opening) must not be added to the EDT without thought — saving copies the database under
+  its lock, opening builds the session factory (see `docs/issues/`).
 - Every thread, socket, REST port and file lock that a recording or a document opens must be released on stop/close;
   start → stop → start must be repeatable.
 
@@ -71,9 +72,12 @@ that solve problems this application does not have:
 
 - A `.timing` project file (earlier versions saved `.heat`; the Open dialog still accepts it) is a SQLite file written through JPA/Hibernate (native bootstrap, no `persistence.xml`,
   `hibernate-community-dialects`). Tables: `settings`, `rawdata`, `aresmessage`, `lanetime`, `heat`, `lane`. Columns added later (e.g. the connection type in `settings`) are nullable and read as the earlier behavior (TCP), so files of earlier versions still open.
-- Save = `VACUUM INTO` a temp file, flushed to disk, then the existing file is renamed to `<name>-previous.timing`
-  (replacing an older one) and the temp file moved into place (`ProjectDatabase.snapshotTo`); a failed save keeps the old file (at worst as `-previous`) and
-  the dirty flag. Open copies the file to `~/.alphatiming/work/` and rejects files that are not AlphaTiming projects.
+- Save (`ProjectDatabase.snapshotTo`) = under the database lock, `VACUUM INTO` a temp file next to the work file, flushed
+  to disk; then, outside the database lock, that file is moved to a temp file next to the target (across filesystems,
+  where an atomic move fails, copied and flushed), the existing file is renamed to `<name>-previous.timing` (replacing
+  an older one), the temp file moved into place and the directory flushed. The document is marked clean only if nothing
+  was written since the `VACUUM INTO` (`snapshotTo` returns that write count). A failed save keeps the old file (at worst
+  as `-previous`) and the dirty flag and removes its temp files. Open copies the file to `~/.alphatiming/work/` and rejects files that are not AlphaTiming projects.
 - Work files are protected by an OS lock (`.lock` next to them); only unlocked ones are offered for crash recovery. A
   `.project` note next to a work file names the project file it was last opened from or saved to, with that file's
   modification time (`WorkFileOrigin`). A recovered document keeps that project file only if it is unchanged since and

@@ -6,8 +6,10 @@ import org.junit.jupiter.api.io.TempDir;
 import org.sqlite.ProgressHandler;
 
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -54,8 +56,7 @@ class ProjectDatabaseTest {
                 return null;
             });
             assertThat(db.isDirty()).isTrue();
-            db.snapshotTo(file);
-            db.markClean();
+            db.markCleanIfUnchangedSince(db.snapshotTo(file));
             assertThat(db.isDirty()).isFalse();
             db.closeAndDelete();
         }
@@ -146,7 +147,7 @@ class ProjectDatabaseTest {
             });
             CountDownLatch tempFileWritten = new CountDownLatch(1);
             CountDownLatch release = new CountDownLatch(1);
-            pauseWhenTempFileAppears(db, projects, tempFileWritten, release);
+            pauseWhenTempFileAppears(db, dir, tempFileWritten, release);
 
             FutureTask<Void> first = snapshotTask(db, file);
             new Thread(first).start();
@@ -168,6 +169,95 @@ class ProjectDatabaseTest {
         assertThat(settingsIn(file)).isEqualTo(2);
     }
 
+    @Test
+    void aWriteDuringTheMoveOfASaveIsNotBlocked() throws Exception {
+        Path projects = Files.createDirectory(dir.resolve("projects"));
+        Path file = projects.resolve("wk.timing");
+        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+            saveWithSettings(db, file, 1);
+            db.write(em -> {
+                em.persist(new SettingsEntity("h", 1, 60, 0));
+                return null;
+            });
+            long countAtSave = db.writeCount();
+            CountDownLatch moving = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            db.useMover((source, target) -> {
+                moving.countDown();
+                awaitUninterruptibly(release);
+                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+            });
+            var pool = Executors.newFixedThreadPool(2);
+            try {
+                Future<Long> save = pool.submit(() -> db.snapshotTo(file));
+                assertThat(moving.await(20, TimeUnit.SECONDS)).isTrue();
+
+                pool.submit(() -> db.write(em -> {
+                    em.persist(new SettingsEntity("h", 1, 60, 0));
+                    return null;
+                })).get(20, TimeUnit.SECONDS);
+                assertThat(save).isNotDone();
+                release.countDown();
+
+                long saved = save.get(20, TimeUnit.SECONDS);
+                assertThat(saved).isEqualTo(countAtSave);
+                db.markCleanIfUnchangedSince(saved);
+                assertThat(db.isDirty()).isTrue();
+            } finally {
+                release.countDown();
+                pool.shutdown();
+            }
+            db.closeAndDelete();
+        }
+        assertThat(settingsIn(file)).isEqualTo(2);
+        assertThat(settingsIn(projects.resolve("wk-previous.timing"))).isEqualTo(1);
+    }
+
+    @Test
+    void aSaveToAnotherFileSystemCopiesTheFileAndLeavesNoTempFiles() throws Exception {
+        Path projects = Files.createDirectory(dir.resolve("projects"));
+        Path file = projects.resolve("wk.timing");
+        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+            db.useMover((source, target) -> {
+                throw new AtomicMoveNotSupportedException(source.toString(), target.toString(), "other file system");
+            });
+            saveWithSettings(db, file, 1);
+            saveWithSettings(db, file, 2);
+            db.closeAndDelete();
+        }
+        assertThat(settingsIn(file)).isEqualTo(2);
+        assertThat(settingsIn(projects.resolve("wk-previous.timing"))).isEqualTo(1);
+        assertThat(tempFilesIn(dir)).isEmpty();
+        try (var files = Files.list(projects)) {
+            assertThat(files.map(p -> p.getFileName().toString())).containsExactlyInAnyOrder("wk.timing", "wk-previous.timing");
+        }
+    }
+
+    @Test
+    void aSaveFailingToMoveTheFileKeepsTheOldFileAndLeavesNoTempFiles() throws Exception {
+        Path projects = Files.createDirectory(dir.resolve("projects"));
+        Path file = projects.resolve("wk.timing");
+        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+            saveWithSettings(db, file, 1);
+            db.useMover((source, target) -> {
+                throw new IOException("disk full");
+            });
+            assertThatThrownBy(() -> saveWithSettings(db, file, 2)).isInstanceOf(IOException.class).hasMessage("disk full");
+            db.closeAndDelete();
+        }
+        assertThat(settingsIn(file)).isEqualTo(1);
+        assertThat(tempFilesIn(dir)).isEmpty();
+        try (var files = Files.list(projects)) {
+            assertThat(files.map(p -> p.getFileName().toString())).containsExactly("wk.timing");
+        }
+    }
+
+    private static List<Path> tempFilesIn(Path directory) throws IOException {
+        try (var files = Files.list(directory)) {
+            return files.filter(p -> p.getFileName().toString().endsWith(".tmp")).toList();
+        }
+    }
+
     private static FutureTask<Void> snapshotTask(ProjectDatabase db, Path file) {
         return new FutureTask<>(() -> {
             db.snapshotTo(file);
@@ -175,13 +265,13 @@ class ProjectDatabaseTest {
         });
     }
 
-    private static void pauseWhenTempFileAppears(ProjectDatabase db, Path projects, CountDownLatch reached, CountDownLatch release) {
+    private static void pauseWhenTempFileAppears(ProjectDatabase db, Path workDir, CountDownLatch reached, CountDownLatch release) {
         AtomicBoolean paused = new AtomicBoolean();
         db.read(em -> {
             em.unwrap(Session.class).doWork(connection -> ProgressHandler.setHandler(connection, 1, new ProgressHandler() {
                 @Override
                 protected int progress() {
-                    if (!paused.get() && hasTempFile(projects)) {
+                    if (!paused.get() && hasTempFile(workDir)) {
                         paused.set(true);
                         reached.countDown();
                         awaitUninterruptibly(release);
@@ -193,8 +283,8 @@ class ProjectDatabaseTest {
         });
     }
 
-    private static boolean hasTempFile(Path projects) {
-        try (var files = Files.list(projects)) {
+    private static boolean hasTempFile(Path directory) {
+        try (var files = Files.list(directory)) {
             return files.anyMatch(p -> p.getFileName().toString().endsWith(".tmp"));
         } catch (IOException ex) {
             throw new IllegalStateException(ex);

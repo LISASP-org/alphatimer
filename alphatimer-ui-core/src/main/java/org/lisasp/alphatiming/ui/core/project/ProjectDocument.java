@@ -267,13 +267,10 @@ public final class ProjectDocument implements AutoCloseable {
     }
 
     private void snapshot(Path target) throws IOException {
-        long version = database.writeCount();
-        database.snapshotTo(target);
+        long savedWriteCount = database.snapshotTo(target);
         log.info("Saved project {}", target.getFileName());
         WorkFileOrigin.record(database.workFile(), target);
-        if (database.writeCount() == version) {
-            database.markClean();
-        }
+        database.markCleanIfUnchangedSince(savedWriteCount);
     }
 
     /** Waits for a running save. */
