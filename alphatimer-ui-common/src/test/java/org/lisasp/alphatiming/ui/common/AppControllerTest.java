@@ -8,6 +8,7 @@ import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.project.db.TimingDatabase;
+import org.lisasp.alphatiming.project.db.TimingFileWriter;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.ui.core.project.CrashLeftover;
@@ -772,7 +773,7 @@ class AppControllerTest {
 
         controller.newProject();
 
-        assertThat(TimingDatabase.previousVersionOf(file)).doesNotExist();
+        assertThat(TimingFileWriter.previousVersionOf(file)).doesNotExist();
         try (TimingDocument saved = TimingDocument.open(file, otherWork())) {
             assertThat(saved.settings().tcpHost()).isEqualTo(S.tcpHost());
         }
@@ -789,7 +790,7 @@ class AppControllerTest {
 
         controller.runAutoSave();
         assertThat(controller.document().isDirty()).isFalse();
-        assertThat(TimingDatabase.previousVersionOf(file)).exists();
+        assertThat(TimingFileWriter.previousVersionOf(file)).exists();
     }
 
     @Test
@@ -801,7 +802,7 @@ class AppControllerTest {
 
         assertThat(controller.saveAs()).isTrue();
 
-        assertThat(TimingDatabase.previousVersionOf(file)).doesNotExist();
+        assertThat(TimingFileWriter.previousVersionOf(file)).doesNotExist();
         assertThat(target).exists();
     }
 }

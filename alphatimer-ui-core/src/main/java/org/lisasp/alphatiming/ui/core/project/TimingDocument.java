@@ -6,6 +6,7 @@ import org.lisasp.alphatiming.project.db.LockFile;
 import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.project.db.SettingsEntity;
+import org.lisasp.alphatiming.project.db.TimingFileWriter;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
@@ -16,6 +17,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -26,6 +28,7 @@ public final class TimingDocument implements AutoCloseable {
     private volatile Path file;
     private volatile LockFile fileLock;
     private boolean closed;
+    private volatile TimingFileWriter fileWriter = new TimingFileWriter();
 
     private TimingDocument(TimingDatabase database, Path file, LockFile fileLock) {
         this.database = database;
@@ -260,6 +263,10 @@ public final class TimingDocument implements AutoCloseable {
         });
     }
 
+    void useFileWriter(TimingFileWriter writer) {
+        this.fileWriter = writer;
+    }
+
     private void checkOpen() {
         if (closed) {
             throw new IllegalStateException("The project is closed.");
@@ -267,7 +274,15 @@ public final class TimingDocument implements AutoCloseable {
     }
 
     private void snapshot(Path target) throws IOException {
-        long savedWriteCount = database.snapshotTo(target);
+        Path workFile = database.workFile();
+        Path snapshot = workFile.resolveSibling(workFile.getFileName() + "." + UUID.randomUUID() + ".tmp");
+        long savedWriteCount;
+        try {
+            savedWriteCount = database.snapshotTo(snapshot);
+            fileWriter.write(snapshot, target);
+        } catch (RuntimeException ex) {
+            throw new IOException("Could not save project file " + target, ex);
+        }
         log.info("Saved project {}", target.getFileName());
         WorkFileOrigin.record(database.workFile(), target);
         database.markCleanIfUnchangedSince(savedWriteCount);

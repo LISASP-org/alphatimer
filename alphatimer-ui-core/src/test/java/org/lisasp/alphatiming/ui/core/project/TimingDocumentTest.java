@@ -1,10 +1,12 @@
 package org.lisasp.alphatiming.ui.core.project;
 
+import org.hibernate.Session;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatiming.project.db.InvalidProjectFileException;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.project.db.TimingDatabase;
+import org.lisasp.alphatiming.project.db.TimingFileWriter;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.HeatService;
 import org.lisasp.alphatiming.heats.HeatStatus;
@@ -13,15 +15,18 @@ import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.heats.LaneStatus;
 import org.lisasp.alphatiming.project.db.MessageStore;
 import org.lisasp.alphatiming.project.db.RawDataRecorder;
+import org.lisasp.alphatiming.project.db.SettingsEntity;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 import org.lisasp.alphatiming.project.db.testdata.DataHandlingMessageTestData;
+import org.sqlite.ProgressHandler;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -33,6 +38,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -647,8 +657,8 @@ class TimingDocumentTest {
             saving.join();
 
             assertThat(failures).isEmpty();
-            assertThat(TimingDatabase.previousVersionOf(a)).doesNotExist();
-            assertThat(TimingDatabase.previousVersionOf(b)).exists();
+            assertThat(TimingFileWriter.previousVersionOf(a)).doesNotExist();
+            assertThat(TimingFileWriter.previousVersionOf(b)).exists();
             assertThat(WorkFileOrigin.read(doc.database().workFile())).map(WorkFileOrigin::projectFile).contains(b.toAbsolutePath());
         }
     }
@@ -661,7 +671,134 @@ class TimingDocumentTest {
         doc.close();
 
         assertThatThrownBy(doc::save).isInstanceOf(IllegalStateException.class);
-        assertThat(TimingDatabase.previousVersionOf(dir.resolve("x.timing"))).doesNotExist();
+        assertThat(TimingFileWriter.previousVersionOf(dir.resolve("x.timing"))).doesNotExist();
+    }
+
+    private static void saveWithSettings(TimingDocument doc, Path file, int count) throws IOException {
+        doc.database().write(em -> {
+            em.createQuery("delete from SettingsEntity").executeUpdate();
+            for (int i = 0; i < count; i++) {
+                em.persist(new SettingsEntity("h", 1, 60, 0));
+            }
+            return null;
+        });
+        doc.saveAs(file);
+    }
+
+    private static void addSettings(TimingDocument doc) {
+        doc.database().write(em -> {
+            em.persist(new SettingsEntity("h", 1, 60, 0));
+            return null;
+        });
+    }
+
+    private long settingsIn(Path file) throws IOException {
+        try (TimingDatabase db = TimingDatabase.openCopy(file, dir)) {
+            long count = db.read(em -> em.createQuery("select count(s) from SettingsEntity s", Long.class).getSingleResult());
+            db.closeAndDelete();
+            return count;
+        }
+    }
+
+    @Test
+    void aSaveStartedDuringAnotherSaveOfTheSameFileWaitsForIt() throws Exception {
+        Path projects = Files.createDirectory(dir.resolve("projects"));
+        Path file = projects.resolve("wk.timing");
+        Path previous = projects.resolve("wk-previous.timing");
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
+            saveWithSettings(doc, file, 1);
+            addSettings(doc);
+            CountDownLatch tempFileWritten = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            pauseWhenTempFileAppears(doc.database(), work(), tempFileWritten, release);
+
+            FutureTask<Void> first = saveTask(doc);
+            new Thread(first).start();
+            assertThat(tempFileWritten.await(20, TimeUnit.SECONDS)).isTrue();
+            FutureTask<Void> second = saveTask(doc);
+            Thread secondThread = new Thread(second);
+            secondThread.start();
+            await().atMost(20, TimeUnit.SECONDS).until(() -> secondThread.getState() == Thread.State.WAITING);
+            release.countDown();
+
+            first.get(20, TimeUnit.SECONDS);
+            second.get(20, TimeUnit.SECONDS);
+        }
+        try (var files = Files.list(projects)) {
+            assertThat(files.map(p -> p.getFileName().toString())).containsExactlyInAnyOrder("wk.timing", "wk-previous.timing");
+        }
+        assertThat(settingsIn(previous)).isEqualTo(2);
+        assertThat(settingsIn(file)).isEqualTo(2);
+    }
+
+    @Test
+    void aWriteDuringTheMoveOfASaveIsNotBlocked() throws Exception {
+        Path projects = Files.createDirectory(dir.resolve("projects"));
+        Path file = projects.resolve("wk.timing");
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
+            saveWithSettings(doc, file, 1);
+            addSettings(doc);
+            CountDownLatch moving = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            doc.useFileWriter(new TimingFileWriter((source, target) -> {
+                moving.countDown();
+                awaitQuietly(release);
+                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+            }));
+            var pool = Executors.newFixedThreadPool(2);
+            try {
+                Future<Void> save = pool.submit(() -> {
+                    doc.save();
+                    return null;
+                });
+                assertThat(moving.await(20, TimeUnit.SECONDS)).isTrue();
+
+                pool.submit(() -> addSettings(doc)).get(20, TimeUnit.SECONDS);
+                assertThat(save).isNotDone();
+                release.countDown();
+
+                save.get(20, TimeUnit.SECONDS);
+                assertThat(doc.isDirty()).isTrue();
+            } finally {
+                release.countDown();
+                pool.shutdown();
+            }
+        }
+        assertThat(settingsIn(file)).isEqualTo(2);
+        assertThat(settingsIn(projects.resolve("wk-previous.timing"))).isEqualTo(1);
+    }
+
+    private static FutureTask<Void> saveTask(TimingDocument doc) {
+        return new FutureTask<>(() -> {
+            doc.save();
+            return null;
+        });
+    }
+
+    private static void pauseWhenTempFileAppears(TimingDatabase db, Path workDir, CountDownLatch reached, CountDownLatch release) {
+        AtomicBoolean paused = new AtomicBoolean();
+        db.read(em -> {
+            em.unwrap(Session.class).doWork(connection -> ProgressHandler.setHandler(connection, 1, new ProgressHandler() {
+                @Override
+                protected int progress() {
+                    if (!paused.get() && hasTempFile(workDir)) {
+                        paused.set(true);
+                        reached.countDown();
+                        awaitQuietly(release);
+                    }
+                    return 0;
+                }
+            }));
+            return null;
+        });
+    }
+
+    private static boolean hasTempFile(Path directory) {
+        try (var files = Files.list(directory)) {
+            return files.anyMatch(p -> p.getFileName().toString().endsWith(".tmp"));
+        } catch (IOException ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 
     static void awaitParkedOrTerminated(Thread thread) {

@@ -2,7 +2,7 @@ package org.lisasp.alphatiming.ui.core.project;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.lisasp.alphatiming.project.db.TimingDatabase;
+import org.lisasp.alphatiming.project.db.TimingFileWriter;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
 import java.nio.file.Files;
@@ -142,6 +142,6 @@ class AutoSaverTest {
             saver.runOnce();
         }
         assertThat(errors).isEmpty();
-        assertThat(TimingDatabase.previousVersionOf(target)).doesNotExist();
+        assertThat(TimingFileWriter.previousVersionOf(target)).doesNotExist();
     }
 }

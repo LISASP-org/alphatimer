@@ -1,27 +1,18 @@
 package org.lisasp.alphatiming.project.db;
 
-import org.hibernate.Session;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.ProgressHandler;
 
-import java.io.IOException;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.awaitility.Awaitility.await;
 
 class TimingDatabaseTest {
 
@@ -56,7 +47,9 @@ class TimingDatabaseTest {
                 return null;
             });
             assertThat(db.isDirty()).isTrue();
-            db.markCleanIfUnchangedSince(db.snapshotTo(file));
+            long saved = db.snapshotTo(file);
+            assertThat(saved).isEqualTo(db.writeCount());
+            db.markCleanIfUnchangedSince(saved);
             assertThat(db.isDirty()).isFalse();
             db.closeAndDelete();
         }
@@ -64,250 +57,6 @@ class TimingDatabaseTest {
             assertThat(countSettings(db)).isEqualTo(1);
             assertThat(db.isDirty()).isFalse();
             db.closeAndDelete();
-        }
-    }
-
-    @Test
-    void snapshotReplacesExistingFileAtomicallyAndLeavesNoTempFile() throws Exception {
-        Path file = dir.resolve("a.heat");
-        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
-            db.snapshotTo(file);
-            db.write(em -> {
-                em.persist(new SettingsEntity("h", 1, 60, 0));
-                return null;
-            });
-            db.snapshotTo(file);
-            db.closeAndDelete();
-        }
-        try (var files = Files.list(dir)) {
-            assertThat(files.map(p -> p.getFileName().toString())).containsExactlyInAnyOrder("a.heat", "a-previous.heat");
-        }
-    }
-
-    private void saveWithSettings(TimingDatabase db, Path file, int count) throws IOException {
-        db.write(em -> {
-            em.createQuery("delete from SettingsEntity").executeUpdate();
-            for (int i = 0; i < count; i++) {
-                em.persist(new SettingsEntity("h", 1, 60, 0));
-            }
-            return null;
-        });
-        db.snapshotTo(file);
-    }
-
-    private long settingsIn(Path file) throws IOException {
-        try (TimingDatabase db = TimingDatabase.openCopy(file, dir)) {
-            long count = countSettings(db);
-            db.closeAndDelete();
-            return count;
-        }
-    }
-
-    @Test
-    void savingAgainKeepsThePreviousStateNextToTheFile() throws Exception {
-        Path projects = Files.createDirectory(dir.resolve("projects"));
-        Path file = projects.resolve("wk.timing");
-        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
-            saveWithSettings(db, file, 1);
-            saveWithSettings(db, file, 2);
-            db.closeAndDelete();
-        }
-        Path previous = projects.resolve("wk-previous.timing");
-        assertThat(previous).exists();
-        assertThat(settingsIn(previous)).isEqualTo(1);
-        assertThat(settingsIn(file)).isEqualTo(2);
-    }
-
-    @Test
-    void aFurtherSaveReplacesThePreviousFile() throws Exception {
-        Path projects = Files.createDirectory(dir.resolve("projects"));
-        Path file = projects.resolve("wk.timing");
-        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
-            saveWithSettings(db, file, 1);
-            saveWithSettings(db, file, 2);
-            saveWithSettings(db, file, 3);
-            db.closeAndDelete();
-        }
-        Path previous = projects.resolve("wk-previous.timing");
-        assertThat(previous).exists();
-        assertThat(settingsIn(previous)).isEqualTo(2);
-        assertThat(settingsIn(file)).isEqualTo(3);
-    }
-
-    @Test
-    void aSaveStartedDuringAnotherSaveOfTheSameFileWaitsForIt() throws Exception {
-        Path projects = Files.createDirectory(dir.resolve("projects"));
-        Path file = projects.resolve("wk.timing");
-        Path previous = projects.resolve("wk-previous.timing");
-        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
-            saveWithSettings(db, file, 1);
-            db.write(em -> {
-                em.persist(new SettingsEntity("h", 1, 60, 0));
-                return null;
-            });
-            CountDownLatch tempFileWritten = new CountDownLatch(1);
-            CountDownLatch release = new CountDownLatch(1);
-            pauseWhenTempFileAppears(db, dir, tempFileWritten, release);
-
-            FutureTask<Void> first = snapshotTask(db, file);
-            new Thread(first).start();
-            assertThat(tempFileWritten.await(20, TimeUnit.SECONDS)).isTrue();
-            FutureTask<Void> second = snapshotTask(db, file);
-            Thread secondThread = new Thread(second);
-            secondThread.start();
-            await().atMost(20, TimeUnit.SECONDS).until(() -> secondThread.getState() == Thread.State.WAITING);
-            release.countDown();
-
-            first.get(20, TimeUnit.SECONDS);
-            second.get(20, TimeUnit.SECONDS);
-            db.closeAndDelete();
-        }
-        try (var files = Files.list(projects)) {
-            assertThat(files.map(p -> p.getFileName().toString())).containsExactlyInAnyOrder("wk.timing", "wk-previous.timing");
-        }
-        assertThat(settingsIn(previous)).isEqualTo(2);
-        assertThat(settingsIn(file)).isEqualTo(2);
-    }
-
-    @Test
-    void aWriteDuringTheMoveOfASaveIsNotBlocked() throws Exception {
-        Path projects = Files.createDirectory(dir.resolve("projects"));
-        Path file = projects.resolve("wk.timing");
-        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
-            saveWithSettings(db, file, 1);
-            db.write(em -> {
-                em.persist(new SettingsEntity("h", 1, 60, 0));
-                return null;
-            });
-            long countAtSave = db.writeCount();
-            CountDownLatch moving = new CountDownLatch(1);
-            CountDownLatch release = new CountDownLatch(1);
-            db.useMover((source, target) -> {
-                moving.countDown();
-                awaitUninterruptibly(release);
-                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
-            });
-            var pool = Executors.newFixedThreadPool(2);
-            try {
-                Future<Long> save = pool.submit(() -> db.snapshotTo(file));
-                assertThat(moving.await(20, TimeUnit.SECONDS)).isTrue();
-
-                pool.submit(() -> db.write(em -> {
-                    em.persist(new SettingsEntity("h", 1, 60, 0));
-                    return null;
-                })).get(20, TimeUnit.SECONDS);
-                assertThat(save).isNotDone();
-                release.countDown();
-
-                long saved = save.get(20, TimeUnit.SECONDS);
-                assertThat(saved).isEqualTo(countAtSave);
-                db.markCleanIfUnchangedSince(saved);
-                assertThat(db.isDirty()).isTrue();
-            } finally {
-                release.countDown();
-                pool.shutdown();
-            }
-            db.closeAndDelete();
-        }
-        assertThat(settingsIn(file)).isEqualTo(2);
-        assertThat(settingsIn(projects.resolve("wk-previous.timing"))).isEqualTo(1);
-    }
-
-    @Test
-    void aSaveToAnotherFileSystemCopiesTheFileAndLeavesNoTempFiles() throws Exception {
-        Path projects = Files.createDirectory(dir.resolve("projects"));
-        Path file = projects.resolve("wk.timing");
-        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
-            db.useMover((source, target) -> {
-                throw new AtomicMoveNotSupportedException(source.toString(), target.toString(), "other file system");
-            });
-            saveWithSettings(db, file, 1);
-            saveWithSettings(db, file, 2);
-            db.closeAndDelete();
-        }
-        assertThat(settingsIn(file)).isEqualTo(2);
-        assertThat(settingsIn(projects.resolve("wk-previous.timing"))).isEqualTo(1);
-        assertThat(tempFilesIn(dir)).isEmpty();
-        try (var files = Files.list(projects)) {
-            assertThat(files.map(p -> p.getFileName().toString())).containsExactlyInAnyOrder("wk.timing", "wk-previous.timing");
-        }
-    }
-
-    @Test
-    void aSaveFailingToMoveTheFileKeepsTheOldFileAndLeavesNoTempFiles() throws Exception {
-        Path projects = Files.createDirectory(dir.resolve("projects"));
-        Path file = projects.resolve("wk.timing");
-        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
-            saveWithSettings(db, file, 1);
-            db.useMover((source, target) -> {
-                throw new IOException("disk full");
-            });
-            assertThatThrownBy(() -> saveWithSettings(db, file, 2)).isInstanceOf(IOException.class).hasMessage("disk full");
-            db.closeAndDelete();
-        }
-        assertThat(settingsIn(file)).isEqualTo(1);
-        assertThat(tempFilesIn(dir)).isEmpty();
-        try (var files = Files.list(projects)) {
-            assertThat(files.map(p -> p.getFileName().toString())).containsExactly("wk.timing");
-        }
-    }
-
-    private static List<Path> tempFilesIn(Path directory) throws IOException {
-        try (var files = Files.list(directory)) {
-            return files.filter(p -> p.getFileName().toString().endsWith(".tmp")).toList();
-        }
-    }
-
-    private static FutureTask<Void> snapshotTask(TimingDatabase db, Path file) {
-        return new FutureTask<>(() -> {
-            db.snapshotTo(file);
-            return null;
-        });
-    }
-
-    private static void pauseWhenTempFileAppears(TimingDatabase db, Path workDir, CountDownLatch reached, CountDownLatch release) {
-        AtomicBoolean paused = new AtomicBoolean();
-        db.read(em -> {
-            em.unwrap(Session.class).doWork(connection -> ProgressHandler.setHandler(connection, 1, new ProgressHandler() {
-                @Override
-                protected int progress() {
-                    if (!paused.get() && hasTempFile(workDir)) {
-                        paused.set(true);
-                        reached.countDown();
-                        awaitUninterruptibly(release);
-                    }
-                    return 0;
-                }
-            }));
-            return null;
-        });
-    }
-
-    private static boolean hasTempFile(Path directory) {
-        try (var files = Files.list(directory)) {
-            return files.anyMatch(p -> p.getFileName().toString().endsWith(".tmp"));
-        } catch (IOException ex) {
-            throw new IllegalStateException(ex);
-        }
-    }
-
-    private static void awaitUninterruptibly(CountDownLatch latch) {
-        try {
-            latch.await();
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    @Test
-    void theFirstSaveCreatesNoPreviousFile() throws Exception {
-        Path projects = Files.createDirectory(dir.resolve("projects"));
-        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
-            saveWithSettings(db, projects.resolve("wk.timing"), 1);
-            db.closeAndDelete();
-        }
-        try (var files = Files.list(projects)) {
-            assertThat(files.map(p -> p.getFileName().toString())).containsExactly("wk.timing");
         }
     }
 

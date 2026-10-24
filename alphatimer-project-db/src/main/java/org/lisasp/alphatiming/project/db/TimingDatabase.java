@@ -9,13 +9,10 @@ import org.hibernate.cfg.Configuration;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
@@ -29,7 +26,7 @@ import java.util.function.Function;
 
 /**
  * All access is serialized by one lock because SQLite allows a single writer and there is a single connection. Saves are
- * additionally serialized by a save lock, taken before the database lock, because they share the temp and -previous files.
+ * additionally serialized by a save lock ({@link #runWithSaveLock}), taken before the database lock.
  */
 @Slf4j
 public final class TimingDatabase implements AutoCloseable {
@@ -50,7 +47,6 @@ public final class TimingDatabase implements AutoCloseable {
     private final SessionFactory factory;
 
     private LockFile workLock;
-    private volatile FileMover mover = (source, target) -> Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
 
     private TimingDatabase(Path workFile, boolean isNew) throws IOException {
         this.workFile = workFile;
@@ -203,18 +199,31 @@ public final class TimingDatabase implements AutoCloseable {
     }
 
     /**
-     * Writes a consistent copy of the database to target (via temp files and an atomic rename); an existing target becomes
-     * {@link #previousVersionOf(Path)}. Concurrent calls run one after another. Only the copy of the database blocks
-     * {@link #write}; moving it to the target does not. Does not clear the dirty flag.
+     * Writes a consistent copy of the database into the new file snapshot, flushed to disk; only the copy blocks
+     * {@link #write}. On failure the snapshot file is removed.
      *
-     * @return the {@link #writeCount()} of the saved state
+     * @return the {@link #writeCount()} of the copied state
      */
-    public long snapshotTo(Path target) throws IOException {
-        saveLock.lock();
-        try {
-            return snapshotUnderSaveLock(target);
+    public long snapshotTo(Path snapshot) throws IOException {
+        lock.lock();
+        try (Session session = factory.openSession()) {
+            session.doWork(connection -> {
+                boolean auto = connection.getAutoCommit();
+                connection.setAutoCommit(true); // VACUUM cannot run inside a transaction
+                try (Statement st = connection.createStatement()) {
+                    st.execute("VACUUM INTO '" + snapshot.toAbsolutePath().toString().replace("'", "''") + "'");
+                } finally {
+                    connection.setAutoCommit(auto);
+                }
+            });
+            // VACUUM INTO does not sync its output; without this a power loss can leave a half-written project file.
+            FileSync.force(snapshot);
+            return writeCount.get();
+        } catch (IOException | RuntimeException ex) {
+            FileSync.deleteTempFile(snapshot);
+            throw ex;
         } finally {
-            saveLock.unlock();
+            lock.unlock();
         }
     }
 
@@ -242,98 +251,6 @@ public final class TimingDatabase implements AutoCloseable {
             }
         } finally {
             lock.unlock();
-        }
-    }
-
-    private long snapshotUnderSaveLock(Path target) throws IOException {
-        Path localTmp = workFile.resolveSibling(workFile.getFileName() + "." + UUID.randomUUID() + ".tmp");
-        Path targetTmp = target.resolveSibling(target.getFileName() + ".tmp");
-        try {
-            long savedWriteCount = copyTo(localTmp);
-            Files.deleteIfExists(targetTmp);
-            moveToTargetFolder(localTmp, targetTmp);
-            if (Files.exists(target)) {
-                Path previous = previousVersionOf(target);
-                Files.deleteIfExists(previous);
-                Files.move(target, previous, StandardCopyOption.ATOMIC_MOVE);
-            }
-            Files.move(targetTmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            forceDirectory(target.toAbsolutePath().getParent());
-            return savedWriteCount;
-        } catch (IOException | RuntimeException ex) {
-            deleteTempFile(localTmp);
-            deleteTempFile(targetTmp);
-            throw ex instanceof IOException io ? io : new IOException("Could not save project file " + target, ex);
-        }
-    }
-
-    private long copyTo(Path tmp) throws IOException {
-        lock.lock();
-        try (Session session = factory.openSession()) {
-            session.doWork(connection -> {
-                boolean auto = connection.getAutoCommit();
-                connection.setAutoCommit(true); // VACUUM cannot run inside a transaction
-                try (Statement st = connection.createStatement()) {
-                    st.execute("VACUUM INTO '" + tmp.toAbsolutePath().toString().replace("'", "''") + "'");
-                } finally {
-                    connection.setAutoCommit(auto);
-                }
-            });
-            // VACUUM INTO does not sync its output; without this a power loss can leave a half-written project file.
-            force(tmp);
-            return writeCount.get();
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    private void moveToTargetFolder(Path localTmp, Path targetTmp) throws IOException {
-        try {
-            mover.moveAtomically(localTmp, targetTmp);
-        } catch (AtomicMoveNotSupportedException ex) {
-            Files.copy(localTmp, targetTmp);
-            force(targetTmp);
-            deleteTempFile(localTmp);
-        }
-    }
-
-    private static void deleteTempFile(Path tmp) {
-        try {
-            Files.deleteIfExists(tmp);
-        } catch (IOException ex) {
-            log.warn("Could not delete temporary file {}", tmp, ex);
-        }
-    }
-
-    @FunctionalInterface
-    interface FileMover {
-        void moveAtomically(Path source, Path target) throws IOException;
-    }
-
-    void useMover(FileMover mover) {
-        this.mover = mover;
-    }
-
-    /** The file that keeps the state before the last save: {@code wk.timing} → {@code wk-previous.timing}. */
-    public static Path previousVersionOf(Path file) {
-        String name = file.getFileName().toString();
-        int dot = name.lastIndexOf('.');
-        String previous = dot > 0 ? name.substring(0, dot) + "-previous" + name.substring(dot) : name + "-previous";
-        return file.resolveSibling(previous);
-    }
-
-    private static void force(Path file) throws IOException {
-        try (FileChannel channel = FileChannel.open(file, StandardOpenOption.WRITE)) {
-            channel.force(true);
-        }
-    }
-
-    private static void forceDirectory(Path directory) {
-        try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ)) {
-            channel.force(true);
-        } catch (IOException ex) {
-            // Windows cannot open a directory as a channel; there the renames are not synced separately.
-            log.debug("Could not sync directory {}", directory, ex);
         }
     }
 
