@@ -24,6 +24,7 @@
         <module>alphatimer-ui-common</module>
         <module>alphatimer-ui</module>
         <module>alphatimer-cli</module>
+        <module>alphatimer-tui</module>
     </modules>
 
     <properties>

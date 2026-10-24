@@ -1,0 +1,18 @@
+<configuration>
+
+  <timestamp key="bySecond" datePattern="yyyy-MM-dd-HH-mm-ss"/>
+
+  <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+    <file>${user.home}/.alphatiming/logs/alphatiming-tui-${bySecond}.log</file>
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <logger name="org.hibernate" level="INFO"/>
+  <logger name="com.zaxxer" level="INFO"/>
+
+  <root level="DEBUG">
+    <appender-ref ref="FILE" />
+  </root>
+</configuration>
