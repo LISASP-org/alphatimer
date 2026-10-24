@@ -61,7 +61,9 @@ that solve problems this application does not have:
   (Save As), records the work file's origin note and closes under the same save lock, so a running save finishes before
   the database closes. Its dirty flag is set by a write listener of `TimingDatabase`, which runs under the database lock.
 - `AppController` pauses the `AutoSaver` while it asks the user about the document (stop recording, Save / Discard /
-  Cancel, Save As path, recovery) and until a discarded document is closed; `pause()` waits for a running auto-save.
+  Cancel, Save As path, recovery) and until a discarded document is closed; `pause()` waits for a running auto-save. If
+  New or Open fails after Discard, it replaces the discarded document with the saved state of its file (a new project
+  without a file; closes it if that fails too) before auto-save resumes.
 - An exception inside the recording pipeline must never reach the reader thread (`RecordingSession.safe`); a failing
   listener must not affect the others.
 - Replacing the document (New, Open, the crash recovery at program start) builds a Hibernate session factory and takes

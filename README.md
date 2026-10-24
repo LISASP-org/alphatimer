@@ -86,7 +86,8 @@ ARES messages and the heats. While a project is open, the app works on a tempora
   it like any project to go back one save.
 - Closing (or New/Open) during a recording first asks whether to stop it; Cancel keeps the recording running and the
   project open. Then Save / Discard / Cancel is asked when there are unsaved changes (Cancel keeps the project open, the
-  recording stays stopped).
+  recording stays stopped). If New or Open fails after Discard, the project goes back to its saved state (a project
+  without a file becomes a new one), so the discarded changes never reach the file.
 - A failed auto-save or data a recording could not store (raw data, messages, heats, lane times; e.g. a full disk) shows
   a red warning in the status bar; with several, the most important one and the number of the others. Its tooltip (in the
   text UI: the message log on *Settings & Recording*) names what failed and why. An auto-save warning disappears with the

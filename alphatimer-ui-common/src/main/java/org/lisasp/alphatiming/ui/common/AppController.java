@@ -97,13 +97,15 @@ public final class AppController implements AutoCloseable {
 
     public void newProject() {
         withoutAutoSave(() -> {
-            if (!prepareToLeaveDocument()) {
+            Leaving leaving = prepareToLeaveDocument();
+            if (leaving == Leaving.CANCELLED) {
                 return;
             }
             try {
                 replaceDocument(TimingDocument.create(workDir, defaults.load()));
             } catch (IOException ex) {
                 prompt.showError(I18n.get("error.new.title"), describe(ex));
+                revertIfDiscarded(leaving);
             }
         });
     }
@@ -113,7 +115,8 @@ public final class AppController implements AutoCloseable {
     }
 
     private void openAfterQuestions(Path file) {
-        if (!prepareToLeaveDocument()) {
+        Leaving leaving = prepareToLeaveDocument();
+        if (leaving == Leaving.CANCELLED) {
             return;
         }
         TimingDocument current = document;
@@ -121,12 +124,30 @@ public final class AppController implements AutoCloseable {
             TimingDocument opened = current != null && current.isSavedAs(file) ? current.reopen(workDir) : TimingDocument.open(file, workDir);
             defaults.save(opened.settings());
             replaceDocument(opened);
+            return;
         } catch (ProjectFileInUseException ex) {
             prompt.showError(I18n.get("error.open.title"), I18n.get("error.open.inUse", file));
         } catch (InvalidProjectFileException ex) {
             prompt.showError(I18n.get("error.open.title"), I18n.get("error.open.invalid", file));
         } catch (IOException | RuntimeException ex) {
             prompt.showError(I18n.get("error.open.title"), I18n.get("error.open.message", file, describe(ex)));
+        }
+        revertIfDiscarded(leaving);
+    }
+
+    /** Without this, the next auto-save or Save would write the changes the user chose to discard. */
+    private void revertIfDiscarded(Leaving leaving) {
+        TimingDocument discarded = document;
+        if (leaving != Leaving.CHANGES_DISCARDED || discarded == null) {
+            return;
+        }
+        try {
+            replaceDocument(discarded.file().isPresent() ? discarded.reopen(workDir) : TimingDocument.create(workDir, defaults.load()));
+        } catch (IOException | RuntimeException ex) {
+            log.warn("Could not load the saved state after discarding changes", ex);
+            prompt.showError(I18n.get("error.revert.title"), I18n.get("error.revert.message", describe(ex)));
+            closeDocument();
+            fireChange();
         }
     }
 
@@ -179,17 +200,21 @@ public final class AppController implements AutoCloseable {
     /** Asks to stop a running recording, then about unsaved data, and closes the document. True when the program may exit. */
     public boolean requestClose() {
         return withoutAutoSave(() -> {
-            if (!prepareToLeaveDocument()) {
+            if (prepareToLeaveDocument() == Leaving.CANCELLED) {
                 return false;
             }
-            TimingDocument doc = document;
-            document = null;
-            session = null;
-            if (doc != null) {
-                doc.close();
-            }
+            closeDocument();
             return true;
         });
+    }
+
+    private void closeDocument() {
+        TimingDocument doc = document;
+        document = null;
+        session = null;
+        if (doc != null) {
+            doc.close();
+        }
     }
 
     public void startRecording() {
@@ -321,21 +346,23 @@ public final class AppController implements AutoCloseable {
         });
     }
 
-    private boolean prepareToLeaveDocument() {
+    private enum Leaving { CANCELLED, NOTHING_UNSAVED, CHANGES_DISCARDED }
+
+    private Leaving prepareToLeaveDocument() {
         if (isRecording()) {
             if (!prompt.askStopRecording()) {
-                return false;
+                return Leaving.CANCELLED;
             }
             stopRecording();
         }
         TimingDocument doc = document;
         if (doc == null || !doc.isDirty()) {
-            return true;
+            return Leaving.NOTHING_UNSAVED;
         }
         return switch (prompt.askSaveChanges()) {
-            case SAVE -> save();
-            case DISCARD -> true;
-            case CANCEL -> false;
+            case SAVE -> save() ? Leaving.NOTHING_UNSAVED : Leaving.CANCELLED;
+            case DISCARD -> Leaving.CHANGES_DISCARDED;
+            case CANCEL -> Leaving.CANCELLED;
         };
     }
 

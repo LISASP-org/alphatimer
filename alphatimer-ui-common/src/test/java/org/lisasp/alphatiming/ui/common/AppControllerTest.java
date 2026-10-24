@@ -805,4 +805,71 @@ class AppControllerTest {
         assertThat(TimingFileWriter.previousVersionOf(file)).doesNotExist();
         assertThat(target).exists();
     }
+
+    @Test
+    void discardedChangesAreNotAutoSavedWhenOpeningACorruptFileFails() throws Exception {
+        Path file = openChangedProject("x.timing");
+        Path bad = Files.writeString(dir.resolve("bad.timing"), "garbage");
+        prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+        controller.open(bad);
+        controller.runAutoSave();
+
+        assertThat(TimingFileWriter.previousVersionOf(file)).doesNotExist();
+        assertThat(prompt.errors).containsExactly(I18n.get("error.open.title") + ": " + I18n.get("error.open.invalid", bad));
+        assertThat(controller.document().file()).contains(file);
+        assertThat(controller.document().settings()).isEqualTo(S);
+        assertThat(controller.document().isDirty()).isFalse();
+        assertThat(workFiles()).isEqualTo(1);
+    }
+
+    @Test
+    void discardedChangesAreNotAutoSavedWhenTheFileToOpenIsInUseAndTheOwnFileStaysLocked() throws Exception {
+        Path held = savedProject("held.timing");
+        try (TimingDocument holder = TimingDocument.open(held, otherWork())) {
+            Path file = openChangedProject("x.timing");
+            prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+            controller.open(held);
+            controller.runAutoSave();
+
+            assertThat(TimingFileWriter.previousVersionOf(file)).doesNotExist();
+            assertThat(prompt.errors).containsExactly(I18n.get("error.open.title") + ": " + I18n.get("error.open.inUse", held));
+            assertThat(controller.document().settings()).isEqualTo(S);
+            assertThat(controller.document().isDirty()).isFalse();
+            assertThatThrownBy(() -> TimingDocument.open(file, otherWork())).isInstanceOf(ProjectFileInUseException.class);
+        }
+    }
+
+    @Test
+    void discardedChangesOfAnUnsavedProjectAreGoneWhenTheOpenFails() throws Exception {
+        controller.init();
+        controller.applySettings(S);
+        Path bad = Files.writeString(dir.resolve("bad.timing"), "garbage");
+        prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+        controller.open(bad);
+
+        assertThat(controller.document().settings()).isEqualTo(defaults.load());
+        assertThat(controller.document().isDirty()).isFalse();
+        assertThat(controller.document().file()).isEmpty();
+        assertThat(workFiles()).isEqualTo(1);
+    }
+
+    @Test
+    void discardedChangesAreClosedWhenNeitherTheNewProjectNorTheSavedStateCanBeLoaded() throws Exception {
+        Path file = openChangedProject("x.timing");
+        Files.move(work, dir.resolve("work-moved"));
+        Files.writeString(work, "not a folder");
+        prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+        controller.newProject();
+        controller.runAutoSave();
+
+        assertThat(controller.document()).isNull();
+        assertThat(TimingFileWriter.previousVersionOf(file)).doesNotExist();
+        assertThat(prompt.errors).hasSize(2).first().asString().startsWith(I18n.get("error.new.title") + ": ");
+        assertThat(prompt.errors.get(1)).startsWith(I18n.get("error.revert.title") + ": ");
+        assertThat(dir.resolve("x.timing.lock")).doesNotExist();
+    }
 }
