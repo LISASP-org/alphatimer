@@ -19,6 +19,7 @@
         <module>alphatimer-serial-core</module>
         <module>alphatimer-heats</module>
         <module>alphatimer-legacy-server</module>
+        <module>alphatimer-project-db</module>
     </modules>
 
     <properties>
