@@ -292,7 +292,13 @@ public final class RecordingSession implements AutoCloseable {
     private void setState(RecordingState newState, RecordingError failure) {
         error = failure;
         state = newState;
-        stateListeners.forEach(l -> l.accept(newState));
+        for (Consumer<RecordingState> listener : stateListeners) {
+            try {
+                listener.accept(newState);
+            } catch (RuntimeException ex) {
+                log.warn("State listener failed", ex);
+            }
+        }
     }
 
     public RecordingState state() {

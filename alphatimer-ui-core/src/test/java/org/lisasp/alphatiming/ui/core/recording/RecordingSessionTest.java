@@ -356,6 +356,20 @@ class RecordingSessionTest {
     }
 
     @Test
+    void aFailingStateListenerDoesNotKeepTheOthersFromHearingTheChange() {
+        List<RecordingState> heard = new CopyOnWriteArrayList<>();
+        session.addStateListener(state -> {
+            throw new IllegalStateException("listener bug");
+        });
+        session.addStateListener(heard::add);
+
+        session.start(settings(0));
+        session.stop();
+
+        assertThat(heard).containsExactly(RecordingState.RUNNING, RecordingState.STOPPED);
+    }
+
+    @Test
     void aDisabledServerDoesNotOpenItsPort() throws Exception {
         try (ServerSocket blocker = new ServerSocket(0)) {
             session.start(new Settings("localhost", 8585, 60, 1).withCompetitionKey("WK").withRest(blocker.getLocalPort(), false));
