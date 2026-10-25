@@ -37,6 +37,7 @@ that solve problems this application does not have:
 | `alphatimer-ui` | Swing UI on the JUtils `JButtonBar` in the layout of the JAuswertung plugin window (`JAlphaTiming.createBody`: `SelectorScrollPane` with the bar left, 4 dlu gap, the panel right with a labeled border of its name, 5 px space around; window sized like `JPFrame`), `SwingSavePrompt`, `AlphaTimingLauncher`. Panels: "Settings & Recording" and "Live View" (lane rows built from `LaneRows`, no `JTable`). Builds `alphatiming.jar` with its dependencies in `target/lib/`. The program icon and the icon of `.timing` files are rendered from the SVGs in `alphatimer-ui/src/icons` (`yarn build`, as in JAuswertung's `jauswertung-files/src/icons`) into `icons/app/`: PNGs for the window, `.ico` files for the JAuswertung installer that bundles AlphaTiming. |
 | `alphatimer-tui` | Text UI on Lanterna with the structure of the GUI (`TuiMainWindow`: menu bar, panel buttons left, status line; `TuiSettingsPanel`, `TuiLiveViewPanel`, `TuiSavePrompt` with text dialogs). All logic comes from `alphatimer-ui-common`; listeners go through `gui.getGUIThread().invokeLater`. Shortcuts are function keys (F2 save, F5/F6 panels, F10 exit), Ctrl+N/O, and Ctrl+C asks like Exit — never Ctrl+S/Ctrl+Q, which terminals use for flow control; they are handled before the focused component, and the settings form commits the text being typed before a document action. Logs to the file only. Builds `alphatiming-tui.jar` with `target/lib/`. |
 | `alphatimer-cli` | Command line recording into an existing project file (`RecordLauncher`, `RecordCommand`): opens it through `AppController` with the non-interactive `CliSavePrompt` (stops and saves without asking), records with its stored settings until `TerminalStopTrigger` (JLine raw mode: any key, Ctrl+C) or SIGTERM fires or the serial connection is lost, saves. Prints `MessageText` lines and finished heats (`FinishedHeats`). Exit codes in `ExitCode` (a lost connection has its own; recorded data still missing after the final save, `AppController.recordedDataMissing`, has its own and wins over it). Logs to the file only. Builds `alphatiming-cli.jar` with `target/lib/`. |
+| `alphatimer-distribution` | The `files` zip (`alphatimer-distribution-<version>-files.zip`) that the JAuswertung installer bundles: `alphatiming.jar`, `alphatiming-tui.jar`, `alphatiming-cli.jar`, their shared `lib/` and the program and file icons in `icons/`. The platform jars of JavaFX are left out; the installer adds those of each platform to `lib/`. |
 
 ### Dependency Rules
 
@@ -214,6 +215,9 @@ untrusted input:
   `org.lisasp.alphatiming.cli.RecordLauncher`.
 - `alphatiming.jar` references its dependencies in `lib/` through the manifest class path (no fat jar); keep `lib/`
   next to the jar when copying it.
+- JAuswertung's installer (`../JAuswertung-Project/jauswertung-setup`) unpacks the zip of `alphatimer-distribution` into
+  its own `alphatiming/` folder with its own class path, so AlphaTiming's libraries never mix with JAuswertung's. Install
+  this project (`mvn clean install`) before building the installer.
 - Captured event data (`data/*.dat`, ignored by Git) contains personal data: never commit it or paste its content.
   Use it only locally, e.g. replayed through a fake TCP server; tests use the sample bytes in
   `alphatimer-project-db/src/test/java/org/lisasp/alphatiming/project/db/testdata/`.

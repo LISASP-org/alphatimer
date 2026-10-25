@@ -1,0 +1,43 @@
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 https://maven.apache.org/xsd/assembly-2.2.0.xsd">
+    <id>files</id>
+    <formats>
+        <format>zip</format>
+    </formats>
+    <includeBaseDirectory>false</includeBaseDirectory>
+    <dependencySets>
+        <dependencySet>
+            <includes><include>org.lisasp.alphatiming:alphatimer-ui</include></includes>
+            <outputFileNameMapping>alphatiming.jar</outputFileNameMapping>
+            <useTransitiveDependencies>false</useTransitiveDependencies>
+        </dependencySet>
+        <dependencySet>
+            <includes><include>org.lisasp.alphatiming:alphatimer-tui</include></includes>
+            <outputFileNameMapping>alphatiming-tui.jar</outputFileNameMapping>
+            <useTransitiveDependencies>false</useTransitiveDependencies>
+        </dependencySet>
+        <dependencySet>
+            <includes><include>org.lisasp.alphatiming:alphatimer-cli</include></includes>
+            <outputFileNameMapping>alphatiming-cli.jar</outputFileNameMapping>
+            <useTransitiveDependencies>false</useTransitiveDependencies>
+        </dependencySet>
+        <dependencySet>
+            <outputDirectory>lib</outputDirectory>
+            <scope>runtime</scope>
+            <excludes>
+                <exclude>org.lisasp.alphatiming:alphatimer-ui</exclude>
+                <exclude>org.lisasp.alphatiming:alphatimer-tui</exclude>
+                <exclude>org.lisasp.alphatiming:alphatimer-cli</exclude>
+                <exclude>org.openjfx:*:jar:linux</exclude>
+                <exclude>org.openjfx:*:jar:win</exclude>
+                <exclude>org.openjfx:*:jar:mac</exclude>
+            </excludes>
+        </dependencySet>
+    </dependencySets>
+    <fileSets>
+        <fileSet>
+            <directory>../alphatimer-ui/src/main/resources/org/lisasp/alphatiming/ui/icons/app</directory>
+            <outputDirectory>icons</outputDirectory>
+        </fileSet>
+    </fileSets>
+</assembly>
