@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -56,6 +57,28 @@ class TimingDatabaseTest {
             List<Object> foreignKeys = db.read(em -> em.createNativeQuery(
                     "select \"table\" || '|' || \"from\" || '|' || \"to\" from pragma_foreign_key_list('lane')").getResultList());
             assertThat(foreignKeys).containsExactly("heat|heat_id|id");
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void aWorkFileBeingCopiedIsNotOfferedAsACrashLeftover() throws Exception {
+        Path file = dir.resolve("a.timing");
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            db.snapshotTo(file);
+            db.closeAndDelete();
+        }
+        Path work = dir.resolve("work");
+        List<CrashLeftover> seenWhileCopying = new ArrayList<>();
+        TimingDatabase.FileCopy copyAndLookForLeftovers = (from, to) -> {
+            byte[] content = Files.readAllBytes(from);
+            Files.write(to, Arrays.copyOf(content, content.length / 2));
+            seenWhileCopying.addAll(TimingWorkFolder.findLeftovers(work));
+            Files.write(to, content);
+        };
+
+        try (TimingDatabase db = TimingDatabase.openCopy(file, work, copyAndLookForLeftovers)) {
+            assertThat(seenWhileCopying).isEmpty();
             db.closeAndDelete();
         }
     }

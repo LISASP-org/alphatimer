@@ -87,7 +87,8 @@ that solve problems this application does not have:
   `ifUnchangedSince` checks it under the database lock).
   A failed save keeps the old file (at worst as `-previous`) and the dirty flag and removes its temp files.
   Open copies the file to `~/.alphatiming/work/` and rejects files that are not AlphaTiming projects.
-- Work files are protected by an OS lock (`.lock` next to them); only unlocked ones are offered for crash recovery. The
+- Work files are protected by an OS lock (`.lock` next to them); only unlocked ones are offered for crash recovery, so
+  Open locks the new work file before it copies the project file into it. The
   same scan deletes the snapshot temp files of a save that crashed (`<work file>.<uuid>.tmp` whose work file is unlocked
   or gone); a snapshot of a locked work file stays, its program may be saving. The scan probes a lock by taking it for
   a moment, so a program locking its own work file retries briefly (`LockFile.acquireOwn`); project-file locks are never

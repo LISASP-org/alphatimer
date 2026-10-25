@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [The work copy is not locked while a project is opened](work-copy-unlocked-while-opening.md) | High | S | Another instance starting at that moment can discard the copy being opened |
 | [Save As onto a folder renames the folder](save-as-onto-folder.md) | Medium | S | An existing folder named `….timing` is moved to `…-previous.timing` |
 | [TUI shortcuts do not work while a text field has the focus](tui-shortcuts-in-text-fields.md) | Medium | S | Ctrl+N/O/C type a letter in the settings form |
 | [Stable serial device paths are rejected](stable-serial-device-paths-rejected.md) | Medium | S | `/dev/serial/by-id/…` paths exceed the length limit; resolve links first |
