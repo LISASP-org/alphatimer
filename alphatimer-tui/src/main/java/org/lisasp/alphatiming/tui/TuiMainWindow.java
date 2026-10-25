@@ -88,9 +88,12 @@ final class TuiMainWindow extends BasicWindow {
         }));
         liveViewPanel.setHeats(controller.liveHeats());
         addWindowListener(new WindowListenerAdapter() {
+            /** Before the focused component: a text box would type the letter of Ctrl+N/O/C. */
             @Override
-            public void onUnhandledInput(Window window, KeyStroke key, AtomicBoolean handled) {
-                handled.set(handleShortcut(key));
+            public void onInput(Window window, KeyStroke key, AtomicBoolean deliverEvent) {
+                if (handleShortcut(key)) {
+                    deliverEvent.set(false);
+                }
             }
         });
 
@@ -145,10 +148,16 @@ final class TuiMainWindow extends BasicWindow {
         content.addComponent(liveCard, LinearLayout.createLayoutData(LinearLayout.Alignment.Fill, LinearLayout.GrowPolicy.CanGrow));
     }
 
-    /** Ctrl+S and Ctrl+Q are left alone: most terminals use them for flow control and never pass them on. */
+    /**
+     * Ctrl+S and Ctrl+Q are left alone: most terminals use them for flow control and never pass them on. The text of the
+     * focused field is committed first, as leaving the field would.
+     */
     private boolean handleShortcut(KeyStroke key) {
         switch (key.getKeyType()) {
-            case F2 -> controller.save();
+            case F2 -> {
+                settingsPanel.commit();
+                controller.save();
+            }
             case F5 -> showSettings();
             case F6 -> showLiveView();
             case F10 -> exit();
@@ -157,7 +166,10 @@ final class TuiMainWindow extends BasicWindow {
                     return false;
                 }
                 switch (Character.toLowerCase(key.getCharacter())) {
-                    case 'n' -> controller.newProject();
+                    case 'n' -> {
+                        settingsPanel.commit();
+                        controller.newProject();
+                    }
                     case 'o' -> open();
                     case 'c' -> exit();
                     default -> {
@@ -173,10 +185,12 @@ final class TuiMainWindow extends BasicWindow {
     }
 
     private void open() {
+        settingsPanel.commit();
         prompt.askOpenPath().ifPresent(controller::open);
     }
 
     void exit() {
+        settingsPanel.commit();
         if (controller.requestClose()) {
             close();
         }

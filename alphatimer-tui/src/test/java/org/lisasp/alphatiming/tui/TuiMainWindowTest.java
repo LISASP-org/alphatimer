@@ -21,6 +21,7 @@ import org.lisasp.alphatiming.heats.Penalty;
 import org.lisasp.alphatiming.ui.common.AppController;
 import org.lisasp.alphatiming.ui.common.SavePrompt;
 import org.lisasp.alphatiming.project.db.CrashLeftover;
+import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
@@ -220,6 +221,31 @@ class TuiMainWindowTest {
 
     @Test
     void ctrlCExitsLikeTheMenuInsteadOfKillingTheProgram() throws IOException {
+        window.handleInput(new KeyStroke('c', true, false));
+        render();
+
+        assertThat(controller.document()).isNull();
+    }
+
+    @Test
+    void ctrlNInATextFieldCommitsTheTypedTextAndStartsANewProject() throws IOException {
+        TimingDocument before = controller.document();
+        TuiSettingsPanel settings = window.settingsPanel();
+        window.setFocusedInteractable(settings.hostField());
+        settings.hostField().setText("typed-host");
+
+        window.handleInput(new KeyStroke('n', true, false));
+        render();
+
+        assertThat(controller.document()).isNotSameAs(before);
+        assertThat(before.settings().tcpHost()).isEqualTo("typed-host");
+        assertThat(settings.hostField().getText()).isNotEqualTo("typed-hostn");
+    }
+
+    @Test
+    void ctrlCInATextFieldExits() throws IOException {
+        window.setFocusedInteractable(window.settingsPanel().hostField());
+
         window.handleInput(new KeyStroke('c', true, false));
         render();
 
