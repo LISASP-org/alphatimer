@@ -400,7 +400,7 @@ public final class AppController implements AutoCloseable {
         next.addMessageListener(message -> announce(MessageText.describe(message)));
         next.addPingListener(() -> pingListeners.forEach(Runnable::run));
         next.addConnectionLostListener(this::onConnectionLost);
-        next.addErrorListener(ex -> announce(I18n.get("log.processingError", ex.toString())));
+        next.addErrorListener(ex -> announce(MessageText.processingError(ex)));
         next.addWriteListener(new WriteListener() {
             @Override
             public void writeFailed(RecordedData data, Exception cause) {

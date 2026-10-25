@@ -130,7 +130,7 @@ public final class RecordingSession implements AutoCloseable {
             };
             return new RecordingError(kind, serial.port());
         }
-        return new RecordingError(RecordingError.Kind.UNEXPECTED, ex.getMessage() == null ? ex.toString() : ex.getMessage());
+        return new RecordingError(RecordingError.Kind.UNEXPECTED, ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
     }
 
     private void build(Settings s) {

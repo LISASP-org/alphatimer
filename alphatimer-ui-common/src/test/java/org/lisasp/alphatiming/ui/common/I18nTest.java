@@ -177,4 +177,12 @@ class I18nTest {
         assertThat(I18n.describe(new RecordingError(RecordingError.Kind.SERIAL_PORT_NOT_FOUND, "COM7"))).isEqualTo("Serial port COM7 was not found");
         assertThat(I18n.describe(new RecordingError(RecordingError.Kind.REST_PORT, "1999"))).contains("1999");
     }
+
+    @Test
+    void anUnexpectedRecordingErrorIsASentenceWithTheDetail() {
+        Locale.setDefault(Locale.ENGLISH);
+        assertThat(I18n.describe(new RecordingError(RecordingError.Kind.UNEXPECTED, "boom"))).isEqualTo("The recording could not be started (unexpected error: boom)");
+        Locale.setDefault(Locale.GERMANY);
+        assertThat(I18n.describe(new RecordingError(RecordingError.Kind.UNEXPECTED, "boom"))).isEqualTo("Die Aufnahme konnte nicht gestartet werden (unerwarteter Fehler: boom)");
+    }
 }

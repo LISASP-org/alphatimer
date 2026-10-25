@@ -38,6 +38,12 @@ class MessageTextTest {
     }
 
     @Test
+    void aProcessingErrorIsASentenceWithTheDetail() {
+        assertThat(MessageText.processingError(new IllegalStateException("boom"))).isEqualTo("Error while processing received data (unexpected error: boom)");
+        assertThat(MessageText.processingError(new IllegalStateException())).isEqualTo("Error while processing received data (unexpected error: IllegalStateException)");
+    }
+
+    @Test
     void describesTheInterpretedMessageWithoutTheRawText() {
         String text = MessageText.describe(message(KindOfTime.Finish, MessageType.OnLineTime, 2, 1, 25_010));
         assertThat(text).isEqualTo("E3 H2 L2  Finish  OnLineTime  25.01  #1");

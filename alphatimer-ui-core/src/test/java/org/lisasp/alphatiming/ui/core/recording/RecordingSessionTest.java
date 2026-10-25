@@ -356,6 +356,20 @@ class RecordingSessionTest {
     }
 
     @Test
+    void anUnexpectedStartErrorWithoutMessageIsDescribedByItsKind() {
+        RecordingSession failing = new RecordingSession(db, s -> {
+            throw new IllegalStateException();
+        }, () -> LocalDateTime.now());
+
+        failing.start(settings(0));
+
+        assertThat(failing.state()).isEqualTo(RecordingState.ERROR);
+        assertThat(failing.error().kind()).isEqualTo(RecordingError.Kind.UNEXPECTED);
+        assertThat(failing.error().detail()).isEqualTo("IllegalStateException");
+        failing.close();
+    }
+
+    @Test
     void aFailingStateListenerDoesNotKeepTheOthersFromHearingTheChange() {
         List<RecordingState> heard = new CopyOnWriteArrayList<>();
         session.addStateListener(state -> {
