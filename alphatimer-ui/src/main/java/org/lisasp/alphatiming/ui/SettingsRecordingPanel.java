@@ -2,10 +2,12 @@ package org.lisasp.alphatiming.ui;
 
 import org.lisasp.alphatiming.ui.common.AppController;
 import org.lisasp.alphatiming.ui.common.I18n;
+import org.lisasp.alphatiming.ui.common.SerialPortTexts;
 import org.lisasp.alphatiming.ui.common.SettingsFormRules;
 import org.lisasp.alphatiming.ui.common.ShownDocument;
 import com.jgoodies.forms.factories.CC;
 import com.jgoodies.forms.layout.FormLayout;
+import com.jgoodies.forms.layout.RowSpec;
 import de.df.jutils.gui.JWarningTextField;
 import de.df.jutils.gui.border.BorderUtils;
 import de.df.jutils.gui.layout.SimpleFormBuilder;
@@ -22,6 +24,7 @@ import javax.swing.DefaultComboBoxModel;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.JList;
 import javax.swing.JPanel;
@@ -31,10 +34,13 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.UIManager;
 import javax.swing.text.BadLocationException;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Component;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.util.List;
@@ -53,6 +59,11 @@ public final class SettingsRecordingPanel extends JPanel {
     private final JSpinner port = new JSpinner(new SpinnerNumberModel(8585, 1, 65535, 1));
     private final JComboBox<String> serialPort = new JComboBox<>();
     private final JButton refreshPorts = new JButton(AppIcons.reload());
+    private final JTextArea portAccessHint = new JTextArea();
+    private final JButton portAccessInfo = new JButton(AppIcons.info());
+    /** The text column ignores the width of the wrapped text, which would otherwise keep the form from getting narrower. */
+    private final JPanel portAccess = new JPanel(new FormLayout("default, 2dlu, fill:0px:grow", "center:default"));
+    private String portAccessInfoText = "";
     private final JComboBox<SerialMode> serialMode = new JComboBox<>(SerialMode.values());
     private final JWarningTextField competitionKey = new JWarningTextField(true, false);
     private final JSpinner autoSave = new JSpinner(new SpinnerNumberModel(60, 5, 3600, 5));
@@ -83,6 +94,8 @@ public final class SettingsRecordingPanel extends JPanel {
         add(messages, CC.xy(1, 3));
 
         serialPort.setEditable(true);
+        // Stable names (/dev/serial/by-id/…) would otherwise make the form as wide as the longest of them.
+        serialPort.setPrototypeDisplayValue("/dev/ttyUSB0");
         serialMode.setRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focus) {
@@ -144,6 +157,26 @@ public final class SettingsRecordingPanel extends JPanel {
         portChoice.setOpaque(false);
         portChoice.add(serialPort, CC.xy(1, 1));
         portChoice.add(refreshPorts, CC.xy(3, 1));
+        portAccessHint.setEditable(false);
+        portAccessHint.setFocusable(false);
+        portAccessHint.setOpaque(false);
+        portAccessHint.setLineWrap(true);
+        portAccessHint.setWrapStyleWord(true);
+        portAccessHint.setFont(UIManager.getFont("Label.font"));
+        portAccessHint.addComponentListener(new ComponentAdapter() {
+            /** A wrapped text knows its height only once it has its width, so the form is laid out again. */
+            @Override
+            public void componentResized(ComponentEvent e) {
+                portAccessHint.revalidate();
+            }
+        });
+        portAccessInfo.setBorder(BorderFactory.createEmptyBorder());
+        portAccessInfo.setContentAreaFilled(false);
+        portAccessInfo.addActionListener(e -> showPortAccessInfo());
+        portAccess.setOpaque(false);
+        portAccess.add(portAccessInfo, CC.xy(1, 1));
+        portAccess.add(portAccessHint, CC.xy(3, 1, "fill, center"));
+        portAccess.setVisible(false);
 
         SimpleFormBuilder typeForm = newBuilder();
         typeForm.add(I18n.get("input.type"), connectionType);
@@ -152,6 +185,7 @@ public final class SettingsRecordingPanel extends JPanel {
         tcpForm.add(I18n.get("input.tcpPort"), port);
         SimpleFormBuilder serialForm = newBuilder();
         serialForm.add(I18n.get("input.serialPort"), portChoice);
+        addBelowLastRow(serialForm, portAccess);
         serialForm.add(I18n.get("input.protocol"), serialMode);
         connectionCards.add(tcpForm.getPanel(), TCP_CARD);
         connectionCards.add(serialForm.getPanel(), SERIAL_CARD);
@@ -187,6 +221,15 @@ public final class SettingsRecordingPanel extends JPanel {
         form.add(input, CC.xy(1, 1));
         form.add(competition, CC.xy(3, 1));
         return form;
+    }
+
+    /** The builder makes all its rows as high as the highest and puts a gap after each, so the row is added here: a hidden one takes no space. */
+    private static void addBelowLastRow(SimpleFormBuilder form, Component component) {
+        JPanel panel = form.getPanel();
+        FormLayout layout = (FormLayout) panel.getLayout();
+        int row = layout.getRowCount();
+        layout.insertRow(row, RowSpec.decode("fill:default"));
+        panel.add(component, CC.xyw(4, row, 2));
     }
 
     /** All forms get the same label column so that the fields of both groups start at the same position. */
@@ -237,10 +280,26 @@ public final class SettingsRecordingPanel extends JPanel {
             SerialPorts.list().forEach(model::addElement);
             serialPort.setModel(model);
             serialPort.setSelectedItem(current == null ? "" : current.toString());
+            showPortAccess(SerialPortTexts.ofThisMachine());
             portsLoaded = true;
         } finally {
             updating = wasUpdating;
         }
+    }
+
+    private void showPortAccess(SerialPortTexts.Access access) {
+        portAccessHint.setText(access.hint());
+        portAccessInfoText = access.info();
+        portAccessInfo.setToolTipText(ToolTips.of(access.info()));
+        portAccess.setVisible(!access.hint().isEmpty());
+    }
+
+    private void showPortAccessInfo() {
+        JTextArea info = new JTextArea(portAccessInfoText);
+        info.setEditable(false);
+        info.setOpaque(false);
+        info.setFont(UIManager.getFont("Label.font"));
+        JOptionPane.showMessageDialog(this, info, I18n.get("input.serialPort.infoTitle"), JOptionPane.INFORMATION_MESSAGE);
     }
 
     private void commit() {

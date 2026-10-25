@@ -9,6 +9,10 @@ public final class MessageText {
     private MessageText() {
     }
 
+    public static String processingError(Exception ex) {
+        return I18n.get("log.processingError", ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+    }
+
     public static String describe(DataHandlingMessage message) {
         StringBuilder text = new StringBuilder(String.format("E%d H%d L%d  %s  %s  %s",
                                                              message.getEvent(),

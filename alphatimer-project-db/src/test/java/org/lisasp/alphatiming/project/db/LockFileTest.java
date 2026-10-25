@@ -7,6 +7,8 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -33,6 +35,26 @@ class LockFileTest {
             owned.get().close();
         }
         assertThat(pauses).hasValue(1);
+    }
+
+    @Test
+    void aLockOnALockFileDeletedMeanwhileDoesNotCountWhileANewOneIsHeld() throws Exception {
+        Path path = dir.resolve("wk.timing.lock");
+        LockFile first = LockFile.tryAcquire(path).orElseThrow();
+        FileChannel openedBeforeTheDeletion = FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);
+        first.closeAndDelete();
+        assertThat(path).doesNotExist();
+
+        try (LockFile current = LockFile.tryAcquire(path).orElseThrow()) {
+            Iterator<FileChannel> early = List.of(openedBeforeTheDeletion).iterator();
+            Optional<LockFile> late = LockFile.tryAcquire(path, p -> early.hasNext() ? early.next()
+                    : FileChannel.open(p, StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE));
+
+            assertThat(late).isEmpty();
+            assertThat(LockFile.isHeld(path)).isTrue();
+        } finally {
+            openedBeforeTheDeletion.close();
+        }
     }
 
     @Test

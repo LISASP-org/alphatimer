@@ -30,6 +30,21 @@ class TimingFileWriterTest {
     }
 
     @Test
+    void aFolderWithTheNameOfTheProjectFileIsLeftAloneAndTheSnapshotConsumed() throws Exception {
+        Path folder = Files.createDirectory(dir.resolve("wk.timing"));
+        Files.writeString(folder.resolve("inside.txt"), "kept");
+        Path snapshot = Files.writeString(dir.resolve("snapshot.tmp"), "1");
+
+        assertThatThrownBy(() -> new TimingFileWriter().write(snapshot, folder))
+                .isInstanceOfSatisfying(ProjectFileIsFolderException.class, ex -> assertThat(ex.file()).isEqualTo(folder));
+
+        assertThat(folder.resolve("inside.txt")).hasContent("kept");
+        assertThat(dir.resolve("wk-previous.timing")).doesNotExist();
+        assertThat(snapshot).doesNotExist();
+        assertThat(tempFilesIn(dir)).isEmpty();
+    }
+
+    @Test
     void snapshotReplacesExistingFileAtomicallyAndLeavesNoTempFile() throws Exception {
         Path file = dir.resolve("a.heat");
         TimingFileWriter writer = new TimingFileWriter();

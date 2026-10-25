@@ -8,35 +8,21 @@ import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.project.db.TimingFileWriter;
 import org.lisasp.alphatiming.project.db.TimingWorkFolder;
-import org.lisasp.alphatiming.heats.HeatDto;
-import org.lisasp.alphatiming.heats.HeatService;
-import org.lisasp.alphatiming.heats.HeatStatus;
-import org.lisasp.alphatiming.heats.TestMessageCreator;
 import org.lisasp.alphatiming.project.db.CrashLeftover;
-import org.lisasp.alphatiming.project.db.HeatStore;
-import org.lisasp.alphatiming.heats.LaneStatus;
-import org.lisasp.alphatiming.project.db.MessageStore;
-import org.lisasp.alphatiming.project.db.RawDataRecorder;
 import org.lisasp.alphatiming.project.db.SettingsEntity;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
-import org.lisasp.alphatiming.project.db.testdata.DataHandlingMessageTestData;
 import org.sqlite.ProgressHandler;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HexFormat;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -362,165 +348,6 @@ class TimingDocumentTest {
             assertThat(doc.settings().restEnabled()).isFalse();
             assertThat(doc.settings().restPort()).isEqualTo(Settings.DEFAULT_REST_PORT);
             assertThat(doc.isDirty()).isFalse();
-        }
-    }
-
-    @Test
-    void projectFileOfTheFirstVersionOpensWithItsSettingsHeatRawDataAndMessages() throws Exception {
-        Path file = Files.copy(Path.of("src/test/resources/compat/first-version.heat"), dir.resolve("first-version.heat"));
-        ByteArrayOutputStream recorded = new ByteArrayOutputStream();
-        recorded.writeBytes(DataHandlingMessageTestData.message1);
-        recorded.writeBytes(DataHandlingMessageTestData.message2);
-        try (TimingDocument doc = TimingDocument.open(file, work())) {
-            assertThat(doc.isDirty()).isFalse();
-            Settings s = doc.settings();
-            assertThat(s.connectionType()).isEqualTo(ConnectionType.TCP);
-            assertThat(s.tcpHost()).isEqualTo("localhost");
-            assertThat(s.autoSaveSeconds()).isEqualTo(60);
-            assertThat(s.restEnabled()).isFalse();
-            assertThat(s.restPort()).isEqualTo(Settings.DEFAULT_REST_PORT);
-            assertThat(s.replayFile()).isEmpty();
-            assertThat(s.competitionKey()).isEqualTo("TestWK");
-
-            HeatDto heat = new HeatStore(doc.database()).findRecent(1).get(0);
-            assertThat(heat.event()).isEqualTo(1);
-            assertThat(heat.heat()).isEqualTo(1);
-            assertThat(heat.status()).isEqualTo(HeatStatus.Started);
-            assertThat(heat.started()).isNotNull();
-            assertThat(heat.ended()).isNull();
-            assertThat(heat.lastMessage()).isNull();
-            assertThat(heat.lanes()).hasSize(8).allMatch(l -> l.status() == LaneStatus.Used);
-
-            ByteArrayOutputStream raw = new ByteArrayOutputStream();
-            RawDataRecorder.readAll(doc.database()).forEach(raw::writeBytes);
-            assertThat(raw.toByteArray()).isEqualTo(recorded.toByteArray());
-            assertThat(new MessageStore(doc.database()).findBy("TestWK", (short) 1, (byte) 1)).hasSize(1);
-
-            doc.updateSettings(s.withTcp("other", 1));
-            doc.saveAs(dir.resolve("resaved.heat"));
-            assertThat(doc.isDirty()).isFalse();
-        }
-        try (TimingDocument doc = TimingDocument.open(dir.resolve("resaved.heat"), work())) {
-            assertThat(doc.settings().tcpHost()).isEqualTo("other");
-            assertThat(new HeatStore(doc.database()).find(1, 1)).isPresent();
-        }
-    }
-
-    private static final List<String> FIRST_VERSION_TABLES = List.of("settings", "rawdata", "aresmessage", "lanetime", "heat", "lane");
-
-    private static Map<String, List<List<Object>>> contentOf(Path file, Map<String, List<String>> columns) throws SQLException {
-        Map<String, List<List<Object>>> content = new LinkedHashMap<>();
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + file); var st = connection.createStatement()) {
-            for (var table : columns.entrySet()) {
-                List<List<Object>> rows = new ArrayList<>();
-                try (var rs = st.executeQuery("select " + String.join(", ", table.getValue()) + " from " + table.getKey() + " order by id")) {
-                    while (rs.next()) {
-                        List<Object> row = new ArrayList<>();
-                        for (int i = 1; i <= table.getValue().size(); i++) {
-                            Object value = rs.getObject(i);
-                            row.add(value instanceof byte[] bytes ? HexFormat.of().formatHex(bytes) : value);
-                        }
-                        rows.add(row);
-                    }
-                }
-                content.put(table.getKey(), rows);
-            }
-        }
-        return content;
-    }
-
-    private static Map<String, List<String>> columnsOf(Path file) throws SQLException {
-        Map<String, List<String>> columns = new LinkedHashMap<>();
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + file); var st = connection.createStatement()) {
-            for (String table : FIRST_VERSION_TABLES) {
-                List<String> names = new ArrayList<>();
-                try (var rs = st.executeQuery("select name from pragma_table_info('" + table + "')")) {
-                    while (rs.next()) {
-                        names.add(rs.getString(1));
-                    }
-                }
-                columns.put(table, names);
-            }
-        }
-        return columns;
-    }
-
-    private static List<String> uniqueKeysOf(Path file, String table) throws SQLException {
-        return rowsOf(file, "select group_concat(ii.name, ',') from pragma_index_list('" + table + "') il, pragma_index_info(il.name) ii "
-                + "where il.\"unique\" = 1 group by il.name");
-    }
-
-    private static List<String> foreignKeysOf(Path file, String table) throws SQLException {
-        return rowsOf(file, "select \"from\" || '->' || \"table\" || '.' || \"to\" from pragma_foreign_key_list('" + table + "')");
-    }
-
-    private static List<String> rowsOf(Path file, String sql) throws SQLException {
-        List<String> rows = new ArrayList<>();
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + file); var st = connection.createStatement(); var rs = st.executeQuery(sql)) {
-            while (rs.next()) {
-                rows.add(rs.getString(1));
-            }
-        }
-        return rows;
-    }
-
-    private static List<String> schemaOf(Path file) throws SQLException {
-        List<String> sql = new ArrayList<>();
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + file); var st = connection.createStatement();
-             var rs = st.executeQuery("select sql from sqlite_master where sql is not null")) {
-            while (rs.next()) {
-                sql.add(rs.getString(1));
-            }
-        }
-        return sql;
-    }
-
-    @Test
-    void projectFileOfTheFirstVersionLosesItsEnumChecksAndTheHeatCompetitionAndKeepsItsData() throws Exception {
-        Path file = Files.copy(Path.of("src/test/resources/compat/first-version.heat"), dir.resolve("first-version.heat"));
-        Map<String, List<String>> columns = columnsOf(file);
-        assertThat(columns.get("heat").remove("competition")).isTrue();
-        Map<String, List<List<Object>>> before = contentOf(file, columns);
-        assertThat(schemaOf(file)).anyMatch(sql -> sql.contains("check"));
-
-        try (TimingDocument doc = TimingDocument.open(file, work())) {
-            Path workFile = doc.database().workFile();
-            assertThat(schemaOf(workFile)).noneMatch(sql -> sql.toLowerCase(Locale.ROOT).contains("check"));
-            assertThat(columnsOf(workFile).get("heat")).doesNotContain("competition");
-            assertThat(uniqueKeysOf(workFile, "heat")).containsExactly("event,heatNumber");
-            assertThat(uniqueKeysOf(workFile, "lane")).containsExactly("heat_id,number");
-            assertThat(foreignKeysOf(workFile, "lane")).containsExactly("heat_id->heat.id");
-            assertThat(contentOf(workFile, columns)).isEqualTo(before);
-            assertThatThrownBy(() -> doc.database().write(em -> em.createNativeQuery(
-                    "insert into lane (heat_id, number, timeInMillis, lap, place, finished) values (99, 9, 0, 0, 0, false)").executeUpdate()))
-                    .hasStackTraceContaining("FOREIGN KEY");
-
-            doc.database().write(em -> {
-                em.createNativeQuery("update heat set status = 'NewStatus'").executeUpdate();
-                em.createNativeQuery("update lane set penalty = 'NewPenalty', status = 'NewStatus'").executeUpdate();
-                em.createNativeQuery("update aresmessage set messageType = 'New', kindOfTime = 'New', timeType = 'New', rankInfo = 'New', timeInfo = 'New', timeMarker = 'New'").executeUpdate();
-                em.createNativeQuery("insert into lanetime (event, heatNumber, laneIndex, timeInMillis, status) values (1, 1, 0, 0, 'New')").executeUpdate();
-                return null;
-            });
-            assertThat(contentOf(workFile, Map.of("heat", List.of("status"), "lanetime", List.of("status"))))
-                    .containsEntry("heat", List.of(List.of("NewStatus")))
-                    .containsEntry("lanetime", List.of(List.of("New")));
-        }
-    }
-
-    @Test
-    void recordingIntoAProjectFileOfTheFirstVersionUpdatesItsTaggedHeat() throws Exception {
-        Path file = Files.copy(Path.of("src/test/resources/compat/first-version.heat"), dir.resolve("first-version.heat"));
-        try (TimingDocument doc = TimingDocument.open(file, work())) {
-            HeatService heats = new HeatService(new HeatStore(doc.database()));
-
-            heats.accept(TestMessageCreator.split(1, 1, 3, 1, 12_340));
-
-            Path workFile = doc.database().workFile();
-            assertThat(contentOf(workFile, Map.of("heat", List.of("id", "event", "heatNumber")))).containsEntry("heat", List.of(List.of(1, 1, 1)));
-            assertThat(contentOf(workFile, Map.of("lane", List.of("id", "heat_id", "number", "timeInMillis"))).get("lane"))
-                    .hasSize(8)
-                    .contains(List.of(3, 1, 3, 12_340));
         }
     }
 

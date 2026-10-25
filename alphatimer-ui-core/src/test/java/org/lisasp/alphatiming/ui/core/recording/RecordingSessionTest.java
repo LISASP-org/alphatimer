@@ -25,6 +25,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -355,6 +356,34 @@ class RecordingSessionTest {
     }
 
     @Test
+    void anUnexpectedStartErrorWithoutMessageIsDescribedByItsKind() {
+        RecordingSession failing = new RecordingSession(db, s -> {
+            throw new IllegalStateException();
+        }, () -> LocalDateTime.now());
+
+        failing.start(settings(0));
+
+        assertThat(failing.state()).isEqualTo(RecordingState.ERROR);
+        assertThat(failing.error().kind()).isEqualTo(RecordingError.Kind.UNEXPECTED);
+        assertThat(failing.error().detail()).isEqualTo("IllegalStateException");
+        failing.close();
+    }
+
+    @Test
+    void aFailingStateListenerDoesNotKeepTheOthersFromHearingTheChange() {
+        List<RecordingState> heard = new CopyOnWriteArrayList<>();
+        session.addStateListener(state -> {
+            throw new IllegalStateException("listener bug");
+        });
+        session.addStateListener(heard::add);
+
+        session.start(settings(0));
+        session.stop();
+
+        assertThat(heard).containsExactly(RecordingState.RUNNING, RecordingState.STOPPED);
+    }
+
+    @Test
     void aDisabledServerDoesNotOpenItsPort() throws Exception {
         try (ServerSocket blocker = new ServerSocket(0)) {
             session.start(new Settings("localhost", 8585, 60, 1).withCompetitionKey("WK").withRest(blocker.getLocalPort(), false));
@@ -396,7 +425,7 @@ class RecordingSessionTest {
 
     @Test
     void aLostConnectionStopsTheRecordingKeepsWhatWasRecordedAndIsReportedWithThePort() {
-        List<String> lost = new CopyOnWriteArrayList<>();
+        List<LostConnection> lost = new CopyOnWriteArrayList<>();
         session.addConnectionLostListener(lost::add);
         session.start(serial("/dev/ttyUSB0"));
         reader().push(DataHandlingMessageTestData.message1);
@@ -405,14 +434,26 @@ class RecordingSessionTest {
 
         await().atMost(10, TimeUnit.SECONDS).until(() -> session.state() == RecordingState.STOPPED);
         assertThat(session.error()).isNull();
-        assertThat(lost).containsExactly("/dev/ttyUSB0");
+        assertThat(lost).containsExactly(new LostConnection(ConnectionType.SERIAL, "/dev/ttyUSB0"));
         assertThat(reader().closes).isEqualTo(1);
         assertThat(RawDataRecorder.readAll(db).stream().mapToInt(c -> c.length).sum()).isEqualTo(DataHandlingMessageTestData.message1.length);
     }
 
     @Test
+    void aLostTcpConnectionIsReportedWithHostAndPort() {
+        List<LostConnection> lost = new CopyOnWriteArrayList<>();
+        session.addConnectionLostListener(lost::add);
+        session.start(settings(0));
+
+        reader().loseConnection();
+
+        await().atMost(10, TimeUnit.SECONDS).until(() -> !lost.isEmpty());
+        assertThat(lost).containsExactly(new LostConnection(ConnectionType.TCP, "localhost:8585"));
+    }
+
+    @Test
     void aLossReportedLateByAnEarlierRecordingDoesNotStopTheCurrentOne() throws Exception {
-        List<String> lost = new CopyOnWriteArrayList<>();
+        List<LostConnection> lost = new CopyOnWriteArrayList<>();
         session.addConnectionLostListener(lost::add);
         session.start(serial("/dev/ttyUSB0"));
         FakeReader first = reader();
@@ -444,8 +485,8 @@ class RecordingSessionTest {
     }
 
     @Test
-    void aSerialPortNameTooLongForTheDriverEndsInTheErrorState() {
-        String name = "/dev/" + "x".repeat(SerialPorts.MAX_NAME_BYTES);
+    void aSerialPortNameTooLongForTheDriverEndsInTheErrorState() throws Exception {
+        String name = Files.createFile(dir.resolve("x".repeat(SerialPorts.MAX_NAME_BYTES))).toString();
         RecordingSession guarded = new RecordingSession(db, s -> new NrSerialReader(name, SerialMode.ARES21.configuration()), () -> LocalDateTime.now());
         guarded.start(new Settings(ConnectionType.SERIAL, "", 1, "COM3", SerialMode.ARES21, 60, 1999, false).withCompetitionKey("WK"));
         assertThat(guarded.state()).isEqualTo(RecordingState.ERROR);

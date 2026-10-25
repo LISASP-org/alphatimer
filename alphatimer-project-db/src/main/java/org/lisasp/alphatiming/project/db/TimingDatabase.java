@@ -36,9 +36,10 @@ public final class TimingDatabase implements AutoCloseable {
 
     private LockFile workLock;
 
-    private TimingDatabase(Path workFile, boolean isNew) throws IOException {
+    /** Takes over the lock of the work file and releases it if opening fails. */
+    private TimingDatabase(Path workFile, LockFile workLock, boolean isNew) throws IOException {
         this.workFile = workFile;
-        workLock = TimingWorkFolder.lock(workFile);
+        this.workLock = workLock;
         try {
             if (isNew) {
                 SchemaMigrations.initialize(workFile);
@@ -64,24 +65,40 @@ public final class TimingDatabase implements AutoCloseable {
     }
 
     public static TimingDatabase createNew(Path workDir) throws IOException {
-        return new TimingDatabase(TimingWorkFolder.newWorkFile(workDir), true);
+        Path work = TimingWorkFolder.newWorkFile(workDir);
+        return new TimingDatabase(work, TimingWorkFolder.lock(work), true);
+    }
+
+    @FunctionalInterface
+    interface FileCopy {
+        void copy(Path from, Path to) throws IOException;
     }
 
     public static TimingDatabase openCopy(Path projectFile, Path workDir) throws IOException {
+        return openCopy(projectFile, workDir, (from, to) -> Files.copy(from, to, StandardCopyOption.REPLACE_EXISTING));
+    }
+
+    static TimingDatabase openCopy(Path projectFile, Path workDir, FileCopy fileCopy) throws IOException {
         checkIsSqlite(projectFile);
         Path work = TimingWorkFolder.newWorkFile(workDir);
+        LockFile workLock = TimingWorkFolder.lock(work);
+        boolean taken = false;
         try {
-            Files.copy(projectFile, work, StandardCopyOption.REPLACE_EXISTING);
+            fileCopy.copy(projectFile, work);
             checkIsTimingDatabase(work, projectFile);
-            return new TimingDatabase(work, false);
+            taken = true;
+            return new TimingDatabase(work, workLock, false);
         } catch (IOException | RuntimeException ex) {
+            if (!taken) {
+                workLock.close();
+            }
             TimingWorkFolder.discard(work);
             throw ex instanceof IOException io ? io : new InvalidProjectFileException(projectFile, ex);
         }
     }
 
     public static TimingDatabase adopt(Path workFile) throws IOException {
-        return new TimingDatabase(workFile, false);
+        return new TimingDatabase(workFile, TimingWorkFolder.lock(workFile), false);
     }
 
     private static void checkIsSqlite(Path file) throws IOException {
@@ -112,7 +129,7 @@ public final class TimingDatabase implements AutoCloseable {
             built.inTransaction(session -> {
                 session.createNativeMutationQuery(HeatEntity.UNIQUE_KEY).executeUpdate();
                 // TableRebuild needs foreign keys off only for a referenced table; no table references lane.
-                session.doWork(AddLaneKeys::addTo);
+                session.doWork(LaneKeys::addTo);
             });
         } catch (RuntimeException ex) {
             built.close();

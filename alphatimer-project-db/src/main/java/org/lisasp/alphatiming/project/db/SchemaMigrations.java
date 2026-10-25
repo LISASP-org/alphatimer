@@ -13,12 +13,12 @@ import java.util.List;
 
 /**
  * Brings the schema of a project file to the current version before Hibernate opens it. The version is SQLite's
- * {@code user_version}: 0 for files written before the first step, otherwise the number of steps applied.
+ * {@code user_version}: the number of steps applied. There are no steps yet: the files of version 1 are the baseline.
  */
 @Slf4j
 final class SchemaMigrations {
 
-    private static final List<MigrationStep> STEPS = List.of(new RemoveCheckConstraints(), new RemoveHeatCompetition(), new AddLaneKeys());
+    private static final List<MigrationStep> STEPS = List.of();
 
     static final int CURRENT_VERSION = STEPS.size();
 
@@ -35,10 +35,14 @@ final class SchemaMigrations {
     }
 
     static void migrate(Path file) throws IOException {
+        migrate(file, STEPS);
+    }
+
+    static void migrate(Path file, List<MigrationStep> steps) throws IOException {
         try (Connection connection = connect(file)) {
             int version = versionOf(connection);
-            for (int step = version; step < CURRENT_VERSION; step++) {
-                apply(connection, step);
+            for (int step = version; step < steps.size(); step++) {
+                apply(connection, steps, step);
             }
         } catch (SQLException ex) {
             throw new IOException("Could not migrate " + file, ex);
@@ -59,10 +63,10 @@ final class SchemaMigrations {
         }
     }
 
-    private static void apply(Connection connection, int step) throws SQLException {
+    private static void apply(Connection connection, List<MigrationStep> steps, int step) throws SQLException {
         connection.setAutoCommit(false);
         try (Statement st = connection.createStatement()) {
-            STEPS.get(step).apply(connection);
+            steps.get(step).apply(connection);
             st.execute("pragma user_version = " + (step + 1));
             connection.commit();
             log.info("Migrated project schema to version {}", step + 1);

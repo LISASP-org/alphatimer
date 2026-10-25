@@ -33,6 +33,9 @@ public final class TimingFileWriter {
     public void write(Path snapshot, Path target) throws IOException {
         Path targetTmp = tempFileOf(target);
         try {
+            if (Files.isDirectory(target)) {
+                throw new ProjectFileIsFolderException(target);
+            }
             Files.deleteIfExists(targetTmp);
             moveToTargetFolder(snapshot, targetTmp);
             if (Files.exists(target)) {

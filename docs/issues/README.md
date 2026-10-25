@@ -13,13 +13,3 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [The work copy is not locked while a project is opened](work-copy-unlocked-while-opening.md) | High | S | Another instance starting at that moment can discard the copy being opened |
-| [Save As onto a folder renames the folder](save-as-onto-folder.md) | Medium | S | An existing folder named `….timing` is moved to `…-previous.timing` |
-| [TUI shortcuts do not work while a text field has the focus](tui-shortcuts-in-text-fields.md) | Medium | S | Ctrl+N/O/C type a letter in the settings form |
-| [Stable serial device paths are rejected](stable-serial-device-paths-rejected.md) | Medium | S | `/dev/serial/by-id/…` paths exceed the length limit; resolve links first |
-| [Recording state listeners are not isolated](state-listeners-not-isolated.md) | Low | S | A throwing state listener skips the others on the reader thread |
-| [Two messages still show raw exception texts](remaining-raw-exception-texts.md) | Low | S | Unexpected recording errors and processing errors, untranslated |
-| [A lost connection message always names the serial port](lost-tcp-connection-empty-port.md) | Low | S | A lost TCP connection would show an empty port name |
-| [The command line ends with OK although data was lost](cli-write-errors-exit-code.md) | Low | S | Write errors do not change the exit code |
-| [Files without a lane table get no keys](keys-missing-without-lane-table.md) | Low | S | Keys are only added when the tables exist before the migration |
-| [A failed recovery deletes the project-file lock file](failed-recovery-deletes-lock-file.md) | Low | S | A rare race between instances on the same project file |

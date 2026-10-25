@@ -70,8 +70,9 @@ It uses the settings stored in the project file (create and configure the projec
 received messages and the result of every finished heat, and records until a key is pressed (or Ctrl+C / SIGTERM).
 Then it saves the file. A replay stops by itself at the end of the data. Auto-save runs as in the UI. Exit codes: 0 =
 saved, 1 = wrong arguments, 2 = the file could not be opened, 3 = the recording could not start (e.g. invalid
-settings, serial port missing), 4 = saving failed, 5 = saved, but the recording ended because the serial connection
-was lost. Without a terminal (input redirected) only Ctrl+C / SIGTERM end it.
+settings, serial port missing), 4 = saving failed, 5 = saved, but the recording ended because the connection was
+lost, 6 = saved, but recorded data could not be stored and is missing from the file (wins over 5). Without a terminal
+(input redirected) only Ctrl+C / SIGTERM end it.
 
 ## Project file
 

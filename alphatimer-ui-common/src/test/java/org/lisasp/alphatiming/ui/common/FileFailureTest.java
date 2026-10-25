@@ -3,6 +3,7 @@ package org.lisasp.alphatiming.ui.common;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatiming.project.db.TimingDatabase;
+import org.lisasp.alphatiming.project.db.ProjectFileIsFolderException;
 import org.lisasp.alphatiming.project.db.TimingWorkFolder;
 import org.sqlite.SQLiteErrorCode;
 import org.sqlite.SQLiteException;
@@ -71,6 +72,13 @@ class FileFailureTest {
 
         assertThat(kindOf(reading)).isEqualTo(FileFailure.Kind.IS_DIRECTORY);
         assertThat(kindOf(new FileNotFoundException("events (Is a directory)"))).isEqualTo(FileFailure.Kind.IS_DIRECTORY);
+    }
+
+    @Test
+    void savingOntoAFolderIsIsDirectory() {
+        Path folder = dir.resolve("wk.timing");
+
+        assertThat(kindOf(new ProjectFileIsFolderException(folder))).isEqualTo(FileFailure.Kind.IS_DIRECTORY);
     }
 
     @Test

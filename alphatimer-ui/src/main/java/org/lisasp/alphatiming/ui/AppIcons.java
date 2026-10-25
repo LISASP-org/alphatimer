@@ -35,6 +35,10 @@ public final class AppIcons {
         return load("refresh-cw", BUTTON_SIZE);
     }
 
+    public static Icon info() {
+        return load("info", BUTTON_SIZE);
+    }
+
     /** Larger sizes are added as resolution variants for screens with display scaling. */
     private static Icon load(String name, int size) {
         String variant = isDarkTheme() ? "lucide-dark" : "lucide";

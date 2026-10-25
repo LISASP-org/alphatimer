@@ -11,10 +11,12 @@ import org.lisasp.alphatiming.ui.core.project.AutoSaver;
 import org.lisasp.alphatiming.project.db.CrashLeftover;
 import org.lisasp.alphatiming.project.db.TimingWorkFolder;
 import org.lisasp.alphatiming.ui.core.project.TimingDocument;
+import org.lisasp.alphatiming.ui.core.recording.LostConnection;
 import org.lisasp.alphatiming.ui.core.recording.RecordedData;
 import org.lisasp.alphatiming.ui.core.recording.RecordingSession;
 import org.lisasp.alphatiming.ui.core.recording.RecordingState;
 import org.lisasp.alphatiming.ui.core.recording.WriteListener;
+import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
@@ -280,6 +282,11 @@ public final class AppController implements AutoCloseable {
     }
 
     /** The problems the user should see until they are resolved, the most important first. */
+    /** Recorded data that is not in the project file even after saving; the write warning stays until it is. */
+    public boolean recordedDataMissing() {
+        return warnings.isActive(StatusWarnings.Kind.RECORDING_WRITE);
+    }
+
     public List<StatusWarnings.Warning> warnings() {
         return warnings.active();
     }
@@ -292,10 +299,12 @@ public final class AppController implements AutoCloseable {
         fireChange();
     }
 
-    private void onConnectionLost(String port) {
-        String details = I18n.get("warn.connectionLost.detail", port);
-        warnings.raise(StatusWarnings.Kind.CONNECTION_LOST, new StatusWarnings.Warning(I18n.get("warn.connectionLost"), details));
-        announce(details);
+    private void onConnectionLost(LostConnection lost) {
+        StatusWarnings.Warning warning = lost.type() == ConnectionType.SERIAL
+                ? new StatusWarnings.Warning(I18n.get("warn.connectionLost"), I18n.get("warn.connectionLost.detail", lost.address()))
+                : new StatusWarnings.Warning(I18n.get("warn.connectionLost.other"), I18n.get("warn.connectionLost.other.detail", lost.address()));
+        warnings.raise(StatusWarnings.Kind.CONNECTION_LOST, warning);
+        announce(warning.details());
         fireChange();
     }
 
@@ -400,7 +409,7 @@ public final class AppController implements AutoCloseable {
         next.addMessageListener(message -> announce(MessageText.describe(message)));
         next.addPingListener(() -> pingListeners.forEach(Runnable::run));
         next.addConnectionLostListener(this::onConnectionLost);
-        next.addErrorListener(ex -> announce(I18n.get("log.processingError", ex.toString())));
+        next.addErrorListener(ex -> announce(MessageText.processingError(ex)));
         next.addWriteListener(new WriteListener() {
             @Override
             public void writeFailed(RecordedData data, Exception cause) {
