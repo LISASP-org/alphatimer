@@ -1,0 +1,40 @@
+<AlphaServer.Heat-array>
+  <AlphaServer.Heat event="3" heat="2" id="1">
+    <lanes class="hashtable">
+      <entry>
+        <int>2</int>
+        <AlphaServer.Lane laneindex="2">
+          <times>
+            <long>3500000</long>
+            <long>3512000</long>
+          </times>
+          <stati>
+            <AlphaServer.LaneStatus>RaceTimes</AlphaServer.LaneStatus>
+            <AlphaServer.LaneStatus>OfficialEnd</AlphaServer.LaneStatus>
+          </stati>
+        </AlphaServer.Lane>
+      </entry>
+      <entry>
+        <int>1</int>
+        <AlphaServer.Lane laneindex="1">
+          <times/>
+          <stati/>
+        </AlphaServer.Lane>
+      </entry>
+      <entry>
+        <int>0</int>
+        <AlphaServer.Lane laneindex="0">
+          <times>
+            <long>3392000</long>
+          </times>
+          <stati>
+            <AlphaServer.LaneStatus>RaceTimes</AlphaServer.LaneStatus>
+          </stati>
+        </AlphaServer.Lane>
+      </entry>
+    </lanes>
+  </AlphaServer.Heat>
+  <AlphaServer.Heat event="4" heat="1" id="2">
+    <lanes class="hashtable"/>
+  </AlphaServer.Heat>
+</AlphaServer.Heat-array>

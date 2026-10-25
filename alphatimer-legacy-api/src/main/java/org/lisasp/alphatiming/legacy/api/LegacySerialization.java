@@ -1,5 +1,8 @@
 package org.lisasp.alphatiming.legacy.api;
 
+import java.io.IOException;
+import java.io.InputStream;
+
 public class LegacySerialization {
 
     public static String toXML(Heat[] heats) {
@@ -15,6 +18,10 @@ public class LegacySerialization {
         }
         sb.append("</AlphaServer.Heat-array>");
         return sb.toString();
+    }
+
+    public static Heat[] fromXML(InputStream in) throws IOException {
+        return LegacyXmlReader.read(in);
     }
 
     private static String addPrefixToEachLine(String text) {
