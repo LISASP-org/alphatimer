@@ -100,26 +100,24 @@ that solve problems this application does not have:
   (`ProjectFileInUseException`); Save As moves the lock, closing releases it. Only a held lock counts, so a lock file left
   behind by a crash blocks nothing. Whoever takes that lock (Open, a recovery that keeps its file) deletes a
   `<name>.timing.tmp` a crashed save left next to the file; without the lock it stays.
-- **Users open files from earlier versions.** Every change to an entity (table or column) must keep older project files
-  loadable; `hbm2ddl=update` only adds, it never migrates data. Renaming or removing a column or table requires an
-  explicit migration. Prove compatibility with a test that opens a fixture file created by the previous version
-  (`alphatimer-ui-core/src/test/resources`).
-- Explicit migrations are `MigrationStep`s in `SchemaMigrations` (`alphatimer-project-db`). The schema version is SQLite's
-  `user_version`: 0 for files of the first versions, otherwise the number of steps applied; `VACUUM INTO` keeps it. Opening
-  (`openCopy`, `adopt`) runs every step above the file's version on the work copy, each in its own transaction, before
-  Hibernate's `update` sees the file; a new file is created with the current version and gets no step. To add a step,
-  append it to `SchemaMigrations.STEPS` (never reorder or change a released step) and extend the fixture test. SQLite
-  cannot drop a constraint or a column with ALTER TABLE; such a step rebuilds the table with `TableRebuild`.
+- **Users open files from earlier versions.** Version 1 is the first released version, so its files are the baseline and
+  there are no migrations yet; they start with version 2.0.0. From then on every change to an entity (table or column)
+  must keep older project files loadable; `hbm2ddl=update` only adds, it never migrates data. Renaming or removing a
+  column or table requires an explicit migration. Prove compatibility with a test that opens a fixture file created by
+  the previous version (`alphatimer-ui-core/src/test/resources`).
+- Explicit migrations are `MigrationStep`s in `SchemaMigrations` (`alphatimer-project-db`; `STEPS` is still empty). The
+  schema version is SQLite's `user_version`: the number of steps applied; `VACUUM INTO` keeps it. Opening (`openCopy`,
+  `adopt`) runs every step above the file's version on the work copy, each in its own transaction, before Hibernate's
+  `update` sees the file; a new file is created with the current version and gets no step. To add a step, append it to
+  `SchemaMigrations.STEPS` (never reorder or change a released step) and add the fixture test. SQLite cannot drop a
+  constraint or a column with ALTER TABLE; such a step rebuilds the table with `TableRebuild`.
 - Enum attributes are stored as their name through an `EnumNameConverter` (`EnumNameConverters`), never with
   `@Enumerated`: Hibernate writes a CHECK with the enum's values for `@Enumerated`, so a value added later could not be
-  stored in existing files. Files of the first versions have such CHECKs; step 1 (`RemoveCheckConstraints`) removes them.
+  stored in existing files.
 - Hibernate's SQLite dialect silently skips foreign keys and unique keys over several columns, so `TimingDatabase`
-  creates them itself for a new file (`HeatEntity.UNIQUE_KEY`, `AddLaneKeys.addTo`); an older file gets them from its
-  migration step. Step 2 (`RemoveHeatCompetition`) rebuilds `heat` without its `competition` column and with the unique
-  key (event, heatNumber); a heat stored under several competition tags keeps only its most recently changed row
-  (`changeSeq`) and that row's lanes. Step 3 (`AddLaneKeys`) rebuilds `lane` with `heat_id` not null, a foreign key to
-  `heat` (no `ON DELETE` action: lanes are deleted before their heat) and the unique key (heat_id, number); lanes without
-  an existing heat and, of lanes sharing a number, all but the oldest row are removed first. The other tables have no
+  creates them itself for a new file: the unique key (event, heatNumber) of `heat` (`HeatEntity.UNIQUE_KEY`) and, by
+  rebuilding `lane` (`LaneKeys.addTo`), `heat_id` not null, a foreign key to `heat` (no `ON DELETE` action: lanes are
+  deleted before their heat) and the unique key (heat_id, number). The other tables have no
   keys besides their id: `settings` is read as its first row, `rawdata` and `aresmessage` record what arrived, and
   `lanetime` legitimately holds the same finish several times (one row per result message).
 - Hibernate's connections enforce foreign keys (`foreign_keys`); the migration connection does not, as `TableRebuild`

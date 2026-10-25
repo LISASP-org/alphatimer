@@ -21,5 +21,4 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 | [Two messages still show raw exception texts](remaining-raw-exception-texts.md) | Low | S | Unexpected recording errors and processing errors, untranslated |
 | [A lost connection message always names the serial port](lost-tcp-connection-empty-port.md) | Low | S | A lost TCP connection would show an empty port name |
 | [The command line ends with OK although data was lost](cli-write-errors-exit-code.md) | Low | S | Write errors do not change the exit code |
-| [Files without a lane table get no keys](keys-missing-without-lane-table.md) | Low | S | Keys are only added when the tables exist before the migration |
 | [A failed recovery deletes the project-file lock file](failed-recovery-deletes-lock-file.md) | Low | S | A rare race between instances on the same project file |

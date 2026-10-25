@@ -112,7 +112,7 @@ public final class TimingDatabase implements AutoCloseable {
             built.inTransaction(session -> {
                 session.createNativeMutationQuery(HeatEntity.UNIQUE_KEY).executeUpdate();
                 // TableRebuild needs foreign keys off only for a referenced table; no table references lane.
-                session.doWork(AddLaneKeys::addTo);
+                session.doWork(LaneKeys::addTo);
             });
         } catch (RuntimeException ex) {
             built.close();
