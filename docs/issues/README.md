@@ -13,4 +13,3 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [A failed recovery deletes the project-file lock file](failed-recovery-deletes-lock-file.md) | Low | S | A rare race between instances on the same project file |

@@ -100,7 +100,8 @@ that solve problems this application does not have:
 - The project file of an open document is protected the same way (`wk.timing.lock`, `LockFile`), never by a lock on the
   file itself, which the renames of a save would break on Windows. Open and Save As refuse a file another instance holds
   (`ProjectFileInUseException`); Save As moves the lock, closing releases it. Only a held lock counts, so a lock file left
-  behind by a crash blocks nothing. Whoever takes that lock (Open, a recovery that keeps its file) deletes a
+  behind by a crash blocks nothing. A lock file is deleted while its lock is still held, and a new holder checks through a
+  token in the file that the path still names the file it locked (`LockFile`), so two programs never both hold it. Whoever takes that lock (Open, a recovery that keeps its file) deletes a
   `<name>.timing.tmp` a crashed save left next to the file; without the lock it stays.
 - **Users open files from earlier versions.** Version 1 is the first released version, so its files are the baseline and
   there are no migrations yet; they start with version 2.0.0. From then on every change to an entity (table or column)
