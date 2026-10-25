@@ -425,7 +425,7 @@ class RecordingSessionTest {
 
     @Test
     void aLostConnectionStopsTheRecordingKeepsWhatWasRecordedAndIsReportedWithThePort() {
-        List<String> lost = new CopyOnWriteArrayList<>();
+        List<LostConnection> lost = new CopyOnWriteArrayList<>();
         session.addConnectionLostListener(lost::add);
         session.start(serial("/dev/ttyUSB0"));
         reader().push(DataHandlingMessageTestData.message1);
@@ -434,14 +434,26 @@ class RecordingSessionTest {
 
         await().atMost(10, TimeUnit.SECONDS).until(() -> session.state() == RecordingState.STOPPED);
         assertThat(session.error()).isNull();
-        assertThat(lost).containsExactly("/dev/ttyUSB0");
+        assertThat(lost).containsExactly(new LostConnection(ConnectionType.SERIAL, "/dev/ttyUSB0"));
         assertThat(reader().closes).isEqualTo(1);
         assertThat(RawDataRecorder.readAll(db).stream().mapToInt(c -> c.length).sum()).isEqualTo(DataHandlingMessageTestData.message1.length);
     }
 
     @Test
+    void aLostTcpConnectionIsReportedWithHostAndPort() {
+        List<LostConnection> lost = new CopyOnWriteArrayList<>();
+        session.addConnectionLostListener(lost::add);
+        session.start(settings(0));
+
+        reader().loseConnection();
+
+        await().atMost(10, TimeUnit.SECONDS).until(() -> !lost.isEmpty());
+        assertThat(lost).containsExactly(new LostConnection(ConnectionType.TCP, "localhost:8585"));
+    }
+
+    @Test
     void aLossReportedLateByAnEarlierRecordingDoesNotStopTheCurrentOne() throws Exception {
-        List<String> lost = new CopyOnWriteArrayList<>();
+        List<LostConnection> lost = new CopyOnWriteArrayList<>();
         session.addConnectionLostListener(lost::add);
         session.start(serial("/dev/ttyUSB0"));
         FakeReader first = reader();

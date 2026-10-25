@@ -60,7 +60,7 @@ public final class RecordingSession implements AutoCloseable {
     private final List<Consumer<DataHandlingMessage>> messageListeners = new CopyOnWriteArrayList<>();
     private final List<Runnable> pingListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<Exception>> errorListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<String>> connectionLostListeners = new CopyOnWriteArrayList<>();
+    private final List<Consumer<LostConnection>> connectionLostListeners = new CopyOnWriteArrayList<>();
     private final List<WriteListener> writeListeners = new CopyOnWriteArrayList<>();
     private final WriteMonitor writes = new WriteMonitor(writeListeners);
 
@@ -162,7 +162,7 @@ public final class RecordingSession implements AutoCloseable {
         SerialPortReader created = readers.create(s);
         reader = created;
         reader.register(safe(rawRecorder)).register(safe(collector));
-        reader.addConnectionLostListener(() -> connectionLost(created, s.serialPort()));
+        reader.addConnectionLostListener(() -> connectionLost(created, new LostConnection(s.connectionType(), addressOf(s))));
         if (reader instanceof FileReplayReader replay) {
             replay.addFinishedListener(this::stop);
         }
@@ -244,14 +244,22 @@ public final class RecordingSession implements AutoCloseable {
         setState(RecordingState.STOPPED, null);
     }
 
-    private synchronized void connectionLost(SerialPortReader lost, String port) {
+    private static String addressOf(Settings s) {
+        return switch (s.connectionType()) {
+            case SERIAL -> s.serialPort();
+            case TCP -> s.tcpHost() + ":" + s.tcpPort();
+            case FILE -> s.replayFile();
+        };
+    }
+
+    private synchronized void connectionLost(SerialPortReader lost, LostConnection connection) {
         if (lost != reader || state != RecordingState.RUNNING) {
             return;
         }
         stop();
-        for (Consumer<String> listener : connectionLostListeners) {
+        for (Consumer<LostConnection> listener : connectionLostListeners) {
             try {
-                listener.accept(port);
+                listener.accept(connection);
             } catch (RuntimeException ex) {
                 log.warn("Connection lost listener failed", ex);
             }
@@ -340,8 +348,8 @@ public final class RecordingSession implements AutoCloseable {
         pingListeners.add(listener);
     }
 
-    /** Called with the serial port after a lost connection has stopped the recording. */
-    public void addConnectionLostListener(Consumer<String> listener) {
+    /** Called after a lost connection has stopped the recording. */
+    public void addConnectionLostListener(Consumer<LostConnection> listener) {
         connectionLostListeners.add(listener);
     }
 

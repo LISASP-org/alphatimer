@@ -764,6 +764,28 @@ class AppControllerTest {
     }
 
     @Test
+    void aLostTcpConnectionNamesHostAndPort() {
+        Locale original = Locale.getDefault();
+        Locale.setDefault(Locale.ENGLISH);
+        List<Runnable> loseConnection = new CopyOnWriteArrayList<>();
+        try (AppController recording = losingController(loseConnection)) {
+            recording.init();
+            recording.applySettings(new Settings("timing", 9000, 60, 0).withCompetitionKey("WK"));
+            recording.startRecording();
+
+            loseConnection.getLast().run();
+
+            await().atMost(10, TimeUnit.SECONDS).until(() -> !recording.warnings().isEmpty());
+            assertThat(recording.warnings()).singleElement().satisfies(w -> {
+                assertThat(w.text()).isEqualTo("Connection lost, recording stopped");
+                assertThat(w.details()).startsWith("The connection to timing:9000 was lost");
+            });
+        } finally {
+            Locale.setDefault(original);
+        }
+    }
+
+    @Test
     void aLostConnectionOfTheClosedProjectIsNotShownForTheNextOne() {
         List<Runnable> loseConnection = new CopyOnWriteArrayList<>();
         try (AppController recording = losingController(loseConnection)) {
