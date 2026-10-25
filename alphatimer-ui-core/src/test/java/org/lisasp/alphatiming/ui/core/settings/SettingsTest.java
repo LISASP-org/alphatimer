@@ -1,11 +1,19 @@
 package org.lisasp.alphatiming.ui.core.settings;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatimer.serial.com.SerialPorts;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SettingsTest {
+
+    @TempDir
+    Path dir;
 
     private static Settings valid() {
         return new Settings("localhost", 8585, 60, 1999).withCompetitionKey("WK");
@@ -52,12 +60,24 @@ class SettingsTest {
     }
 
     @Test
-    void serialPortNamesTooLongForTheDriverAreRejected() {
+    void serialDevicesWithNamesTooLongForTheDriverAreRejected() throws IOException {
         Settings serial = new Settings(ConnectionType.SERIAL, "", 0, "", SerialMode.ARES21, 60, 1999, false).withCompetitionKey("WK");
-        String longest = "/dev/" + "x".repeat(SerialPorts.MAX_NAME_BYTES - 5);
+        String longest = Files.createFile(dir.resolve("x".repeat(SerialPorts.MAX_NAME_BYTES - dir.toString().length() - 1))).toString();
+        String tooLong = Files.createFile(Path.of(longest + "x")).toString();
         assertThat(serial.withSerial(longest, SerialMode.ARES21).validate()).isEmpty();
-        assertThat(serial.withSerial(longest + "x", SerialMode.ARES21).validate()).containsExactly(SettingsProblem.SERIAL_PORT_NAME_TOO_LONG);
-        assertThat(serial.withSerial(longest + "x", SerialMode.ARES21).withConnectionType(ConnectionType.TCP).withTcp("h", 1).validate()).isEmpty();
+        assertThat(serial.withSerial(tooLong, SerialMode.ARES21).validate()).containsExactly(SettingsProblem.SERIAL_PORT_NAME_TOO_LONG);
+        assertThat(serial.withSerial(tooLong, SerialMode.ARES21).withConnectionType(ConnectionType.TCP).withTcp("h", 1).validate()).isEmpty();
+    }
+
+    @Test
+    void aStableSerialPortNameIsCheckedAsTheDeviceItPointsTo() throws IOException {
+        Settings serial = new Settings(ConnectionType.SERIAL, "", 0, "", SerialMode.ARES21, 60, 1999, false).withCompetitionKey("WK");
+        Path device = Files.createFile(dir.resolve("ttyUSB1"));
+        String stable = Files.createSymbolicLink(dir.resolve("usb-FTDI_FT232R_USB_UART_AB0N3MLA-if00-port0"), device).toString();
+        String unplugged = dir.resolve("usb-Prolific_Technology_Inc._USB-Serial_Controller-if00-port0").toString();
+
+        assertThat(serial.withSerial(stable, SerialMode.ARES21).validate()).isEmpty();
+        assertThat(serial.withSerial(unplugged, SerialMode.ARES21).validate()).isEmpty();
     }
 
     @Test

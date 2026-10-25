@@ -57,9 +57,10 @@ public final class NrSerialReader implements SerialPortReader {
         if (!SerialPorts.fitsDriver(portName)) {
             throw new SerialConnectionException(portName, SerialConnectionException.Reason.NAME_TOO_LONG, null);
         }
+        String device = SerialPorts.deviceOf(portName);
         SerialPort opened = null;
         try {
-            opened = (SerialPort) find().open("AlphaTiming", OPEN_TIMEOUT_MILLIS);
+            opened = (SerialPort) find(device).open("AlphaTiming", OPEN_TIMEOUT_MILLIS);
             opened.setSerialPortParams(configuration.getBaud(),
                                        dataBits(configuration),
                                        stopBits(configuration),
@@ -69,7 +70,7 @@ public final class NrSerialReader implements SerialPortReader {
             opened.addEventListener(this::onEvent);
             opened.notifyOnDataAvailable(true);
             port = opened;
-            log.info("Reading from serial port {} ({})", portName, configuration);
+            log.info("Reading from serial port {} ({}, {})", portName, device, configuration);
         } catch (PortInUseException ex) {
             closeQuietly(opened);
             throw new SerialConnectionException(portName, SerialConnectionException.Reason.IN_USE, ex);
@@ -109,11 +110,11 @@ public final class NrSerialReader implements SerialPortReader {
         };
     }
 
-    private CommPortIdentifier find() {
+    private CommPortIdentifier find(String device) {
         Enumeration<?> identifiers = CommPortIdentifier.getPortIdentifiers();
         while (identifiers.hasMoreElements()) {
             CommPortIdentifier id = (CommPortIdentifier) identifiers.nextElement();
-            if (id.getPortType() == CommPortIdentifier.PORT_SERIAL && id.getName().equals(portName)) {
+            if (id.getPortType() == CommPortIdentifier.PORT_SERIAL && id.getName().equals(device)) {
                 return id;
             }
         }

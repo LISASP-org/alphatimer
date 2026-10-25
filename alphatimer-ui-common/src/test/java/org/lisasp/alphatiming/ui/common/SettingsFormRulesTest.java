@@ -3,11 +3,15 @@ package org.lisasp.alphatiming.ui.common;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatimer.serial.com.SerialPorts;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,8 +66,9 @@ class SettingsFormRulesTest {
     }
 
     @Test
-    void aSerialPortNameTooLongForTheDriverCannotBeRecorded() {
-        Settings serial = TCP.withConnectionType(ConnectionType.SERIAL).withSerial("/dev/" + "x".repeat(SerialPorts.MAX_NAME_BYTES), SerialMode.ARES21);
+    void aSerialPortNameTooLongForTheDriverCannotBeRecorded(@TempDir Path dir) throws IOException {
+        String tooLong = Files.createFile(dir.resolve("x".repeat(SerialPorts.MAX_NAME_BYTES))).toString();
+        Settings serial = TCP.withConnectionType(ConnectionType.SERIAL).withSerial(tooLong, SerialMode.ARES21);
         SettingsFormRules rules = SettingsFormRules.of(serial, false, true);
 
         assertThat(rules.recordEnabled()).isFalse();

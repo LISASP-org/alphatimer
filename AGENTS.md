@@ -145,7 +145,10 @@ untrusted input:
 - A serial port that is missing or in use ends the start in the ERROR state (`SerialConnectionException`), never in a crash.
 - nrjavaserial aborts the whole JVM natively on a port name of 54 bytes or more. Every name passes
   `SerialPorts.fitsDriver` (`MAX_NAME_BYTES`) before nrjavaserial sees it: `Settings.validate()`, `NrSerialReader.start()`
-  and `SerialPorts.list()` reject longer ones. Never let a test open such a name inside the test JVM.
+  and `SerialPorts.list()` reject longer ones. Never let a test open such a name inside the test JVM. nrjavaserial only
+  knows device names, so a link such as `/dev/serial/by-id/…` (stable when an adapter is replugged, offered in the port
+  list next to `/dev/ttyUSBn`) is resolved first (`SerialPorts.deviceOf`) and the limit applies to the device; a name of
+  no existing device passes, its start fails as not found.
 - Bytes from the device are validated by the copied parsers; unknown or garbled data is dropped and logged, never fatal.
 - Files from disk are checked before use (`TimingDatabase.openCopy`, `DefaultSettingsStore.load`).
 - The REST server is intentionally without authentication: it serves read-only heat data to JAuswertung on the local

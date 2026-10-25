@@ -94,6 +94,8 @@ public final class SettingsRecordingPanel extends JPanel {
         add(messages, CC.xy(1, 3));
 
         serialPort.setEditable(true);
+        // Stable names (/dev/serial/by-id/…) would otherwise make the form as wide as the longest of them.
+        serialPort.setPrototypeDisplayValue("/dev/ttyUSB0");
         serialMode.setRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focus) {

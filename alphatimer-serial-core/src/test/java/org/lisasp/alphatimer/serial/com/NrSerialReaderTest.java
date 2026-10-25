@@ -1,14 +1,20 @@
 package org.lisasp.alphatimer.serial.com;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatimer.api.serial.configuration.SerialConfiguration;
 
-import java.util.List;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class NrSerialReaderTest {
+
+    @TempDir
+    Path dir;
 
     @Test
     void listingPortsNeverFails() {
@@ -28,8 +34,8 @@ class NrSerialReaderTest {
     }
 
     @Test
-    void aNameTooLongForTheDriverFailsOnStartBeforeTheDriverSeesIt() {
-        String name = "/dev/" + "x".repeat(SerialPorts.MAX_NAME_BYTES - 4);
+    void aNameTooLongForTheDriverFailsOnStartBeforeTheDriverSeesIt() throws IOException {
+        String name = Files.createFile(dir.resolve("x".repeat(SerialPorts.MAX_NAME_BYTES))).toString();
         NrSerialReader reader = new NrSerialReader(name, SerialConfiguration.ARES21);
         assertThatThrownBy(reader::start)
                 .isInstanceOfSatisfying(SerialConnectionException.class, ex -> {
@@ -40,18 +46,23 @@ class NrSerialReaderTest {
     }
 
     @Test
-    void theDriverLimitCountsUtf8Bytes() {
-        assertThat(SerialPorts.fitsDriver("x".repeat(SerialPorts.MAX_NAME_BYTES))).isTrue();
-        assertThat(SerialPorts.fitsDriver("x".repeat(SerialPorts.MAX_NAME_BYTES + 1))).isFalse();
-        assertThat(SerialPorts.fitsDriver("\u00E4".repeat(SerialPorts.MAX_NAME_BYTES / 2))).isTrue();
-        assertThat(SerialPorts.fitsDriver("\u00E4".repeat(SerialPorts.MAX_NAME_BYTES / 2) + "x")).isFalse();
+    void aStableNameIsOpenedAsTheDeviceItPointsToAndReportedUnderItsOwnName() throws IOException {
+        Path device = Files.createFile(dir.resolve("ttyUSB1"));
+        String name = Files.createSymbolicLink(dir.resolve("usb-FTDI_FT232R_USB_UART_AB0N3MLA-if00-port0"), device).toString();
+        NrSerialReader reader = new NrSerialReader(name, SerialConfiguration.ARES21);
+        assertThatThrownBy(reader::start)
+                .isInstanceOfSatisfying(SerialConnectionException.class, ex -> {
+                    assertThat(ex.port()).isEqualTo(name);
+                    assertThat(ex.reason()).isEqualTo(SerialConnectionException.Reason.NOT_FOUND);
+                });
     }
 
     @Test
-    void portsWithNamesTooLongForTheDriverAreNotOffered() {
-        String fits = "/tmp/" + "y".repeat(SerialPorts.MAX_NAME_BYTES - 5);
-        String tooLong = "/tmp/" + "z".repeat(SerialPorts.MAX_NAME_BYTES - 4);
-        assertThat(SerialPorts.offered(List.of(tooLong, fits, "COM1"))).containsExactly(fits, "COM1");
+    void aStableNameOfAnUnpluggedAdapterIsNotFound() {
+        String name = dir.resolve("usb-Prolific_Technology_Inc._USB-Serial_Controller-if00-port0").toString();
+        NrSerialReader reader = new NrSerialReader(name, SerialConfiguration.ARES21);
+        assertThatThrownBy(reader::start)
+                .isInstanceOfSatisfying(SerialConnectionException.class, ex -> assertThat(ex.reason()).isEqualTo(SerialConnectionException.Reason.NOT_FOUND));
     }
 
     @Test

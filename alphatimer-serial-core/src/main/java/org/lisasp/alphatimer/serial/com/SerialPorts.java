@@ -25,13 +25,41 @@ public final class SerialPorts {
     public static final int MAX_NAME_BYTES = 48;
 
     private static final Path DEVICE_DIRECTORY = Path.of("/dev");
+    private static final Path STABLE_NAMES = Path.of("/dev/serial/by-id");
     private static final Pattern USB_ADAPTER = Pattern.compile("tty(USB|ACM)\\d+");
 
     private SerialPorts() {
     }
 
+    /**
+     * Whether nrjavaserial may get the device of this name. A name of no existing device fits: nrjavaserial only opens
+     * devices its own scan found, so its start fails as not found.
+     */
     public static boolean fitsDriver(String name) {
+        String device = deviceOf(name);
+        return fitsLength(device) || !exists(device);
+    }
+
+    static boolean fitsLength(String name) {
         return name.getBytes(StandardCharsets.UTF_8).length <= MAX_NAME_BYTES;
+    }
+
+    /** The device a link such as {@code /dev/serial/by-id/…} points to; nrjavaserial only knows the device names. */
+    public static String deviceOf(String name) {
+        try {
+            Path path = Path.of(name);
+            return Files.isSymbolicLink(path) ? path.toRealPath().toString() : name;
+        } catch (IOException | RuntimeException ex) {
+            return name;
+        }
+    }
+
+    private static boolean exists(String name) {
+        try {
+            return Files.exists(Path.of(name));
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 
     static List<String> offered(List<String> names) {
@@ -61,7 +89,23 @@ public final class SerialPorts {
         } catch (RuntimeException | LinkageError ex) {
             log.warn("Could not list serial ports", ex);
         }
+        ports.addAll(stableNames(STABLE_NAMES, ports));
         return offered(ports);
+    }
+
+    /** The links in {@code byIdDirectory} that point to one of the ports: names that stay the same when replugged. */
+    static List<String> stableNames(Path byIdDirectory, List<String> ports) {
+        if (!Files.isDirectory(byIdDirectory)) {
+            return List.of();
+        }
+        try (Stream<Path> links = Files.list(byIdDirectory)) {
+            return links.map(Path::toString)
+                        .filter(link -> ports.contains(deviceOf(link)))
+                        .toList();
+        } catch (IOException | RuntimeException ex) {
+            log.warn("Could not list the stable serial port names in {}", byIdDirectory, ex);
+            return List.of();
+        }
     }
 
     /**

@@ -85,6 +85,8 @@ final class TuiSettingsPanel extends Panel {
             number.setValidationPattern(DIGITS);
         }
         serialPort.setReadOnly(false);
+        // Stable names (/dev/serial/by-id/…) would otherwise make the form as wide as the longest of them.
+        serialPort.setPreferredSize(new TerminalSize(30, 1));
         log.setReadOnly(true);
 
         addComponent(createSource().withBorder(Borders.singleLine(I18n.get("source.title"))),

@@ -25,6 +25,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -444,8 +445,8 @@ class RecordingSessionTest {
     }
 
     @Test
-    void aSerialPortNameTooLongForTheDriverEndsInTheErrorState() {
-        String name = "/dev/" + "x".repeat(SerialPorts.MAX_NAME_BYTES);
+    void aSerialPortNameTooLongForTheDriverEndsInTheErrorState() throws Exception {
+        String name = Files.createFile(dir.resolve("x".repeat(SerialPorts.MAX_NAME_BYTES))).toString();
         RecordingSession guarded = new RecordingSession(db, s -> new NrSerialReader(name, SerialMode.ARES21.configuration()), () -> LocalDateTime.now());
         guarded.start(new Settings(ConnectionType.SERIAL, "", 1, "COM3", SerialMode.ARES21, 60, 1999, false).withCompetitionKey("WK"));
         assertThat(guarded.state()).isEqualTo(RecordingState.ERROR);
