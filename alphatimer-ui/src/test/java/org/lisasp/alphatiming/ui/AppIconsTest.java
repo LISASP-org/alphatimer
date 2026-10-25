@@ -21,9 +21,10 @@ class AppIconsTest {
     }
 
     @Test
-    void theReloadIconIsSmall() {
-        Icon icon = AppIcons.reload();
-        assertThat(icon.getIconWidth()).isEqualTo(16);
-        assertThat(((MultiResolutionImage) ((ImageIcon) icon).getImage()).getResolutionVariants()).hasSize(3);
+    void theButtonIconsAreSmall() {
+        for (Icon icon : new Icon[]{AppIcons.reload(), AppIcons.info()}) {
+            assertThat(icon.getIconWidth()).isEqualTo(16);
+            assertThat(((MultiResolutionImage) ((ImageIcon) icon).getImage()).getResolutionVariants()).hasSize(3);
+        }
     }
 }

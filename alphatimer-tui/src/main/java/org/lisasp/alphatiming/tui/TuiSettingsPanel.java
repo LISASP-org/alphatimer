@@ -6,6 +6,7 @@ import com.googlecode.lanterna.gui2.Button;
 import com.googlecode.lanterna.gui2.CheckBox;
 import com.googlecode.lanterna.gui2.ComboBox;
 import com.googlecode.lanterna.gui2.Direction;
+import com.googlecode.lanterna.gui2.EmptySpace;
 import com.googlecode.lanterna.gui2.GridLayout;
 import com.googlecode.lanterna.gui2.Label;
 import com.googlecode.lanterna.gui2.LinearLayout;
@@ -13,9 +14,12 @@ import com.googlecode.lanterna.gui2.Panel;
 import com.googlecode.lanterna.gui2.TextBox;
 import com.googlecode.lanterna.gui2.WindowBasedTextGUI;
 import com.googlecode.lanterna.gui2.dialogs.FileDialogBuilder;
+import com.googlecode.lanterna.gui2.dialogs.MessageDialogBuilder;
+import com.googlecode.lanterna.gui2.dialogs.MessageDialogButton;
 import org.lisasp.alphatimer.serial.com.SerialPorts;
 import org.lisasp.alphatiming.ui.common.AppController;
 import org.lisasp.alphatiming.ui.common.I18n;
+import org.lisasp.alphatiming.ui.common.SerialPortTexts;
 import org.lisasp.alphatiming.ui.common.SettingsFormRules;
 import org.lisasp.alphatiming.ui.common.ShownDocument;
 import org.lisasp.alphatiming.ui.common.TimeFormat;
@@ -45,6 +49,11 @@ final class TuiSettingsPanel extends Panel {
     private final CommitTextBox port = new CommitTextBox(6, this::commit);
     private final ComboBox<String> serialPort = new ComboBox<>();
     private final Button refreshPorts = new Button(I18n.get("input.refresh"), this::loadPorts);
+    private final Panel portRow = row(serialPort, refreshPorts);
+    private final EmptySpace portAccessHintIndent = new EmptySpace();
+    private final Label portAccessHint = new Label("");
+    private final Panel portAccess = new Panel(new LinearLayout(Direction.HORIZONTAL));
+    private String portAccessInfo = "";
     private final ComboBox<String> serialMode = new ComboBox<>(Arrays.stream(SerialMode.values()).map(I18n::label).toList());
     private final CommitTextBox replayFile = new CommitTextBox(40, this::commit);
     private final Button chooseFile = new Button(I18n.get("input.chooseFile"), this::chooseReplayFile);
@@ -104,7 +113,12 @@ final class TuiSettingsPanel extends Panel {
         tcpPanel.addComponent(port);
 
         serialPanel.addComponent(new Label(I18n.get("input.serialPort")));
-        serialPanel.addComponent(row(serialPort, refreshPorts));
+        serialPanel.addComponent(portRow);
+        portAccessHint.setLabelWidth(30);
+        Button info = new Button("i", this::showPortAccessInfo);
+        info.setRenderer(new Button.FlatButtonRenderer());
+        portAccess.addComponent(info, LinearLayout.createLayoutData(LinearLayout.Alignment.Center));
+        portAccess.addComponent(portAccessHint);
         serialPanel.addComponent(new Label(I18n.get("input.protocol")));
         serialPanel.addComponent(serialMode);
 
@@ -199,10 +213,34 @@ final class TuiSettingsPanel extends Panel {
             serialPort.clearItems();
             SerialPorts.list().forEach(serialPort::addItem);
             selectPort(current);
+            showPortAccess(SerialPortTexts.ofThisMachine());
             portsLoaded = true;
         } finally {
             updating = wasUpdating;
         }
+    }
+
+    /** The grid lays out hidden components too, so the row below the port list is only added while there is a hint. */
+    private void showPortAccess(SerialPortTexts.Access access) {
+        portAccessHint.setText(access.hint());
+        portAccessInfo = access.info();
+        boolean shown = serialPanel.containsComponent(portAccess);
+        if (!access.hint().isEmpty() && !shown) {
+            int belowPortList = serialPanel.getChildrenList().indexOf(portRow) + 1;
+            serialPanel.addComponent(belowPortList, portAccessHintIndent);
+            serialPanel.addComponent(belowPortList + 1, portAccess);
+        } else if (access.hint().isEmpty() && shown) {
+            serialPanel.removeComponent(portAccessHintIndent);
+            serialPanel.removeComponent(portAccess);
+        }
+    }
+
+    private void showPortAccessInfo() {
+        new MessageDialogBuilder().setTitle(I18n.get("input.serialPort.infoTitle"))
+                                  .setText(portAccessInfo)
+                                  .addButton(MessageDialogButton.OK)
+                                  .build()
+                                  .showDialog(gui);
     }
 
     private void selectPort(String name) {
