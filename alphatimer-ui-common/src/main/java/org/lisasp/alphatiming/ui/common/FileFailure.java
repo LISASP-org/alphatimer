@@ -1,5 +1,7 @@
 package org.lisasp.alphatiming.ui.common;
 
+import org.lisasp.alphatiming.project.db.ProjectFileIsFolderException;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.AccessDeniedException;
@@ -43,6 +45,7 @@ public record FileFailure(Kind kind, Path file, String detail) {
     private static Optional<Kind> kindOf(Throwable t) {
         return switch (t) {
             case NoSuchFileException _ -> Optional.of(Kind.NOT_FOUND);
+            case ProjectFileIsFolderException _ -> Optional.of(Kind.IS_DIRECTORY);
             case AccessDeniedException _, ReadOnlyFileSystemException _ -> Optional.of(Kind.NO_PERMISSION);
             case SQLException sql -> kindOfSqlite(sql.getErrorCode());
             case FileSystemException fs -> kindOfReason(fs.getReason());

@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -23,11 +24,17 @@ public final class ProjectFiles {
         return file.resolveSibling(file.getFileName() + "." + EXTENSION);
     }
 
-    public static Optional<Path> chooseSavePath(Supplier<Optional<Path>> chooser, Predicate<Path> confirmOverwrite) {
+    public static String folderMessage(Path folder) {
+        return I18n.get("error.saveTo.message", folder, I18n.describe(new FileFailure(FileFailure.Kind.IS_DIRECTORY, folder, "")));
+    }
+
+    public static Optional<Path> chooseSavePath(Supplier<Optional<Path>> chooser, Predicate<Path> confirmOverwrite, Consumer<Path> rejectFolder) {
         Optional<Path> chosen;
         while ((chosen = chooser.get()).isPresent()) {
             Path path = withDefaultExtension(chosen.get());
-            if (!Files.exists(path) || confirmOverwrite.test(path)) {
+            if (Files.isDirectory(path)) {
+                rejectFolder.accept(path);
+            } else if (!Files.exists(path) || confirmOverwrite.test(path)) {
                 return Optional.of(path);
             }
         }

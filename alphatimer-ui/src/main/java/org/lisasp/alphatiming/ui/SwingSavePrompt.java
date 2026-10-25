@@ -73,7 +73,8 @@ public final class SwingSavePrompt implements SavePrompt {
     private Optional<Path> savePathDialog() {
         return ProjectFiles.chooseSavePath(() -> Optional.ofNullable(FileChooserUtils.saveFile(parent, projectFilter())).map(Path::of),
                                            path -> JOptionPane.showConfirmDialog(parent, I18n.get("dialog.overwrite.message", path.getFileName()), I18n.get("dialog.overwrite.title"), JOptionPane.YES_NO_OPTION)
-                                                   == JOptionPane.YES_OPTION);
+                                                   == JOptionPane.YES_OPTION,
+                                           folder -> JOptionPane.showMessageDialog(parent, ProjectFiles.folderMessage(folder), I18n.get("error.save.title"), JOptionPane.ERROR_MESSAGE));
     }
 
     public Optional<Path> askOpenPath() {

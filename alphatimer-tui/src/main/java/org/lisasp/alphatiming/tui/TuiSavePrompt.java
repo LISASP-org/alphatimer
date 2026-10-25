@@ -44,7 +44,8 @@ final class TuiSavePrompt implements SavePrompt {
         return ProjectFiles.chooseSavePath(() -> Optional.ofNullable(new FileDialogBuilder().setTitle(I18n.get("menu.saveAs")).setActionLabel(I18n.get("button.save")).build().showDialog(gui)).map(File::toPath),
                                            path -> choose(I18n.get("dialog.overwrite.title"), I18n.get("dialog.overwrite.message", path.getFileName()), false,
                                                           I18n.get("button.overwrite"), true,
-                                                          I18n.get("button.cancel"), false));
+                                                          I18n.get("button.cancel"), false),
+                                           folder -> showError(I18n.get("error.save.title"), ProjectFiles.folderMessage(folder)));
     }
 
     Optional<Path> askOpenPath() {
