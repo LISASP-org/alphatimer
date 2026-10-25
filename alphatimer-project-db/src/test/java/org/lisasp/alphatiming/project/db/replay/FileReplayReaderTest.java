@@ -2,7 +2,7 @@ package org.lisasp.alphatiming.project.db.replay;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.lisasp.alphatiming.project.db.ProjectDatabase;
+import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.project.db.RawDataChunkEntity;
 
 import java.io.ByteArrayOutputStream;
@@ -57,7 +57,7 @@ class FileReplayReaderTest {
     @Test
     void replaysTheRawDataOfAnotherHeatFile() throws Exception {
         Path heat = dir.resolve("other.heat");
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             db.write(em -> {
                 em.persist(new RawDataChunkEntity(LocalDateTime.now(), new byte[]{1, 2, 3}));
                 em.persist(new RawDataChunkEntity(LocalDateTime.now(), new byte[]{4, 5}));

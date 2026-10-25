@@ -3,13 +3,18 @@ package org.lisasp.alphatiming.ui.common;
 import lombok.extern.slf4j.Slf4j;
 import org.lisasp.basics.jre.date.DateTimeFacade;
 import org.lisasp.alphatiming.project.db.InvalidProjectFileException;
+import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.ui.core.project.AutoSaver;
-import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
+import org.lisasp.alphatiming.project.db.CrashLeftover;
+import org.lisasp.alphatiming.project.db.TimingWorkFolder;
+import org.lisasp.alphatiming.ui.core.project.TimingDocument;
+import org.lisasp.alphatiming.ui.core.recording.RecordedData;
 import org.lisasp.alphatiming.ui.core.recording.RecordingSession;
 import org.lisasp.alphatiming.ui.core.recording.RecordingState;
+import org.lisasp.alphatiming.ui.core.recording.WriteListener;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
@@ -38,10 +43,11 @@ public final class AppController implements AutoCloseable {
     private final List<Consumer<String>> messageListeners = new CopyOnWriteArrayList<>();
     private final List<Runnable> pingListeners = new CopyOnWriteArrayList<>();
 
-    private volatile ProjectDocument document;
+    private volatile TimingDocument document;
     private volatile RecordingSession session;
     private volatile LiveHeats lastHeats = LiveHeats.NONE;
-    private volatile String warning = "";
+    private final StatusWarnings warnings = new StatusWarnings();
+    private final WriteFailures writeFailures = new WriteFailures(warnings);
 
     public AppController(Path workDir, DefaultSettingsStore defaults, SavePrompt prompt, Supplier<RecordingSession.ReaderFactory> readers, DateTimeFacade time) {
         this.workDir = workDir;
@@ -53,60 +59,107 @@ public final class AppController implements AutoCloseable {
     }
 
     public void init() {
-        for (Path leftover : ProjectDocument.findRecoverable(workDir)) {
+        for (CrashLeftover leftover : TimingWorkFolder.findLeftovers(workDir)) {
             if (document != null) {
                 break; // keep the remaining leftovers for the next start
             }
-            switch (prompt.askRecover(leftover)) {
-                case RECOVER -> {
-                    try {
-                        install(ProjectDocument.recover(leftover));
-                    } catch (IOException | RuntimeException ex) {
-                        prompt.showError(I18n.get("error.recovery.title"), describe(ex));
-                    }
-                }
-                case DISCARD -> ProjectDocument.discard(leftover);
-                case LATER -> {
-                }
-            }
+            withoutAutoSave(() -> offerRecovery(leftover));
         }
         if (document == null) {
             newProject();
         }
     }
 
-    public void newProject() {
-        if (!prepareToLeaveDocument()) {
-            return;
-        }
-        try {
-            replaceDocument(ProjectDocument.create(workDir, defaults.load()));
-        } catch (IOException ex) {
-            prompt.showError(I18n.get("error.new.title"), describe(ex));
+    private void offerRecovery(CrashLeftover leftover) {
+        while (true) {
+            switch (prompt.askRecover(leftover)) {
+                case RECOVER -> {
+                    try {
+                        install(TimingDocument.recover(leftover.workFile()));
+                        return;
+                    } catch (IOException | RuntimeException ex) {
+                        log.warn("Could not recover {}", leftover.workFile().getFileName(), ex);
+                        prompt.showError(I18n.get("error.recovery.title"), I18n.get("error.recovery.message", describe(ex, leftover.workFile())));
+                    }
+                }
+                case DISCARD -> {
+                    if (prompt.confirmDiscard(leftover)) {
+                        TimingWorkFolder.discard(leftover.workFile());
+                        return;
+                    }
+                }
+                case LATER -> {
+                    return;
+                }
+            }
         }
     }
 
+    public void newProject() {
+        withoutAutoSave(() -> {
+            Leaving leaving = prepareToLeaveDocument();
+            if (leaving == Leaving.CANCELLED) {
+                return;
+            }
+            try {
+                replaceDocument(TimingDocument.create(workDir, defaults.load()));
+            } catch (IOException ex) {
+                log.warn("Could not create a new project", ex);
+                prompt.showError(I18n.get("error.new.title"), I18n.get("error.new.message", describe(ex, workDir)));
+                revertIfDiscarded(leaving);
+            }
+        });
+    }
+
     public void open(Path file) {
-        if (!prepareToLeaveDocument()) {
+        withoutAutoSave(() -> openAfterQuestions(file));
+    }
+
+    private void openAfterQuestions(Path file) {
+        Leaving leaving = prepareToLeaveDocument();
+        if (leaving == Leaving.CANCELLED) {
             return;
         }
+        TimingDocument current = document;
         try {
-            ProjectDocument opened = ProjectDocument.open(file, workDir);
+            TimingDocument opened = current != null && current.isSavedAs(file) ? current.reopen(workDir) : TimingDocument.open(file, workDir);
             defaults.save(opened.settings());
             replaceDocument(opened);
+            return;
+        } catch (ProjectFileInUseException ex) {
+            prompt.showError(I18n.get("error.open.title"), I18n.get("error.open.inUse", file));
         } catch (InvalidProjectFileException ex) {
             prompt.showError(I18n.get("error.open.title"), I18n.get("error.open.invalid", file));
         } catch (IOException | RuntimeException ex) {
-            prompt.showError(I18n.get("error.open.title"), I18n.get("error.open.message", file, describe(ex)));
+            log.warn("Could not open {}", file.getFileName(), ex);
+            prompt.showError(I18n.get("error.open.title"), I18n.get("error.open.message", file, describe(ex, file)));
+        }
+        revertIfDiscarded(leaving);
+    }
+
+    /** Without this, the next auto-save or Save would write the changes the user chose to discard. */
+    private void revertIfDiscarded(Leaving leaving) {
+        TimingDocument discarded = document;
+        if (leaving != Leaving.CHANGES_DISCARDED || discarded == null) {
+            return;
+        }
+        try {
+            replaceDocument(discarded.file().isPresent() ? discarded.reopen(workDir) : TimingDocument.create(workDir, defaults.load()));
+        } catch (IOException | RuntimeException ex) {
+            log.warn("Could not load the saved state after discarding changes", ex);
+            prompt.showError(I18n.get("error.revert.title"), I18n.get("error.revert.message", describe(ex, discarded.file().orElse(workDir))));
+            closeDocument();
+            fireChange();
         }
     }
 
     public boolean save() {
-        ProjectDocument doc = document;
+        TimingDocument doc = document;
         if (doc == null) {
             return false;
         }
-        if (doc.file().isEmpty()) {
+        Optional<Path> file = doc.file();
+        if (file.isEmpty()) {
             return saveAs();
         }
         try {
@@ -115,13 +168,18 @@ public final class AppController implements AutoCloseable {
             fireChange();
             return true;
         } catch (IOException ex) {
-            prompt.showError(I18n.get("error.save.title"), I18n.get("error.save.message", describe(ex)));
+            log.warn("Could not save {}", file.get().getFileName(), ex);
+            prompt.showError(I18n.get("error.save.title"), I18n.get("error.save.message", describe(ex, file.get())));
             return false;
         }
     }
 
     public boolean saveAs() {
-        ProjectDocument doc = document;
+        return withoutAutoSave(this::askPathAndSave);
+    }
+
+    private boolean askPathAndSave() {
+        TimingDocument doc = document;
         if (doc == null) {
             return false;
         }
@@ -134,34 +192,46 @@ public final class AppController implements AutoCloseable {
             defaults.save(doc.settings());
             fireChange();
             return true;
+        } catch (ProjectFileInUseException ex) {
+            prompt.showError(I18n.get("error.save.title"), I18n.get("error.saveTo.inUse", target.get()));
+            return false;
         } catch (IOException ex) {
-            prompt.showError(I18n.get("error.save.title"), I18n.get("error.saveTo.message", target.get(), describe(ex)));
+            log.warn("Could not save {}", target.get().getFileName(), ex);
+            prompt.showError(I18n.get("error.save.title"), I18n.get("error.saveTo.message", target.get(), describe(ex, target.get())));
             return false;
         }
     }
 
-    /** Stops the recording, asks about unsaved data and closes the document. True when the program may exit. */
+    /** Asks to stop a running recording, then about unsaved data, and closes the document. True when the program may exit. */
     public boolean requestClose() {
-        if (!prepareToLeaveDocument()) {
-            return false;
-        }
-        ProjectDocument doc = document;
+        return withoutAutoSave(() -> {
+            if (prepareToLeaveDocument() == Leaving.CANCELLED) {
+                return false;
+            }
+            closeDocument();
+            return true;
+        });
+    }
+
+    private void closeDocument() {
+        TimingDocument doc = document;
         document = null;
         session = null;
+        clearWarningsOfTheDocument();
         if (doc != null) {
             doc.close();
         }
-        return true;
     }
 
     public void startRecording() {
-        ProjectDocument doc = document;
+        TimingDocument doc = document;
         RecordingSession s = session;
         if (doc == null || s == null) {
             return;
         }
         Settings settings = doc.settings();
         defaults.save(settings);
+        warnings.clear(StatusWarnings.Kind.CONNECTION_LOST);
         s.start(settings);
     }
 
@@ -173,7 +243,7 @@ public final class AppController implements AutoCloseable {
     }
 
     public void applySettings(Settings settings) {
-        ProjectDocument doc = document;
+        TimingDocument doc = document;
         RecordingSession s = session;
         if (doc == null) {
             return;
@@ -188,7 +258,7 @@ public final class AppController implements AutoCloseable {
 
     /** Applies settings entered in a form unless they are unchanged or a recording runs; true when they were applied. */
     public boolean applySettingsIfChanged(Settings settings) {
-        ProjectDocument doc = document;
+        TimingDocument doc = document;
         if (doc == null || isRecording() || settings.equals(doc.settings())) {
             return false;
         }
@@ -201,7 +271,7 @@ public final class AppController implements AutoCloseable {
         return s != null && s.state() == RecordingState.RUNNING;
     }
 
-    public ProjectDocument document() {
+    public TimingDocument document() {
         return document;
     }
 
@@ -209,14 +279,23 @@ public final class AppController implements AutoCloseable {
         return session;
     }
 
-    /** A problem the user should see until it is resolved (currently: a failed auto-save); empty when there is none. */
-    public String warning() {
-        return warning;
+    /** The problems the user should see until they are resolved, the most important first. */
+    public List<StatusWarnings.Warning> warnings() {
+        return warnings.active();
     }
 
     void onAutoSaveError(Exception ex) {
-        warning = I18n.get("warn.autoSaveFailed", describe(ex));
-        announce(warning);
+        TimingDocument doc = document;
+        String text = I18n.get("warn.autoSaveFailed", describe(ex, doc == null ? workDir : doc.file().orElse(workDir)));
+        warnings.raise(StatusWarnings.Kind.AUTO_SAVE, new StatusWarnings.Warning(text, text));
+        announce(text);
+        fireChange();
+    }
+
+    private void onConnectionLost(String port) {
+        String details = I18n.get("warn.connectionLost.detail", port);
+        warnings.raise(StatusWarnings.Kind.CONNECTION_LOST, new StatusWarnings.Warning(I18n.get("warn.connectionLost"), details));
+        announce(details);
         fireChange();
     }
 
@@ -253,28 +332,62 @@ public final class AppController implements AutoCloseable {
         autoSaver.close();
     }
 
-    private boolean prepareToLeaveDocument() {
-        stopRecording();
-        ProjectDocument doc = document;
+    void runAutoSave() {
+        autoSaver.runOnce();
+    }
+
+    /** The user's answers decide whether changes reach the file, so the pause lasts until a discarded document is closed. */
+    private <T> T withoutAutoSave(Supplier<T> questionsAndTheirConsequence) {
+        autoSaver.pause();
+        try {
+            return questionsAndTheirConsequence.get();
+        } finally {
+            autoSaver.resume();
+        }
+    }
+
+    private void withoutAutoSave(Runnable questionsAndTheirConsequence) {
+        withoutAutoSave(() -> {
+            questionsAndTheirConsequence.run();
+            return null;
+        });
+    }
+
+    private enum Leaving { CANCELLED, NOTHING_UNSAVED, CHANGES_DISCARDED }
+
+    private Leaving prepareToLeaveDocument() {
+        if (isRecording()) {
+            if (!prompt.askStopRecording()) {
+                return Leaving.CANCELLED;
+            }
+            stopRecording();
+        }
+        TimingDocument doc = document;
         if (doc == null || !doc.isDirty()) {
-            return true;
+            return Leaving.NOTHING_UNSAVED;
         }
         return switch (prompt.askSaveChanges()) {
-            case SAVE -> save();
-            case DISCARD -> true;
-            case CANCEL -> false;
+            case SAVE -> save() ? Leaving.NOTHING_UNSAVED : Leaving.CANCELLED;
+            case DISCARD -> Leaving.CHANGES_DISCARDED;
+            case CANCEL -> Leaving.CANCELLED;
         };
     }
 
-    private void replaceDocument(ProjectDocument next) {
-        ProjectDocument old = document;
+    private void replaceDocument(TimingDocument next) {
+        TimingDocument old = document;
         install(next);
         if (old != null) {
             old.close();
         }
     }
 
-    private void install(ProjectDocument doc) {
+    private void clearWarningsOfTheDocument() {
+        writeFailures.reset();
+        warnings.clear(StatusWarnings.Kind.CONNECTION_LOST);
+        warnings.clear(StatusWarnings.Kind.AUTO_SAVE);
+    }
+
+    private void install(TimingDocument doc) {
         RecordingSession next = new RecordingSession(doc.database(), readers.get(), time);
         next.addHeatListener(h -> {
             lastHeats = h;
@@ -286,13 +399,37 @@ public final class AppController implements AutoCloseable {
         });
         next.addMessageListener(message -> announce(MessageText.describe(message)));
         next.addPingListener(() -> pingListeners.forEach(Runnable::run));
+        next.addConnectionLostListener(this::onConnectionLost);
         next.addErrorListener(ex -> announce(I18n.get("log.processingError", ex.toString())));
+        next.addWriteListener(new WriteListener() {
+            @Override
+            public void writeFailed(RecordedData data, Exception cause) {
+                writeFailures.failed(data, cause, doc.database().workFile());
+                announce(WriteFailures.describe(data, cause, doc.database().workFile()));
+                fireChange();
+            }
+
+            @Override
+            public void writeRecovered(RecordedData data) {
+                writeFailures.storedAgain(data);
+                fireChange();
+            }
+
+            @Override
+            public void dataDropped(RecordedData data, int bytes) {
+                writeFailures.dropped(data, bytes);
+                announce(WriteFailures.describeDropped(data, bytes));
+                fireChange();
+            }
+        });
         doc.addDirtyListener(dirty -> {
             if (!dirty) {
-                warning = "";
+                warnings.clear(StatusWarnings.Kind.AUTO_SAVE);
+                writeFailures.saved();
             }
             fireChange();
         });
+        clearWarningsOfTheDocument();
 
         document = doc;
         session = next;
@@ -312,8 +449,8 @@ public final class AppController implements AutoCloseable {
         }
     }
 
-    static String describe(Exception ex) {
-        return ex.getMessage() == null ? ex.toString() : ex.getMessage();
+    private static String describe(Exception ex, Path file) {
+        return I18n.describe(FileFailure.of(ex, file));
     }
 
     private void announce(String text) {

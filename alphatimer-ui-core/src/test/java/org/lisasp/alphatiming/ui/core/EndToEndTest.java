@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.project.db.HeatStore;
-import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
+import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.project.db.MessageStore;
 import org.lisasp.alphatiming.project.db.RawDataRecorder;
 import org.lisasp.alphatiming.ui.core.recording.RecordingSession;
@@ -62,7 +62,7 @@ class EndToEndTest {
         byte[] data = sample();
 
         try (ServerSocket server = new ServerSocket(0);
-             ProjectDocument doc = ProjectDocument.create(work, new Settings("localhost", server.getLocalPort(), 60, 0).withCompetitionKey("WK"));
+             TimingDocument doc = TimingDocument.create(work, new Settings("localhost", server.getLocalPort(), 60, 0).withCompetitionKey("WK"));
              RecordingSession session = new RecordingSession(doc.database(), RecordingSession.tcp(), LocalDateTime::now)) {
             CopyOnWriteArrayList<LiveHeats> heats = new CopyOnWriteArrayList<>();
             session.addHeatListener(heats::add);
@@ -75,7 +75,7 @@ class EndToEndTest {
         assertThat(filesIn(work)).isZero();
 
         try (ServerSocket server = new ServerSocket(0);
-             ProjectDocument doc = ProjectDocument.open(file, work);
+             TimingDocument doc = TimingDocument.open(file, work);
              RecordingSession session = new RecordingSession(doc.database(), RecordingSession.tcp(), LocalDateTime::now)) {
             assertThat(doc.settings().tcpHost()).isEqualTo("localhost");
             ByteArrayOutputStream raw = new ByteArrayOutputStream();

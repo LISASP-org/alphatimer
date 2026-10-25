@@ -23,6 +23,7 @@ public final class RecordCommand {
     private final FinishedHeats finishedHeats = new FinishedHeats();
     private final CountDownLatch stopRequested = new CountDownLatch(1);
     private final CountDownLatch finished = new CountDownLatch(1);
+    private volatile boolean connectionLost;
 
     public RecordCommand(AppController controller, PrintStream out, PrintStream err) {
         this.controller = controller;
@@ -57,6 +58,7 @@ public final class RecordCommand {
         }
         controller.addMessageListener(out::println);
         controller.addHeatListener(heats -> finishedHeats.describe(heats).ifPresent(out::println));
+        controller.session().addConnectionLostListener(port -> connectionLost = true);
         controller.addStateListener(state -> {
             if (state != RecordingState.RUNNING) {
                 requestStop();
@@ -75,8 +77,9 @@ public final class RecordCommand {
             stopRequested.await();
         }
 
-        out.println(I18n.get("cli.stopping"));
+        // A lost connection is reported under the session's lock, which stopping waits for, so its line comes first.
         controller.stopRecording();
+        out.println(I18n.get("cli.stopping"));
         boolean saved = controller.save();
         controller.requestClose();
         if (!saved) {
@@ -84,6 +87,6 @@ public final class RecordCommand {
         }
         log.info("Recording into {} ended", file.getFileName());
         out.println(I18n.get("cli.saved", file));
-        return ExitCode.OK;
+        return connectionLost ? ExitCode.CONNECTION_LOST : ExitCode.OK;
     }
 }

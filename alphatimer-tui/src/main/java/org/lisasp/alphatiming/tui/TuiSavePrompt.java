@@ -7,15 +7,15 @@ import com.googlecode.lanterna.gui2.dialogs.MessageDialogBuilder;
 import com.googlecode.lanterna.gui2.dialogs.MessageDialogButton;
 import org.lisasp.alphatiming.ui.common.I18n;
 import org.lisasp.alphatiming.ui.common.ProjectFiles;
+import org.lisasp.alphatiming.ui.common.RecoveryTexts;
 import org.lisasp.alphatiming.ui.common.SavePrompt;
+import org.lisasp.alphatiming.project.db.CrashLeftover;
 
 import java.io.File;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** The dialogs behind {@link SavePrompt}, as text dialogs. */
 final class TuiSavePrompt implements SavePrompt {
 
     private final WindowBasedTextGUI gui;
@@ -33,18 +33,18 @@ final class TuiSavePrompt implements SavePrompt {
     }
 
     @Override
+    public boolean askStopRecording() {
+        return choose(I18n.get("dialog.stopRecording.title"), I18n.get("dialog.stopRecording.message"), false,
+                      I18n.get("button.cancel"), false,
+                      I18n.get("button.stopRecording"), true);
+    }
+
+    @Override
     public Optional<Path> askSavePath() {
-        File chosen;
-        while ((chosen = new FileDialogBuilder().setTitle(I18n.get("menu.saveAs")).setActionLabel(I18n.get("button.save")).build().showDialog(gui)) != null) {
-            Path path = ProjectFiles.withDefaultExtension(chosen.toPath());
-            if (!Files.exists(path)
-                    || choose(I18n.get("dialog.overwrite.title"), I18n.get("dialog.overwrite.message", path.getFileName()), false,
-                              I18n.get("button.overwrite"), true,
-                              I18n.get("button.cancel"), false)) {
-                return Optional.of(path);
-            }
-        }
-        return Optional.empty();
+        return ProjectFiles.chooseSavePath(() -> Optional.ofNullable(new FileDialogBuilder().setTitle(I18n.get("menu.saveAs")).setActionLabel(I18n.get("button.save")).build().showDialog(gui)).map(File::toPath),
+                                           path -> choose(I18n.get("dialog.overwrite.title"), I18n.get("dialog.overwrite.message", path.getFileName()), false,
+                                                          I18n.get("button.overwrite"), true,
+                                                          I18n.get("button.cancel"), false));
     }
 
     Optional<Path> askOpenPath() {
@@ -58,11 +58,18 @@ final class TuiSavePrompt implements SavePrompt {
     }
 
     @Override
-    public RecoveryChoice askRecover(Path workFile) {
-        return choose(I18n.get("dialog.recover.title"), I18n.get("dialog.recover.message"), RecoveryChoice.LATER,
+    public RecoveryChoice askRecover(CrashLeftover leftover) {
+        return choose(I18n.get("dialog.recover.title"), RecoveryTexts.question(leftover), RecoveryChoice.LATER,
                       I18n.get("button.recover"), RecoveryChoice.RECOVER,
                       I18n.get("button.discard"), RecoveryChoice.DISCARD,
                       I18n.get("button.later"), RecoveryChoice.LATER);
+    }
+
+    @Override
+    public boolean confirmDiscard(CrashLeftover leftover) {
+        return choose(I18n.get("dialog.discard.title"), RecoveryTexts.discardQuestion(leftover), false,
+                      I18n.get("button.back"), false,
+                      I18n.get("button.delete"), true);
     }
 
     /** Alternating labels and answers; Escape gives {@code onCancel}. */

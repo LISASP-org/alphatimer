@@ -1,8 +1,7 @@
 package org.lisasp.alphatiming.project.db;
 
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -28,15 +27,15 @@ public class LaneEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "heat_id")
+    @JoinColumn(name = "heat_id", nullable = false)
     private HeatEntity heat;
 
     private int number;
     private int timeInMillis;
     private int lap;
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = EnumNameConverters.LaneStatusConverter.class)
     private LaneStatus status;
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = EnumNameConverters.PenaltyConverter.class)
     private Penalty penalty;
     private int place;
     private boolean finished;

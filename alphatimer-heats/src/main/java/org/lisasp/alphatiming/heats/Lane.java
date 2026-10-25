@@ -73,10 +73,22 @@ final class Lane {
         if (message.getTimeInMillis() <= 0) {
             return;
         }
+        if (finished && message.getKindOfTime() != RefinedKindOfTime.Finish) {
+            return;
+        }
         timeInMillis = message.getTimeInMillis();
         lap = message.getCurrentLap();
         finished = message.getKindOfTime() == RefinedKindOfTime.Finish;
         enforceStatus();
+    }
+
+    boolean deleteTime(TimeMessage message) {
+        if (timeInMillis <= 0 || message.getTimeInMillis() != timeInMillis || message.getCurrentLap() != lap) {
+            return false;
+        }
+        timeInMillis = 0;
+        enforceStatus();
+        return true;
     }
 
     void didNotStart() {

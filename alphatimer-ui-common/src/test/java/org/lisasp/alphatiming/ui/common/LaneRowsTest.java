@@ -30,7 +30,7 @@ class LaneRowsTest {
     }
 
     private static HeatDto heat() {
-        return new HeatDto("WK", 1, 1, HeatStatus.Started, null, null, 2, List.of(
+        return new HeatDto(1, 1, HeatStatus.Started, null, null, 2, List.of(
                 new LaneDto(1, 0, 0, LaneStatus.NotUsed, Penalty.None, 0, false),
                 new LaneDto(2, 12_340, 1, LaneStatus.Used, Penalty.None, 0, false),
                 new LaneDto(3, 25_000, 2, LaneStatus.Used, Penalty.None, 1, true),
@@ -48,7 +48,7 @@ class LaneRowsTest {
 
     @Test
     void lanesUsedBeforeKeepAnEmptyRowAndNeverUsedLanesStayHidden() {
-        HeatDto heat = new HeatDto("WK", 1, 2, HeatStatus.Started, null, null, 2, List.of(
+        HeatDto heat = new HeatDto(1, 2, HeatStatus.Started, null, null, 2, List.of(
                 new LaneDto(1, 0, 0, LaneStatus.NotUsed, Penalty.None, 0, false),
                 new LaneDto(2, 12_340, 1, LaneStatus.Used, Penalty.None, 0, false),
                 new LaneDto(3, 0, 0, LaneStatus.NotUsed, Penalty.None, 0, false),

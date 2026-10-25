@@ -7,6 +7,7 @@ import com.googlecode.lanterna.terminal.DefaultTerminalFactory;
 import com.googlecode.lanterna.terminal.ansi.UnixLikeTerminal;
 import lombok.extern.slf4j.Slf4j;
 import org.lisasp.alphatiming.ui.common.AppController;
+import org.lisasp.alphatiming.ui.common.LogFileCleanup;
 import org.lisasp.alphatiming.ui.core.recording.RecordingSession;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
 import org.lisasp.basics.jre.date.ActualDateTime;
@@ -23,6 +24,7 @@ public final class TuiLauncher {
     public static void main(String[] args) throws IOException {
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> log.error("Uncaught exception in thread {}", thread.getName(), throwable));
         log.info("Starting AlphaTiming TUI");
+        LogFileCleanup.inUserHome("alphatiming-tui").run();
         // Ctrl+C must reach the window, which asks about unsaved changes, instead of ending the program on the spot.
         DefaultTerminalFactory terminals = new DefaultTerminalFactory().setUnixTerminalCtrlCBehaviour(UnixLikeTerminal.CtrlCBehaviour.TRAP);
         Screen screen = new TerminalScreen(terminals.createTerminal());

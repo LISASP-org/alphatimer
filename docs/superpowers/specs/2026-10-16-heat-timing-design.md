@@ -15,11 +15,16 @@ Workflow: stop recording → change settings → start recording.
 - Persistence: **JPA with Hibernate**. Project file = **one SQLite file** (`*.heat`) holding settings, raw data,
   interpreted messages and heats. SQLite via `hibernate-community-dialects` + `sqlite-jdbc`.
 - Working database while a project is open: a temporary SQLite database. **Save** writes a consistent snapshot to the
-  project file (`VACUUM INTO` a temp file next to the target, then atomic rename).
-- Dirty tracking, periodic auto-save (when dirty and the project has a file; interval is a setting, default 60 s),
-  explicit Save / Save As.
-- Closing (window close, File → Exit, and also File → New / Open): the **recording is stopped first**, then if the
-  document is dirty a dialog offers Save / Discard / Cancel. Cancel returns to the app (recording stays stopped).
+  project file (`VACUUM INTO` a temp file in the work folder, then moved next to the target and renamed atomically;
+  only the `VACUUM INTO` blocks the recording).
+- Dirty tracking, periodic auto-save (when dirty and the project has a file; interval is a setting, default 60 s;
+  paused while a question about the project or the Save As dialog is open), explicit Save / Save As.
+- Closing (window close, File → Exit, and also File → New / Open): while a recording runs, a dialog first asks whether
+  to **stop the recording**; Cancel returns to the app with the recording still running. Only after the user confirmed,
+  the recording stops, and then, if the document is dirty, a dialog offers Save / Discard / Cancel. Cancel there returns
+  to the app (recording stays stopped). If New or Open fails after Discard, the document goes back to the saved state of
+  its file (without a file: a new project; if even that fails, it is closed). The command line stops its recording
+  itself and is never asked.
 - Default settings: the settings of the last loaded/saved project are stored in `~/.heat-timing/defaults.json` and used
   when the program starts and when a new project is created.
 - Main window: JAuswertung-style left button bar with two panels, "Settings & Recording" (host, port, other
@@ -45,16 +50,20 @@ alphatimer's `messagesstorage`, `heats` and `legacy` modules are not copied as m
 
 Changes to copied code: `TcpReader` must not start its thread in the constructor (explicit `start()`), and
 `close()` must be safe when never connected (currently NPE) and repeatable, so a session can be started and stopped
-many times.
+many times. `close()` waits (bounded) until the reader thread has ended, so the bytes it already read reach the
+consumers before the session closes the raw data recorder, and a connect in progress is abandoned.
 
 ## Core components
 
-- **`Settings`** (immutable record): TCP host, TCP port, auto-save interval, server port with an on/off switch (the competition key of alphatimer was dropped: a project is one
-  competition). Validation: non-blank host, ports 1–65535. Stored in the project file; defaults in `defaults.json`.
-- **`ProjectFile` / `ProjectDocument`**: owns the working database (EntityManagerFactory), the current file path
+- **`Settings`** (immutable record): TCP host, TCP port, auto-save interval, server port with an on/off switch, and the competition key (a project is one competition; the key
+  is stored once per project file and required to start a recording). Validation: non-blank host, ports 1–65535. Stored in the project file; defaults in `defaults.json`.
+- **`ProjectFile` / `TimingDocument`**: owns the working database (EntityManagerFactory), the current file path
   (optional), the dirty flag and listeners. Operations: `create()`, `open(path)`, `save()`, `saveAs(path)`, `close()`.
   Any write (incoming data, settings change) sets dirty. After a crash the temp working database remains; at next start
-  the app offers to recover it.
+  the app offers to recover it, naming the project file the work file was last opened from or saved to (a
+  `<work file>.project` note next to it) and its last change; discarding needs a second confirmation. A failed recovery leaves the work file in place and
+  asks again. While a document has a project file, it holds an OS lock on `<file>.lock` next to it, so
+  a second program instance refuses to open the file or to save over it.
 - **`RecordingSession`**: `start()` snapshots the settings and builds a fresh pipeline (`TcpReader` → raw-data
   storage + `InputCollector` → `MessageConverter` → aggregator → message storage, refiner, heat service); `stop()`
   closes it. State: STOPPED / RUNNING / ERROR, reported to the UI via listener. Settings are read-only in the UI while
@@ -67,6 +76,9 @@ many times.
   finishes; the device's rank data is ignored because it is provisional while the race runs and was found to be
   inconsistent with the times in captured data. Repeated results of previous races (RefinedMessageType
   PreviousRaceResult) are ignored by the heat service so they cannot re-select or change an older heat.
+  A deleted time (time type DeletedTime; the device sends a deleted final time as a split time of the last lap) clears
+  the lane's time, finish and place if it is the lane's current time, and lets a stopped clock run again; it is never
+  applied as a time.
 
 ## UI
 
@@ -89,18 +101,27 @@ Open…, Save, Save As…, Exit) and Recording (Start, Stop). Panel switching do
 panel keeps updating while hidden.
 
 **Running time**: alphatimer does not interpret the device's running-time messages, so the clock is computed locally
-from the heat start timestamp (UI timer, ~100 ms repaint). Every start signal restarts it; it is frozen at the official end or as soon as every used lane has a final time or a penalty (captured data often lacks the official end). It can differ slightly from the
+from the heat start timestamp (UI timer, ~100 ms repaint). Every live start signal restarts it (repeated results and corrected or deleted starts do not); it is frozen at the official end or as soon as every used lane has a final time or a penalty (captured data often lacks the official end). It can differ slightly from the
 device clock; the final time from the device is authoritative.
 
-All UI updates run on the EDT; pipeline callbacks marshal via `SwingUtilities.invokeLater`.
+All UI updates run on the EDT; pipeline callbacks marshal via `SwingUtilities.invokeLater`. New, Open and the recovery
+at program start load the project off the EDT while the window is disabled; their dialogs are still shown on the EDT.
 
 ## Error handling
 
 - Invalid/garbled device data: handled by the copied parsers (dropped messages are logged, never fatal).
-- Connection loss: reader reconnects with back-off; the state shows "disconnected"; recording remains RUNNING.
+- Connection loss over TCP: reader reconnects with back-off; the state shows "disconnected"; recording remains RUNNING.
+- Serial port names longer than the driver accepts (`SerialPorts.MAX_NAME_BYTES`; nrjavaserial aborts the JVM on
+  longer ones): rejected by the settings validation, refused by the reader before nrjavaserial sees them, not offered in
+  the port list.
+- Connection loss of a serial port (read error, port vanished): the reader closes the port and the recording stops
+  (STOPPED, everything recorded is kept); a status-bar warning stays until the recording is started again. No automatic
+  reconnect.
 - Save failures (disk full, permissions): error dialog, document stays dirty, previous file untouched (atomic rename).
 - Corrupt/unknown project file on Open: error dialog, current document unchanged.
 - Auto-save failure: status-bar warning, retried at the next interval.
+- Write failure during a recording (raw data, messages, heats, lane times): status-bar warning naming the data and the
+  error; the other stores go on. It stays until that data is stored again and the project has been saved after that.
 
 ## Testing
 
@@ -137,7 +158,7 @@ interpreted messages and not the raw lines; pings only switch a green marker (da
 Every live split or finish time carries the race time of the device and, as message timestamp, its arrival on the local
 clock. The start of the heat is set to `timestamp − race time` with every such message, so the running clock follows the
 device clock instead of drifting from the local arrival of the start message. Repeats of results (message type
-CurrentRaceResult) and times after the official end are not used for this.
+CurrentRaceResult), deleted times and times after the official end are not used for this.
 
 ### Running time model
 

@@ -9,7 +9,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class LaneTimeStore implements LaneTimeRepository {
 
-    private final ProjectDatabase db;
+    private final TimingDatabase db;
 
     @Override
     public void save(LaneTime laneTime) {
@@ -33,6 +33,17 @@ public class LaneTimeStore implements LaneTimeRepository {
                                .getResultStream()
                                .map(LaneTimeStore::toLaneTime)
                                .toList());
+    }
+
+    @Override
+    public void delete(int event, int heatNumber, int laneIndex, long timeInMillis) {
+        db.write(em -> em.createQuery("delete from LaneTimeEntity l where l.event = :event and l.heatNumber = :heatNumber"
+                                              + " and l.laneIndex = :laneIndex and l.timeInMillis = :timeInMillis")
+                         .setParameter("event", event)
+                         .setParameter("heatNumber", heatNumber)
+                         .setParameter("laneIndex", laneIndex)
+                         .setParameter("timeInMillis", timeInMillis)
+                         .executeUpdate());
     }
 
     private static LaneTime toLaneTime(LaneTimeEntity e) {

@@ -1,16 +1,20 @@
 package org.lisasp.alphatiming.ui.common;
 
+import org.lisasp.alphatiming.project.db.CrashLeftover;
+
 import java.nio.file.Path;
 import java.util.Optional;
 
-/** The questions the controller has to ask the user; implemented with dialogs in the UI and with stubs in tests. */
+/** The questions the controller asks on the thread that calls it, which need not be the UI thread; implemented with dialogs in the UI and with stubs in tests. */
 public interface SavePrompt {
 
     enum Choice { SAVE, DISCARD, CANCEL }
 
     enum RecoveryChoice { RECOVER, DISCARD, LATER }
 
-    /** The current project has unsaved changes. */
+    /** Leaving the document would end the running recording; false keeps both. */
+    boolean askStopRecording();
+
     Choice askSaveChanges();
 
     /** Where to save a project that has no file yet (or Save As); empty = cancelled. */
@@ -18,6 +22,8 @@ public interface SavePrompt {
 
     void showError(String title, String message);
 
-    /** A work file of an earlier run was left behind (crash). */
-    RecoveryChoice askRecover(Path workFile);
+    RecoveryChoice askRecover(CrashLeftover leftover);
+
+    /** Discarding deletes the leftover for good; false goes back to {@link #askRecover}. */
+    boolean confirmDiscard(CrashLeftover leftover);
 }

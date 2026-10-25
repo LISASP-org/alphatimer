@@ -1,8 +1,7 @@
 package org.lisasp.alphatiming.project.db;
 
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -31,7 +30,7 @@ public class LaneTimeEntity {
     private int heatNumber;
     private int laneIndex;
     private long timeInMillis;
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = EnumNameConverters.LegacyLaneStatusConverter.class)
     private LaneStatus status;
     private LocalDateTime timestamp;
 }

@@ -14,7 +14,10 @@ import org.lisasp.basics.notification.primitive.ByteNotifier;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.TooManyListenersException;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 public final class NrSerialReader implements SerialPortReader {
@@ -24,6 +27,8 @@ public final class NrSerialReader implements SerialPortReader {
     private final String portName;
     private final SerialConfiguration configuration;
     private final ByteNotifier notifier = new ByteNotifier();
+    private final List<Runnable> connectionLostListeners = new CopyOnWriteArrayList<>();
+    private final AtomicBoolean lossReported = new AtomicBoolean();
 
     private volatile SerialPort port;
     private volatile InputStream input;
@@ -40,9 +45,17 @@ public final class NrSerialReader implements SerialPortReader {
     }
 
     @Override
+    public void addConnectionLostListener(Runnable listener) {
+        connectionLostListeners.add(listener);
+    }
+
+    @Override
     public synchronized void start() {
         if (port != null) {
             return;
+        }
+        if (!SerialPorts.fitsDriver(portName)) {
+            throw new SerialConnectionException(portName, SerialConnectionException.Reason.NAME_TOO_LONG, null);
         }
         SerialPort opened = null;
         try {
@@ -52,6 +65,7 @@ public final class NrSerialReader implements SerialPortReader {
                                        stopBits(configuration),
                                        parity(configuration));
             input = opened.getInputStream();
+            lossReported.set(false);
             opened.addEventListener(this::onEvent);
             opened.notifyOnDataAvailable(true);
             port = opened;
@@ -107,9 +121,15 @@ public final class NrSerialReader implements SerialPortReader {
     }
 
     private void onEvent(SerialPortEvent event) {
-        if (event.getEventType() != SerialPortEvent.DATA_AVAILABLE) {
-            return;
+        switch (event.getEventType()) {
+            case SerialPortEvent.DATA_AVAILABLE -> read();
+            case SerialPortEvent.HARDWARE_ERROR -> connectionLost(null);
+            default -> {
+            }
         }
+    }
+
+    private void read() {
         InputStream in = input;
         if (in == null) {
             return;
@@ -123,8 +143,26 @@ public final class NrSerialReader implements SerialPortReader {
                 }
             }
         } catch (IOException ex) {
-            log.warn("Could not read from serial port {}", portName, ex);
+            connectionLost(ex);
         }
+    }
+
+    /** Runs on the monitor thread of nrjavaserial, which closing the port joins; so the close is handed to another thread. */
+    private void connectionLost(IOException cause) {
+        if (port == null || !lossReported.compareAndSet(false, true)) {
+            return;
+        }
+        log.warn("Lost the connection to serial port {}", portName, cause);
+        Thread.ofPlatform().daemon().name("serial-connection-lost-" + portName).start(() -> {
+            close();
+            for (Runnable listener : connectionLostListeners) {
+                try {
+                    listener.run();
+                } catch (RuntimeException ex) {
+                    log.warn("Connection lost listener failed", ex);
+                }
+            }
+        });
     }
 
     @Override

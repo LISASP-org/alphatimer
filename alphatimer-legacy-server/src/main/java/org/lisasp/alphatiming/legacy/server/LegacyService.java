@@ -5,6 +5,7 @@ import org.lisasp.alphatimer.api.ares.serial.DataHandlingMessageListener;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.KindOfTime;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.MessageType;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeType;
 import org.lisasp.alphatiming.legacy.server.dto.Heat;
 import org.lisasp.alphatiming.legacy.server.dto.LaneStatus;
 
@@ -26,10 +27,14 @@ public final class LegacyService implements DataHandlingMessageListener {
         if (message.getMessageType() == MessageType.OfficialEnd) {
             return;
         }
-        if (message.getKindOfTime() != KindOfTime.Finish) {
+        if (message.getEvent() <= 0 || message.getHeat() <= 0) {
             return;
         }
-        if (message.getEvent() <= 0 || message.getHeat() <= 0) {
+        if (message.getTimeType() == TimeType.DeletedTime) {
+            deleteFinish(message);
+            return;
+        }
+        if (message.getKindOfTime() != KindOfTime.Finish) {
             return;
         }
 
@@ -49,6 +54,14 @@ public final class LegacyService implements DataHandlingMessageListener {
                                 message.getTimeInMillis(),
                                 status,
                                 message.getTimestamp()));
+    }
+
+    /** The device withdraws a finish by sending it again as a deleted split time of the last lap. */
+    private void deleteFinish(DataHandlingMessage message) {
+        if (message.getCurrentLap() != message.getLapCount()) {
+            return;
+        }
+        store.delete(message.getEvent(), message.getHeat(), message.getLane() - 1, message.getTimeInMillis());
     }
 
     public Heat[] getHeats() {

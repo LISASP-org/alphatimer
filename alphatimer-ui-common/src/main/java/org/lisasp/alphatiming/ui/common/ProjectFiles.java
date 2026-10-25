@@ -1,7 +1,11 @@
 package org.lisasp.alphatiming.ui.common;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 public final class ProjectFiles {
 
@@ -17,5 +21,16 @@ public final class ProjectFiles {
             return file;
         }
         return file.resolveSibling(file.getFileName() + "." + EXTENSION);
+    }
+
+    public static Optional<Path> chooseSavePath(Supplier<Optional<Path>> chooser, Predicate<Path> confirmOverwrite) {
+        Optional<Path> chosen;
+        while ((chosen = chooser.get()).isPresent()) {
+            Path path = withDefaultExtension(chosen.get());
+            if (!Files.exists(path) || confirmOverwrite.test(path)) {
+                return Optional.of(path);
+            }
+        }
+        return Optional.empty();
     }
 }

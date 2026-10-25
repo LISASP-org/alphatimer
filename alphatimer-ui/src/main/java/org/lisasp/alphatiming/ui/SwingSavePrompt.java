@@ -3,6 +3,8 @@ package org.lisasp.alphatiming.ui;
 import org.lisasp.alphatiming.ui.common.SavePrompt;
 import org.lisasp.alphatiming.ui.common.I18n;
 import org.lisasp.alphatiming.ui.common.ProjectFiles;
+import org.lisasp.alphatiming.ui.common.RecoveryTexts;
+import org.lisasp.alphatiming.project.db.CrashLeftover;
 import lombok.Setter;
 
 import org.lisasp.swing.filechooser.FileChooserUtils;
@@ -10,11 +12,14 @@ import org.lisasp.swing.filechooser.filefilter.SimpleFileFilter;
 
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
-import java.nio.file.Files;
+import javax.swing.SwingUtilities;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.function.Supplier;
 
-/** The dialogs behind {@link SavePrompt}. */
 public final class SwingSavePrompt implements SavePrompt {
 
     @Setter
@@ -22,6 +27,10 @@ public final class SwingSavePrompt implements SavePrompt {
 
     @Override
     public Choice askSaveChanges() {
+        return answerOnEdt(this::saveChangesDialog, Choice.CANCEL);
+    }
+
+    private Choice saveChangesDialog() {
         Object[] options = {I18n.get("button.save"), I18n.get("button.discard"), I18n.get("button.cancel")};
         int answer = JOptionPane.showOptionDialog(parent,
                                                   I18n.get("dialog.save.message"),
@@ -39,21 +48,53 @@ public final class SwingSavePrompt implements SavePrompt {
     }
 
     @Override
+    public boolean askStopRecording() {
+        return answerOnEdt(this::stopRecordingDialog, false);
+    }
+
+    private boolean stopRecordingDialog() {
+        Object[] options = {I18n.get("button.stopRecording"), I18n.get("button.cancel")};
+        int answer = JOptionPane.showOptionDialog(parent,
+                                                  I18n.get("dialog.stopRecording.message"),
+                                                  I18n.get("dialog.stopRecording.title"),
+                                                  JOptionPane.OK_CANCEL_OPTION,
+                                                  JOptionPane.WARNING_MESSAGE,
+                                                  null,
+                                                  options,
+                                                  options[1]);
+        return answer == 0;
+    }
+
+    @Override
     public Optional<Path> askSavePath() {
-        String name;
-        while ((name = FileChooserUtils.saveFile(parent, projectFilter())) != null) {
-            Path path = Path.of(name);
-            if (!Files.exists(path)
-                    || JOptionPane.showConfirmDialog(parent, I18n.get("dialog.overwrite.message", path.getFileName()), I18n.get("dialog.overwrite.title"), JOptionPane.YES_NO_OPTION)
-                    == JOptionPane.YES_OPTION) {
-                return Optional.of(path);
-            }
-        }
-        return Optional.empty();
+        return answerOnEdt(this::savePathDialog, Optional.empty());
+    }
+
+    private Optional<Path> savePathDialog() {
+        return ProjectFiles.chooseSavePath(() -> Optional.ofNullable(FileChooserUtils.saveFile(parent, projectFilter())).map(Path::of),
+                                           path -> JOptionPane.showConfirmDialog(parent, I18n.get("dialog.overwrite.message", path.getFileName()), I18n.get("dialog.overwrite.title"), JOptionPane.YES_NO_OPTION)
+                                                   == JOptionPane.YES_OPTION);
     }
 
     public Optional<Path> askOpenPath() {
         return Optional.ofNullable(FileChooserUtils.openFile(parent, projectFilter())).map(Path::of);
+    }
+
+    /** The controller asks from the thread that runs its document work; dialogs must be shown on the EDT. */
+    static <T> T answerOnEdt(Supplier<T> question, T ifInterrupted) {
+        if (SwingUtilities.isEventDispatchThread()) {
+            return question.get();
+        }
+        FutureTask<T> asked = new FutureTask<>(question::get);
+        try {
+            SwingUtilities.invokeAndWait(asked);
+            return asked.get();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return ifInterrupted;
+        } catch (InvocationTargetException | ExecutionException ex) {
+            throw ex.getCause() instanceof RuntimeException failure ? failure : new IllegalStateException("A dialog failed", ex.getCause());
+        }
     }
 
     static SimpleFileFilter projectFilter() {
@@ -62,14 +103,21 @@ public final class SwingSavePrompt implements SavePrompt {
 
     @Override
     public void showError(String title, String message) {
-        JOptionPane.showMessageDialog(parent, message, title, JOptionPane.ERROR_MESSAGE);
+        answerOnEdt(() -> {
+            JOptionPane.showMessageDialog(parent, message, title, JOptionPane.ERROR_MESSAGE);
+            return null;
+        }, null);
     }
 
     @Override
-    public RecoveryChoice askRecover(Path workFile) {
+    public RecoveryChoice askRecover(CrashLeftover leftover) {
+        return answerOnEdt(() -> recoverDialog(leftover), RecoveryChoice.LATER);
+    }
+
+    private RecoveryChoice recoverDialog(CrashLeftover leftover) {
         Object[] options = {I18n.get("button.recover"), I18n.get("button.discard"), I18n.get("button.later")};
         int answer = JOptionPane.showOptionDialog(parent,
-                                                  I18n.get("dialog.recover.message"),
+                                                  RecoveryTexts.question(leftover),
                                                   I18n.get("dialog.recover.title"),
                                                   JOptionPane.DEFAULT_OPTION,
                                                   JOptionPane.QUESTION_MESSAGE,
@@ -81,5 +129,23 @@ public final class SwingSavePrompt implements SavePrompt {
             case 1 -> RecoveryChoice.DISCARD;
             default -> RecoveryChoice.LATER;
         };
+    }
+
+    @Override
+    public boolean confirmDiscard(CrashLeftover leftover) {
+        return answerOnEdt(() -> discardDialog(leftover), false);
+    }
+
+    private boolean discardDialog(CrashLeftover leftover) {
+        Object[] options = {I18n.get("button.delete"), I18n.get("button.back")};
+        int answer = JOptionPane.showOptionDialog(parent,
+                                                  RecoveryTexts.discardQuestion(leftover),
+                                                  I18n.get("dialog.discard.title"),
+                                                  JOptionPane.YES_NO_OPTION,
+                                                  JOptionPane.WARNING_MESSAGE,
+                                                  null,
+                                                  options,
+                                                  options[1]);
+        return answer == 0;
     }
 }

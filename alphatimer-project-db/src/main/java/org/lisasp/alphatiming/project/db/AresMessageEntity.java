@@ -1,9 +1,8 @@
 package org.lisasp.alphatiming.project.db;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -38,13 +37,13 @@ public class AresMessageEntity {
     private String originalText2;
     @Column(nullable = false)
     private LocalDateTime timestamp;
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = EnumNameConverters.MessageTypeConverter.class)
     @Column(nullable = false)
     private MessageType messageType;
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = EnumNameConverters.KindOfTimeConverter.class)
     @Column(nullable = false)
     private KindOfTime kindOfTime;
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = EnumNameConverters.TimeTypeConverter.class)
     @Column(nullable = false)
     private TimeType timeType;
     @Column(nullable = false)
@@ -53,16 +52,16 @@ public class AresMessageEntity {
     private short event;
     private byte heat;
     private byte rank;
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = EnumNameConverters.RankInfoConverter.class)
     @Column(nullable = false)
     private RankInfo rankInfo;
     private byte lane;
     private byte currentLap;
     private int timeInMillis;
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = EnumNameConverters.TimeInfoConverter.class)
     @Column(nullable = false)
     private TimeInfo timeInfo;
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = EnumNameConverters.TimeMarkerConverter.class)
     @Column(nullable = false)
     private TimeMarker timeMarker;
     @Column(nullable = false)

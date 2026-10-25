@@ -10,27 +10,36 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.time.Duration;
 import java.util.function.Supplier;
 
 @Slf4j
 public final class LegacyHttpServer implements AutoCloseable {
 
+    private static final int THREADS = 4;
+    private static final int QUEUE_CAPACITY = 16;
+    private static final Duration REQUEST_TIME_LIMIT = Duration.ofSeconds(10);
+
     private final ObjectMapper mapper = new ObjectMapper();
     private final Supplier<Heat[]> heats;
     private final HttpServer server;
-    private final ExecutorService executor = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r, "legacy-http");
-        t.setDaemon(true);
-        return t;
-    });
+    private final HandlerPool pool;
 
     public LegacyHttpServer(int port, Supplier<Heat[]> heats) throws IOException {
+        this(port, heats, new HandlerPool(THREADS, QUEUE_CAPACITY, REQUEST_TIME_LIMIT));
+    }
+
+    LegacyHttpServer(int port, Supplier<Heat[]> heats, HandlerPool pool) throws IOException {
         this.heats = heats;
-        this.server = HttpServer.create(new InetSocketAddress(port), 0);
+        this.pool = pool;
+        try {
+            this.server = HttpServer.create(new InetSocketAddress(port), 0);
+        } catch (IOException e) {
+            pool.close();
+            throw e;
+        }
         this.server.createContext("/", this::handle);
-        this.server.setExecutor(executor);
+        this.server.setExecutor(pool);
         this.server.start();
     }
 
@@ -77,6 +86,6 @@ public final class LegacyHttpServer implements AutoCloseable {
     @Override
     public void close() {
         server.stop(0);
-        executor.shutdownNow();
+        pool.close();
     }
 }

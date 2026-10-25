@@ -7,10 +7,16 @@ import org.lisasp.alphatimer.api.serial.SerialPortReader;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.project.db.HeatStore;
+import org.lisasp.alphatiming.project.db.TimingFileWriter;
+import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.heats.LiveHeats;
-import org.lisasp.alphatiming.ui.core.project.ProjectDocument;
+import org.lisasp.alphatiming.project.db.CrashLeftover;
+import org.lisasp.alphatiming.project.db.TimingWorkFolder;
+import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.recording.RecordingState;
+import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
+import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
 import java.io.IOException;
@@ -20,11 +26,15 @@ import java.time.LocalDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 class AppControllerTest {
 
@@ -32,8 +42,12 @@ class AppControllerTest {
         final Queue<Choice> choices = new ArrayDeque<>();
         final Queue<Optional<Path>> paths = new ArrayDeque<>();
         final Queue<RecoveryChoice> recoveries = new ArrayDeque<>();
+        final Queue<Boolean> discards = new ArrayDeque<>();
+        final List<CrashLeftover> leftovers = new ArrayList<>();
+        final Queue<Boolean> stops = new ArrayDeque<>();
         final List<String> errors = new ArrayList<>();
         final List<String> events;
+        Runnable whileAsking = () -> { };
 
         RecordingPrompt(List<String> events) {
             this.events = events;
@@ -42,12 +56,21 @@ class AppControllerTest {
         @Override
         public Choice askSaveChanges() {
             events.add("askSaveChanges");
+            whileAsking.run();
             return choices.remove();
+        }
+
+        @Override
+        public boolean askStopRecording() {
+            events.add("askStopRecording");
+            whileAsking.run();
+            return stops.remove();
         }
 
         @Override
         public Optional<Path> askSavePath() {
             events.add("askSavePath");
+            whileAsking.run();
             return paths.remove();
         }
 
@@ -57,9 +80,17 @@ class AppControllerTest {
         }
 
         @Override
-        public RecoveryChoice askRecover(Path workFile) {
+        public RecoveryChoice askRecover(CrashLeftover leftover) {
             events.add("askRecover");
+            whileAsking.run();
+            leftovers.add(leftover);
             return recoveries.remove();
+        }
+
+        @Override
+        public boolean confirmDiscard(CrashLeftover leftover) {
+            events.add("confirmDiscard");
+            return discards.remove();
         }
     }
 
@@ -114,12 +145,6 @@ class AppControllerTest {
     }
 
     @Test
-    void errorTextsFallBackToTheExceptionTypeInsteadOfNull() {
-        assertThat(AppController.describe(new IllegalStateException())).isEqualTo("java.lang.IllegalStateException");
-        assertThat(AppController.describe(new IllegalStateException("boom"))).isEqualTo("boom");
-    }
-
-    @Test
     void pingsReachThePingListenersButNeverTheMessageLog() {
         java.util.List<ByteConsumer> consumers = new ArrayList<>();
         AppController capturing = new AppController(work, defaults, prompt, () -> s -> new SerialPortReader() {
@@ -159,7 +184,7 @@ class AppControllerTest {
         controller.init();
         assertThat(controller.document().isDirty()).isFalse();
         assertThat(controller.requestClose()).isTrue();
-        assertThat(events).doesNotContain("askSaveChanges");
+        assertThat(events).doesNotContain("askSaveChanges", "askStopRecording");
         assertThat(workFiles()).isZero();
     }
 
@@ -167,7 +192,7 @@ class AppControllerTest {
     void newAndOpenOnAFreshProjectDoNotAsk() throws Exception {
         controller.init();
         Path file = dir.resolve("other.heat");
-        try (ProjectDocument other = ProjectDocument.create(work, S)) {
+        try (TimingDocument other = TimingDocument.create(work, S)) {
             other.saveAs(file);
         }
         controller.newProject();
@@ -177,17 +202,38 @@ class AppControllerTest {
     }
 
     @Test
-    void closeWhileRecordingStopsFirstThenAsks() throws Exception {
+    void closeWhileRecordingAsksToStopThenStopsThenAsksToSave() throws Exception {
         controller.init();
         controller.applySettings(S);
         controller.startRecording();
         assertThat(controller.session().state()).isEqualTo(RecordingState.RUNNING);
+        prompt.stops.add(true);
         prompt.choices.add(SavePrompt.Choice.DISCARD);
 
         assertThat(controller.requestClose()).isTrue();
 
-        assertThat(events).containsExactly("readerClosed", "askSaveChanges");
+        assertThat(events).containsExactly("askStopRecording", "readerClosed", "askSaveChanges");
         assertThat(workFiles()).isZero();
+    }
+
+    @Test
+    void declinedStopKeepsTheRecordingAndTheDocumentOnCloseNewAndOpen() throws Exception {
+        Path file = savedProject("other.timing");
+        controller.init();
+        controller.applySettings(S);
+        controller.startRecording();
+        TimingDocument before = controller.document();
+        prompt.stops.addAll(List.of(false, false, false));
+
+        assertThat(controller.requestClose()).isFalse();
+        controller.newProject();
+        controller.open(file);
+
+        assertThat(events).containsExactly("askStopRecording", "askStopRecording", "askStopRecording");
+        assertThat(controller.document()).isSameAs(before);
+        assertThat(controller.session().state()).isEqualTo(RecordingState.RUNNING);
+        assertThat(controller.document().isDirty()).isTrue();
+        controller.stopRecording();
     }
 
     @Test
@@ -209,10 +255,11 @@ class AppControllerTest {
     }
 
     @Test
-    void cancelKeepsTheDocumentAndLeavesRecordingStopped() {
+    void cancelOfTheSaveQuestionAfterAConfirmedStopKeepsTheDocumentWithTheRecordingStopped() {
         controller.init();
         controller.applySettings(S);
         controller.startRecording();
+        prompt.stops.add(true);
         prompt.choices.add(SavePrompt.Choice.CANCEL);
 
         assertThat(controller.requestClose()).isFalse();
@@ -260,7 +307,7 @@ class AppControllerTest {
         assertThat(controller.document().settings()).isEqualTo(remembered);
 
         Path file = dir.resolve("other.heat");
-        try (ProjectDocument other = ProjectDocument.create(work, S)) {
+        try (TimingDocument other = TimingDocument.create(work, S)) {
             other.saveAs(file);
         }
         prompt.choices.add(SavePrompt.Choice.DISCARD);
@@ -277,7 +324,7 @@ class AppControllerTest {
     void newProjectOnDirtyDocumentCanBeCancelled() {
         controller.init();
         controller.applySettings(S);
-        ProjectDocument before = controller.document();
+        TimingDocument before = controller.document();
         prompt.choices.add(SavePrompt.Choice.CANCEL);
         controller.newProject();
         assertThat(controller.document()).isSameAs(before);
@@ -286,7 +333,7 @@ class AppControllerTest {
     @Test
     void openingACorruptFileShowsAnErrorAndKeepsTheCurrentDocument() throws Exception {
         controller.init();
-        ProjectDocument before = controller.document();
+        TimingDocument before = controller.document();
         Path bad = dir.resolve("bad.heat");
         Files.writeString(bad, "garbage");
         prompt.choices.add(SavePrompt.Choice.DISCARD);
@@ -296,6 +343,24 @@ class AppControllerTest {
         assertThat(prompt.errors).hasSize(1);
         assertThat(controller.document()).isSameAs(before);
         assertThat(workFiles()).isEqualTo(1);
+    }
+
+    @Test
+    void theErrorForACorruptFileSaysItIsNotAnAlphaTimingProject() throws Exception {
+        Locale original = Locale.getDefault();
+        Locale.setDefault(Locale.ENGLISH);
+        try {
+            controller.init();
+            Path bad = dir.resolve("bad.timing");
+            Files.writeString(bad, "garbage");
+            prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+            controller.open(bad);
+
+            assertThat(prompt.errors).singleElement().asString().contains(bad + " is not an AlphaTiming project file.");
+        } finally {
+            Locale.setDefault(original);
+        }
     }
 
     @Test
@@ -319,7 +384,7 @@ class AppControllerTest {
 
     @Test
     void leftoverWorkFileCanBeRecoveredOrDiscarded() throws Exception {
-        ProjectDocument crashed = ProjectDocument.create(work, S);
+        TimingDocument crashed = TimingDocument.create(work, S);
         crashed.database().close();
         prompt.recoveries.add(SavePrompt.RecoveryChoice.RECOVER);
         controller.init();
@@ -329,9 +394,10 @@ class AppControllerTest {
         controller.requestClose();
         assertThat(workFiles()).isZero();
 
-        ProjectDocument crashed2 = ProjectDocument.create(work, S);
+        TimingDocument crashed2 = TimingDocument.create(work, S);
         crashed2.database().close();
         prompt.recoveries.add(SavePrompt.RecoveryChoice.DISCARD);
+        prompt.discards.add(true);
         AppController second = new AppController(work, defaults, prompt, () -> s -> fakeReader(), LocalDateTime::now);
         second.init();
         assertThat(second.document().settings()).isNotEqualTo(S);
@@ -341,24 +407,118 @@ class AppControllerTest {
     @Test
     void latestHeatIsRestoredWhenOpeningAFile() throws Exception {
         Path file = dir.resolve("heat.heat");
-        try (ProjectDocument other = ProjectDocument.create(work, S)) {
-            HeatStore store = new HeatStore(other.database());
-            HeatDto created = store.create("WK", 4, 2, 8);
+        HeatDto created;
+        try (TimingDocument other = TimingDocument.create(work, S)) {
+            created = new HeatStore(other.database()).create(4, 2, 8);
             other.saveAs(file);
-            prompt.recoveries.add(SavePrompt.RecoveryChoice.DISCARD);
+        }
+        controller.init();
+        List<LiveHeats> seen = new ArrayList<>();
+        controller.addHeatListener(seen::add);
+        controller.open(file);
+        assertThat(controller.currentHeat()).contains(created);
+        assertThat(seen).containsExactly(new LiveHeats(created, null));
+    }
+
+    @Test
+    void discardingALeftoverNeedsASecondConfirmation() throws Exception {
+        TimingDocument crashed = TimingDocument.create(work, S);
+        crashed.database().close();
+        prompt.recoveries.add(SavePrompt.RecoveryChoice.DISCARD);
+        prompt.discards.add(false);
+        prompt.recoveries.add(SavePrompt.RecoveryChoice.LATER);
+        controller.init();
+        assertThat(events).containsExactly("askRecover", "confirmDiscard", "askRecover");
+        assertThat(prompt.leftovers).extracting(CrashLeftover::workFile).containsOnly(crashed.database().workFile());
+        assertThat(workFiles()).isEqualTo(2); // the leftover and the new project
+    }
+
+    @Test
+    void aLeftoverThatCannotBeRecoveredIsOfferedAgain() throws Exception {
+        Path leftover = Files.writeString(work.resolve("heat-broken" + TimingWorkFolder.WORK_FILE_SUFFIX), "not a database");
+        prompt.recoveries.add(SavePrompt.RecoveryChoice.RECOVER);
+        prompt.recoveries.add(SavePrompt.RecoveryChoice.DISCARD);
+        prompt.discards.add(true);
+        controller.init();
+        assertThat(events).containsExactly("askRecover", "askRecover", "confirmDiscard");
+        String[] message = I18n.get("error.recovery.message", "|").split("\\|");
+        assertThat(prompt.errors).singleElement().asString()
+                                 .startsWith(I18n.get("error.recovery.title") + ": " + message[0])
+                                 .endsWith(message[1]);
+        assertThat(prompt.leftovers).extracting(CrashLeftover::workFile).containsOnly(leftover);
+        assertThat(leftover).doesNotExist();
+        assertThat(controller.document()).isNotNull();
+    }
+
+    private String errorOfRecoveringALeftoverThatIsNoDatabase(Locale locale) throws IOException {
+        Path leftover = Files.writeString(work.resolve("heat-broken" + TimingWorkFolder.WORK_FILE_SUFFIX), "not a database");
+        prompt.recoveries.add(SavePrompt.RecoveryChoice.RECOVER);
+        prompt.recoveries.add(SavePrompt.RecoveryChoice.LATER);
+        Locale original = Locale.getDefault();
+        Locale.setDefault(locale);
+        try {
             controller.init();
-            prompt.choices.add(SavePrompt.Choice.DISCARD);
-            List<LiveHeats> seen = new ArrayList<>();
-            controller.addHeatListener(seen::add);
-            controller.open(file);
-            assertThat(controller.currentHeat()).contains(created);
-            assertThat(seen).containsExactly(new LiveHeats(created, null));
+        } finally {
+            Locale.setDefault(original);
+        }
+        assertThat(prompt.errors).hasSize(1);
+        return prompt.errors.getFirst().replace(leftover.toString(), "<leftover>");
+    }
+
+    @Test
+    void recoveringALeftoverThatIsNoDatabaseSaysItIsDamaged() throws Exception {
+        assertThat(errorOfRecoveringALeftoverThatIsNoDatabase(Locale.ENGLISH))
+                .startsWith("Recovery failed: The unsaved data could not be recovered: <leftover> is damaged or not a database\n");
+    }
+
+    @Test
+    void recoveringALeftoverThatIsNoDatabaseSaysItIsDamagedInGerman() throws Exception {
+        assertThat(errorOfRecoveringALeftoverThatIsNoDatabase(Locale.GERMANY))
+                .startsWith("Wiederherstellung fehlgeschlagen: Die ungespeicherten Daten konnten nicht wiederhergestellt werden: <leftover> ist beschädigt oder keine Datenbank\n");
+    }
+
+    private String errorOfSavingIntoAMissingFolder(Locale locale) {
+        Path target = dir.resolve("missing").resolve("wk.timing");
+        controller.init();
+        controller.applySettings(S);
+        prompt.paths.add(Optional.of(target));
+        Locale original = Locale.getDefault();
+        Locale.setDefault(locale);
+        try {
+            assertThat(controller.saveAs()).isFalse();
+        } finally {
+            Locale.setDefault(original);
+        }
+        assertThat(prompt.errors).hasSize(1);
+        return prompt.errors.getFirst().replace(target.toString(), "<target>");
+    }
+
+    @Test
+    void savingIntoAMissingFolderSaysTheFolderDoesNotExist() {
+        assertThat(errorOfSavingIntoAMissingFolder(Locale.ENGLISH)).isEqualTo("Save project: Could not save <target>: <target> or its folder does not exist");
+    }
+
+    @Test
+    void savingIntoAMissingFolderSaysTheFolderDoesNotExistInGerman() {
+        assertThat(errorOfSavingIntoAMissingFolder(Locale.GERMANY))
+                .isEqualTo("Projekt speichern: <target> konnte nicht gespeichert werden: <target> oder sein Ordner existiert nicht");
+    }
+
+    @Test
+    void recoveryQuestionNamesTheProjectFileOfTheLeftover() throws Exception {
+        Path file = dir.resolve("crashed.timing");
+        try (TimingDocument crashed = TimingDocument.create(work, S)) {
+            crashed.saveAs(file);
+            crashed.database().close();
+            prompt.recoveries.add(SavePrompt.RecoveryChoice.LATER);
+            controller.init();
+            assertThat(prompt.leftovers).singleElement().satisfies(l -> assertThat(l.projectFile()).contains(file));
         }
     }
 
     @Test
     void closingTheRecoveryDialogKeepsTheLeftoverForLater() throws Exception {
-        ProjectDocument crashed = ProjectDocument.create(work, S);
+        TimingDocument crashed = TimingDocument.create(work, S);
         crashed.database().close();
         prompt.recoveries.add(SavePrompt.RecoveryChoice.LATER);
         controller.init();
@@ -369,10 +529,10 @@ class AppControllerTest {
     @Test
     void openingAProjectRestoresTheCurrentAndThePreviousHeat() throws Exception {
         Path file = dir.resolve("two.heat");
-        try (ProjectDocument a = ProjectDocument.create(work, S)) {
+        try (TimingDocument a = TimingDocument.create(work, S)) {
             HeatStore store = new HeatStore(a.database());
-            store.create("", 1, 1, 8);
-            store.create("", 1, 2, 8);
+            store.create(1, 1, 8);
+            store.create(1, 2, 8);
             a.saveAs(file);
         }
         controller.init();
@@ -389,11 +549,11 @@ class AppControllerTest {
     void openingAProjectWithoutHeatsClearsTheLiveHeat() throws Exception {
         Path withHeat = dir.resolve("with.heat");
         Path without = dir.resolve("without.heat");
-        try (ProjectDocument a = ProjectDocument.create(work, S)) {
-            new HeatStore(a.database()).create("WK", 4, 2, 8);
+        try (TimingDocument a = TimingDocument.create(work, S)) {
+            new HeatStore(a.database()).create(4, 2, 8);
             a.saveAs(withHeat);
         }
-        try (ProjectDocument b = ProjectDocument.create(work, S)) {
+        try (TimingDocument b = TimingDocument.create(work, S)) {
             b.saveAs(without);
         }
         controller.init();
@@ -412,13 +572,400 @@ class AppControllerTest {
     void autoSaveFailureIsVisibleUntilTheDocumentIsSavedAgain() {
         controller.init();
         controller.applySettings(S);
-        List<String> changes = new ArrayList<>();
-        controller.addChangeListener(() -> changes.add(controller.warning()));
+        List<List<StatusWarnings.Warning>> changes = new ArrayList<>();
+        controller.addChangeListener(() -> changes.add(controller.warnings()));
         controller.onAutoSaveError(new IOException("disk full"));
-        assertThat(controller.warning()).contains("disk full");
+        assertThat(controller.warnings()).singleElement().satisfies(w -> {
+            assertThat(w.text()).contains("disk full");
+            assertThat(w.details()).contains("disk full");
+        });
         assertThat(changes).isNotEmpty();
         prompt.paths.add(Optional.of(dir.resolve("x.heat")));
         assertThat(controller.save()).isTrue();
-        assertThat(controller.warning()).isEmpty();
+        assertThat(controller.warnings()).isEmpty();
+    }
+
+    private void failAutoSaveOfAChangedProject() {
+        controller.init();
+        controller.applySettings(S);
+        controller.onAutoSaveError(new IOException("disk full"));
+        assertThat(controller.warnings()).hasSize(1);
+        prompt.choices.add(SavePrompt.Choice.DISCARD);
+    }
+
+    @Test
+    void anAutoSaveFailureOfTheDiscardedProjectIsNotShownForANewOne() {
+        failAutoSaveOfAChangedProject();
+
+        controller.newProject();
+
+        assertThat(controller.warnings()).isEmpty();
+    }
+
+    @Test
+    void anAutoSaveFailureOfTheDiscardedProjectIsNotShownForAnOpenedOne() throws Exception {
+        Path other = savedProject("other.timing");
+        failAutoSaveOfAChangedProject();
+
+        controller.open(other);
+
+        assertThat(controller.document().file()).contains(other);
+        assertThat(controller.warnings()).isEmpty();
+    }
+
+    @Test
+    void anAutoSaveFailureOfTheDiscardedChangesIsNotShownAfterAFailedOpenRevertsThem() throws Exception {
+        Path bad = Files.writeString(dir.resolve("bad.timing"), "garbage");
+        failAutoSaveOfAChangedProject();
+
+        controller.open(bad);
+
+        assertThat(controller.document().isDirty()).isFalse();
+        assertThat(controller.warnings()).isEmpty();
+    }
+
+    private static final byte[] PING = {org.lisasp.alphatimer.api.ares.serial.Characters.SOH_StartOfHeader, org.lisasp.alphatimer.api.ares.serial.Characters.DC2_Periphery, 0x39,
+            org.lisasp.alphatimer.api.ares.serial.Characters.DC4_Command, 0x54, 0x50, org.lisasp.alphatimer.api.ares.serial.Characters.EOT_EndOfText};
+
+    private AppController recordingController(List<ByteConsumer> consumers) {
+        return new AppController(work, defaults, prompt, () -> s -> new SerialPortReader() {
+            @Override
+            public SerialPortReader register(ByteConsumer listener) {
+                consumers.add(listener);
+                return this;
+            }
+
+            @Override
+            public void close() {
+            }
+        }, LocalDateTime::now);
+    }
+
+    private static void recordPing(AppController recording, List<ByteConsumer> consumers) {
+        consumers.clear();
+        recording.startRecording();
+        for (byte b : PING) {
+            consumers.forEach(c -> c.accept(b));
+        }
+        recording.stopRecording();
+    }
+
+    private static void execute(AppController recording, String sql) {
+        recording.document().database().write(em -> em.createNativeQuery(sql).executeUpdate());
+    }
+
+    @Test
+    void aWriteErrorIsVisibleWithItsDetailsUntilTheDataIsStoredAgainAndTheProjectSavedAfterwards() {
+        Locale original = Locale.getDefault();
+        Locale.setDefault(Locale.ENGLISH);
+        List<ByteConsumer> consumers = new CopyOnWriteArrayList<>();
+        try (AppController recording = recordingController(consumers)) {
+            recording.init();
+            recording.applySettings(S);
+            prompt.paths.add(Optional.of(dir.resolve("w.timing")));
+            assertThat(recording.save()).isTrue();
+            List<String> log = new CopyOnWriteArrayList<>();
+            recording.addMessageListener(log::add);
+            execute(recording, "CREATE TRIGGER block_rawdata BEFORE INSERT ON rawdata BEGIN SELECT RAISE(ABORT, 'disk full'); END");
+
+            recordPing(recording, consumers);
+            assertThat(recording.warnings()).singleElement().satisfies(w -> {
+                assertThat(w.text()).isEqualTo("Recorded data could not be stored");
+                assertThat(w.details()).startsWith("Raw data could not be stored: ").contains("disk full")
+                                       .endsWith("(7 bytes were lost when the recording stopped)");
+            });
+            assertThat(log).anySatisfy(line -> assertThat(line).startsWith("Raw data could not be stored: ").contains("disk full"));
+            assertThat(log).contains("Raw data: 7 bytes could not be stored and were lost when the recording stopped");
+
+            assertThat(recording.save()).isTrue();
+            assertThat(recording.warnings()).as("saved, but the raw data is still missing").hasSize(1);
+
+            recordPing(recording, consumers);
+            assertThat(recording.warnings()).as("losses of several recordings add up").singleElement()
+                                            .satisfies(w -> assertThat(w.details()).contains("(14 bytes were lost when the recording stopped)"));
+
+            execute(recording, "DROP TRIGGER block_rawdata");
+            recordPing(recording, consumers);
+            assertThat(recording.warnings()).as("stored again, but not saved yet; the lost bytes stay lost").singleElement()
+                                            .satisfies(w -> assertThat(w.details()).contains("(14 bytes were lost when the recording stopped)")
+                                                                                   .contains("stored again"));
+
+            assertThat(recording.save()).isTrue();
+            assertThat(recording.warnings()).isEmpty();
+        } finally {
+            Locale.setDefault(original);
+        }
+    }
+
+    @Test
+    void aWriteErrorOfTheClosedProjectIsNotShownForTheNextOne() {
+        List<ByteConsumer> consumers = new CopyOnWriteArrayList<>();
+        try (AppController recording = recordingController(consumers)) {
+            recording.init();
+            recording.applySettings(S);
+            execute(recording, "CREATE TRIGGER block_rawdata BEFORE INSERT ON rawdata BEGIN SELECT RAISE(ABORT, 'disk full'); END");
+            recordPing(recording, consumers);
+            assertThat(recording.warnings()).hasSize(1);
+
+            prompt.choices.add(SavePrompt.Choice.DISCARD);
+            recording.newProject();
+            assertThat(recording.warnings()).isEmpty();
+        }
+    }
+
+    private static final Settings SERIAL = new Settings(ConnectionType.SERIAL, "", 1, "/dev/ttyUSB0", SerialMode.ARES21, 60, 0, false).withCompetitionKey("WK");
+
+    private AppController losingController(List<Runnable> loseConnection) {
+        return new AppController(work, defaults, prompt, () -> s -> new SerialPortReader() {
+            @Override
+            public SerialPortReader register(ByteConsumer listener) {
+                return this;
+            }
+
+            @Override
+            public void addConnectionLostListener(Runnable listener) {
+                loseConnection.add(() -> new Thread(listener, "fake-connection-lost").start());
+            }
+
+            @Override
+            public void close() {
+            }
+        }, LocalDateTime::now);
+    }
+
+    @Test
+    void aLostSerialConnectionStopsTheRecordingAndWarnsUntilTheRecordingIsStartedAgain() {
+        Locale original = Locale.getDefault();
+        Locale.setDefault(Locale.ENGLISH);
+        List<Runnable> loseConnection = new CopyOnWriteArrayList<>();
+        try (AppController recording = losingController(loseConnection)) {
+            recording.init();
+            recording.applySettings(SERIAL);
+            List<String> log = new CopyOnWriteArrayList<>();
+            recording.addMessageListener(log::add);
+            recording.startRecording();
+
+            loseConnection.getLast().run();
+
+            await().atMost(10, TimeUnit.SECONDS).until(() -> !recording.warnings().isEmpty());
+            assertThat(recording.isRecording()).isFalse();
+            assertThat(recording.warnings()).singleElement().satisfies(w -> {
+                assertThat(w.text()).isEqualTo("Serial connection lost, recording stopped");
+                assertThat(w.details()).startsWith("The connection to serial port /dev/ttyUSB0 was lost");
+                assertThat(log).contains(w.details());
+            });
+
+            recording.startRecording();
+            assertThat(recording.isRecording()).isTrue();
+            assertThat(recording.warnings()).isEmpty();
+        } finally {
+            Locale.setDefault(original);
+        }
+    }
+
+    @Test
+    void aLostConnectionOfTheClosedProjectIsNotShownForTheNextOne() {
+        List<Runnable> loseConnection = new CopyOnWriteArrayList<>();
+        try (AppController recording = losingController(loseConnection)) {
+            recording.init();
+            recording.applySettings(SERIAL);
+            recording.startRecording();
+            loseConnection.getLast().run();
+            await().atMost(10, TimeUnit.SECONDS).until(() -> !recording.warnings().isEmpty());
+
+            prompt.choices.add(SavePrompt.Choice.DISCARD);
+            recording.newProject();
+            assertThat(recording.warnings()).isEmpty();
+        }
+    }
+
+    private Path savedProject(String name) throws IOException {
+        Path file = dir.resolve(name);
+        try (TimingDocument doc = TimingDocument.create(work, S)) {
+            doc.saveAs(file);
+        }
+        return file;
+    }
+
+    private Path otherWork() throws IOException {
+        return Files.createDirectories(dir.resolve("other-work"));
+    }
+
+    @Test
+    void openingAFileThatAnotherProgramHoldsIsRefusedAndKeepsTheCurrentDocument() throws Exception {
+        Path file = savedProject("x.timing");
+        try (TimingDocument holder = TimingDocument.open(file, otherWork())) {
+            controller.init();
+            TimingDocument before = controller.document();
+
+            controller.open(file);
+
+            assertThat(prompt.errors).containsExactly(I18n.get("error.open.title") + ": " + I18n.get("error.open.inUse", file));
+            assertThat(controller.document()).isSameAs(before);
+            assertThat(workFiles()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void saveAsToAFileThatAnotherProgramHoldsIsRefused() throws Exception {
+        Path file = savedProject("x.timing");
+        try (TimingDocument holder = TimingDocument.open(file, otherWork())) {
+            controller.init();
+            controller.applySettings(S.withTcp("changed", 1));
+            prompt.paths.add(Optional.of(file));
+
+            assertThat(controller.saveAs()).isFalse();
+
+            assertThat(prompt.errors).containsExactly(I18n.get("error.save.title") + ": " + I18n.get("error.saveTo.inUse", file));
+            assertThat(controller.document().file()).isEmpty();
+            assertThat(controller.document().isDirty()).isTrue();
+        }
+    }
+
+    @Test
+    void openingTheOwnFileAgainGoesBackToTheSavedStateAndKeepsTheLock() throws Exception {
+        controller.init();
+        controller.applySettings(S);
+        Path file = dir.resolve("x.timing");
+        prompt.paths.add(Optional.of(file));
+        assertThat(controller.save()).isTrue();
+        controller.applySettings(S.withTcp("changed", 1));
+        prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+        controller.open(file);
+
+        assertThat(prompt.errors).isEmpty();
+        assertThat(controller.document().settings()).isEqualTo(S);
+        assertThatThrownBy(() -> TimingDocument.open(file, otherWork())).isInstanceOf(ProjectFileInUseException.class);
+        assertThat(controller.requestClose()).isTrue();
+        assertThat(dir.resolve("x.timing.lock")).doesNotExist();
+    }
+
+    private void autoSaveFromAnotherThread() {
+        Thread autoSave = new Thread(controller::runAutoSave);
+        autoSave.start();
+        try {
+            autoSave.join();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private Path openChangedProject(String name) throws IOException {
+        Path file = savedProject(name);
+        controller.init();
+        controller.open(file);
+        controller.applySettings(S.withTcp("changed", 1));
+        return file;
+    }
+
+    @Test
+    void anAutoSaveDuringTheSaveQuestionDoesNotWriteChangesTheUserDiscards() throws Exception {
+        Path file = openChangedProject("x.timing");
+        prompt.whileAsking = this::autoSaveFromAnotherThread;
+        prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+        controller.newProject();
+
+        assertThat(TimingFileWriter.previousVersionOf(file)).doesNotExist();
+        try (TimingDocument saved = TimingDocument.open(file, otherWork())) {
+            assertThat(saved.settings().tcpHost()).isEqualTo(S.tcpHost());
+        }
+    }
+
+    @Test
+    void afterACancelledQuestionAutoSaveResumes() throws Exception {
+        Path file = openChangedProject("x.timing");
+        prompt.whileAsking = this::autoSaveFromAnotherThread;
+        prompt.choices.add(SavePrompt.Choice.CANCEL);
+
+        assertThat(controller.requestClose()).isFalse();
+        assertThat(controller.document().isDirty()).isTrue();
+
+        controller.runAutoSave();
+        assertThat(controller.document().isDirty()).isFalse();
+        assertThat(TimingFileWriter.previousVersionOf(file)).exists();
+    }
+
+    @Test
+    void anAutoSaveWhileTheSaveAsDialogIsOpenDoesNotWriteTheCurrentFile() throws Exception {
+        Path file = openChangedProject("a.timing");
+        Path target = dir.resolve("b.timing");
+        prompt.whileAsking = this::autoSaveFromAnotherThread;
+        prompt.paths.add(Optional.of(target));
+
+        assertThat(controller.saveAs()).isTrue();
+
+        assertThat(TimingFileWriter.previousVersionOf(file)).doesNotExist();
+        assertThat(target).exists();
+    }
+
+    @Test
+    void discardedChangesAreNotAutoSavedWhenOpeningACorruptFileFails() throws Exception {
+        Path file = openChangedProject("x.timing");
+        Path bad = Files.writeString(dir.resolve("bad.timing"), "garbage");
+        prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+        controller.open(bad);
+        controller.runAutoSave();
+
+        assertThat(TimingFileWriter.previousVersionOf(file)).doesNotExist();
+        assertThat(prompt.errors).containsExactly(I18n.get("error.open.title") + ": " + I18n.get("error.open.invalid", bad));
+        assertThat(controller.document().file()).contains(file);
+        assertThat(controller.document().settings()).isEqualTo(S);
+        assertThat(controller.document().isDirty()).isFalse();
+        assertThat(workFiles()).isEqualTo(1);
+    }
+
+    @Test
+    void discardedChangesAreNotAutoSavedWhenTheFileToOpenIsInUseAndTheOwnFileStaysLocked() throws Exception {
+        Path held = savedProject("held.timing");
+        try (TimingDocument holder = TimingDocument.open(held, otherWork())) {
+            Path file = openChangedProject("x.timing");
+            prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+            controller.open(held);
+            controller.runAutoSave();
+
+            assertThat(TimingFileWriter.previousVersionOf(file)).doesNotExist();
+            assertThat(prompt.errors).containsExactly(I18n.get("error.open.title") + ": " + I18n.get("error.open.inUse", held));
+            assertThat(controller.document().settings()).isEqualTo(S);
+            assertThat(controller.document().isDirty()).isFalse();
+            assertThatThrownBy(() -> TimingDocument.open(file, otherWork())).isInstanceOf(ProjectFileInUseException.class);
+        }
+    }
+
+    @Test
+    void discardedChangesOfAnUnsavedProjectAreGoneWhenTheOpenFails() throws Exception {
+        controller.init();
+        controller.applySettings(S);
+        Path bad = Files.writeString(dir.resolve("bad.timing"), "garbage");
+        prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+        controller.open(bad);
+
+        assertThat(controller.document().settings()).isEqualTo(defaults.load());
+        assertThat(controller.document().isDirty()).isFalse();
+        assertThat(controller.document().file()).isEmpty();
+        assertThat(workFiles()).isEqualTo(1);
+    }
+
+    @Test
+    void discardedChangesAreClosedWhenNeitherTheNewProjectNorTheSavedStateCanBeLoaded() throws Exception {
+        Path file = openChangedProject("x.timing");
+        Files.move(work, dir.resolve("work-moved"));
+        Files.writeString(work, "not a folder");
+        controller.onAutoSaveError(new IOException("disk full"));
+        prompt.choices.add(SavePrompt.Choice.DISCARD);
+
+        controller.newProject();
+        controller.runAutoSave();
+
+        assertThat(controller.document()).isNull();
+        assertThat(controller.warnings()).isEmpty();
+        assertThat(TimingFileWriter.previousVersionOf(file)).doesNotExist();
+        assertThat(prompt.errors).hasSize(2).first().asString().startsWith(I18n.get("error.new.title") + ": ");
+        assertThat(prompt.errors.get(1)).startsWith(I18n.get("error.revert.title") + ": ");
+        assertThat(dir.resolve("x.timing.lock")).doesNotExist();
     }
 }

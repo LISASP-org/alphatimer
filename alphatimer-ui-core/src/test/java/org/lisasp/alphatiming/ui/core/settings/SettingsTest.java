@@ -1,6 +1,7 @@
 package org.lisasp.alphatiming.ui.core.settings;
 
 import org.junit.jupiter.api.Test;
+import org.lisasp.alphatimer.serial.com.SerialPorts;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -48,6 +49,15 @@ class SettingsTest {
         Settings serial = new Settings(ConnectionType.SERIAL, "", 0, "", SerialMode.ARES21, 60, 1999, false).withCompetitionKey("WK");
         assertThat(serial.validate()).containsExactly(SettingsProblem.SERIAL_PORT_MISSING);
         assertThat(new Settings(ConnectionType.SERIAL, "", 0, "/dev/ttyUSB0", SerialMode.QUANTUM, 60, 1999, false).withCompetitionKey("WK").validate()).isEmpty();
+    }
+
+    @Test
+    void serialPortNamesTooLongForTheDriverAreRejected() {
+        Settings serial = new Settings(ConnectionType.SERIAL, "", 0, "", SerialMode.ARES21, 60, 1999, false).withCompetitionKey("WK");
+        String longest = "/dev/" + "x".repeat(SerialPorts.MAX_NAME_BYTES - 5);
+        assertThat(serial.withSerial(longest, SerialMode.ARES21).validate()).isEmpty();
+        assertThat(serial.withSerial(longest + "x", SerialMode.ARES21).validate()).containsExactly(SettingsProblem.SERIAL_PORT_NAME_TOO_LONG);
+        assertThat(serial.withSerial(longest + "x", SerialMode.ARES21).withConnectionType(ConnectionType.TCP).withTcp("h", 1).validate()).isEmpty();
     }
 
     @Test

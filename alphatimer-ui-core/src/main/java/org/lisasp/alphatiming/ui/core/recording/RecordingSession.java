@@ -4,6 +4,7 @@ import org.lisasp.alphatiming.project.db.MessageStore;
 import org.lisasp.alphatiming.project.db.RawDataRecorder;
 import lombok.extern.slf4j.Slf4j;
 import org.lisasp.alphatimer.api.ares.serial.DataHandlingMessageAggregator;
+import org.lisasp.alphatimer.api.ares.serial.DataHandlingMessageListener;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.Ping;
 import org.lisasp.alphatimer.api.serial.SerialPortReader;
@@ -14,7 +15,7 @@ import org.lisasp.alphatimer.refinedmessages.DataHandlingMessageRefiner;
 import org.lisasp.alphatimer.serial.tcp.TcpReader;
 import org.lisasp.basics.jre.date.DateTimeFacade;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
-import org.lisasp.alphatiming.project.db.ProjectDatabase;
+import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.heats.HeatService;
 import org.lisasp.alphatiming.project.db.HeatStore;
@@ -50,7 +51,7 @@ public final class RecordingSession implements AutoCloseable {
     private static final String COMPETITION = "";
     private static final int REPLAY_BAUD_RATE = 9600;
 
-    private final ProjectDatabase db;
+    private final TimingDatabase db;
     private final ReaderFactory readers;
     private final DateTimeFacade time;
 
@@ -59,6 +60,9 @@ public final class RecordingSession implements AutoCloseable {
     private final List<Consumer<DataHandlingMessage>> messageListeners = new CopyOnWriteArrayList<>();
     private final List<Runnable> pingListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<Exception>> errorListeners = new CopyOnWriteArrayList<>();
+    private final List<Consumer<String>> connectionLostListeners = new CopyOnWriteArrayList<>();
+    private final List<WriteListener> writeListeners = new CopyOnWriteArrayList<>();
+    private final WriteMonitor writes = new WriteMonitor(writeListeners);
 
     private volatile RecordingState state = RecordingState.STOPPED;
     private volatile RecordingError error;
@@ -68,7 +72,7 @@ public final class RecordingSession implements AutoCloseable {
     private LegacyHttpServer restServer;
     private volatile LegacyService legacy;
 
-    public RecordingSession(ProjectDatabase db, ReaderFactory readers, DateTimeFacade time) {
+    public RecordingSession(TimingDatabase db, ReaderFactory readers, DateTimeFacade time) {
         this.db = db;
         this.readers = readers;
         this.time = time;
@@ -122,6 +126,7 @@ public final class RecordingSession implements AutoCloseable {
                 case IN_USE -> RecordingError.Kind.SERIAL_PORT_IN_USE;
                 case UNAVAILABLE -> RecordingError.Kind.SERIAL_UNAVAILABLE;
                 case OPEN_FAILED -> RecordingError.Kind.SERIAL_OPEN_FAILED;
+                case NAME_TOO_LONG -> RecordingError.Kind.SERIAL_PORT_NAME_TOO_LONG;
             };
             return new RecordingError(kind, serial.port());
         }
@@ -129,19 +134,20 @@ public final class RecordingSession implements AutoCloseable {
     }
 
     private void build(Settings s) {
-        legacy = new LegacyService(new LaneTimeStore(db));
+        legacy = new LegacyService(writes.laneTimes(new LaneTimeStore(db)));
         MessageStore messageStore = new MessageStore(db);
-        HeatService heatService = new HeatService(new HeatStore(db), this::reportError);
+        HeatService heatService = new HeatService(writes.heats(new HeatStore(db)), this::reportError);
         heatListeners.forEach(heatService::register);
-        rawRecorder = new RawDataRecorder(db, time, 512, 250, this::reportError);
+        rawRecorder = new RawDataRecorder(db, time, 512, 250, ex -> writes.failed(RecordedData.RAW_DATA, ex), () -> writes.stored(RecordedData.RAW_DATA),
+                                          bytes -> writes.dropped(RecordedData.RAW_DATA, bytes));
 
         InputCollector collector = new InputCollector(COMPETITION, time);
         MessageConverter converter = new MessageConverter();
         DataHandlingMessageAggregator aggregator = new MessageAggregator();
         DataHandlingMessageRefiner refiner = new DataHandlingMessageRefiner();
 
-        aggregator.register(legacy);
-        aggregator.register(messageStore::put);
+        aggregator.register(isolated(legacy));
+        aggregator.register(isolated(m -> writes.write(RecordedData.MESSAGES, () -> messageStore.put(m))));
         aggregator.register(refiner);
         aggregator.register(this::announce);
         refiner.register(heatService::accept);
@@ -153,8 +159,10 @@ public final class RecordingSession implements AutoCloseable {
         });
         collector.register(converter);
 
-        reader = readers.create(s);
+        SerialPortReader created = readers.create(s);
+        reader = created;
         reader.register(safe(rawRecorder)).register(safe(collector));
+        reader.addConnectionLostListener(() -> connectionLost(created, s.serialPort()));
         if (reader instanceof FileReplayReader replay) {
             replay.addFinishedListener(this::stop);
         }
@@ -180,7 +188,23 @@ public final class RecordingSession implements AutoCloseable {
         };
     }
 
+    /** A store that cannot write a message must not keep it from the stores registered after it. */
+    private DataHandlingMessageListener isolated(DataHandlingMessageListener delegate) {
+        return m -> {
+            try {
+                delegate.accept(m);
+            } catch (RuntimeException ex) {
+                log.warn("Could not store received message", ex);
+                reportError(ex);
+            }
+        };
+    }
+
     private void reportError(RuntimeException ex) {
+        if (ex instanceof RecordingWriteException write) {
+            writes.failed(write.data(), (Exception) write.getCause());
+            return;
+        }
         for (Consumer<Exception> listener : errorListeners) {
             try {
                 listener.accept(ex);
@@ -218,6 +242,20 @@ public final class RecordingSession implements AutoCloseable {
         teardown();
         log.info("Recording stopped");
         setState(RecordingState.STOPPED, null);
+    }
+
+    private synchronized void connectionLost(SerialPortReader lost, String port) {
+        if (lost != reader || state != RecordingState.RUNNING) {
+            return;
+        }
+        stop();
+        for (Consumer<String> listener : connectionLostListeners) {
+            try {
+                listener.accept(port);
+            } catch (RuntimeException ex) {
+                log.warn("Connection lost listener failed", ex);
+            }
+        }
     }
 
     private void teardown() {
@@ -270,6 +308,10 @@ public final class RecordingSession implements AutoCloseable {
         errorListeners.add(listener);
     }
 
+    public void addWriteListener(WriteListener listener) {
+        writeListeners.add(listener);
+    }
+
     public boolean isConnected() {
         SerialPortReader r = reader;
         return state == RecordingState.RUNNING && r != null && r.isConnected();
@@ -288,9 +330,13 @@ public final class RecordingSession implements AutoCloseable {
         messageListeners.add(listener);
     }
 
-    /** Called for every ping the device sends. */
     public void addPingListener(Runnable listener) {
         pingListeners.add(listener);
+    }
+
+    /** Called with the serial port after a lost connection has stopped the recording. */
+    public void addConnectionLostListener(Consumer<String> listener) {
+        connectionLostListeners.add(listener);
     }
 
     public Heat[] legacyHeats() {

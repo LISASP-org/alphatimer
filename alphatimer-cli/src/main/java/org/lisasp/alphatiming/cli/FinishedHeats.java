@@ -19,7 +19,7 @@ final class FinishedHeats {
         if (heat == null || heat.status() != HeatStatus.Finished) {
             return Optional.empty();
         }
-        String key = heat.competition() + "/" + heat.event() + "/" + heat.heat();
+        String key = heat.event() + "/" + heat.heat();
         if (key.equals(lastDescribed)) {
             return Optional.empty();
         }

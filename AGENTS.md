@@ -26,16 +26,16 @@ that solve problems this application does not have:
 
 | Module | Purpose |
 | --- | --- |
-| `alphatimer-ares-serial-api`, `alphatimer-ares-serial`, `alphatimer-refinedmessages-api`, `alphatimer-refinedmessages`, `alphatimer-serial-api` | Copied from `../alphatimer` (`module-info.java` removed): protocol messages, byte→message parsing, message refining, `SerialPortReader`, `SerialConfiguration`. Independent copies — never make them depend on alphatimer. `SerialPortReader` has the additions `start()` and `isConnected()`. `RefinedMessage` has the addition `getDeviceTimeInMillis()` (the time value the device sent, where the message has one; `getTimestamp()` is the local arrival time) and `TakeOverTimeMessage` keeps its time. |
-| `alphatimer-serial-core` | The `SerialPortReader` implementations: `TcpReader` (`serial.tcp`, copied from `../alphatimer`) and `NrSerialReader`, `SerialPorts`, `SerialConnectionException` (`serial.com`, on nrjavaserial as in AlphaServer; line settings from `SerialConfiguration`). Never depends on the UI modules. |
+| `alphatimer-ares-serial-api`, `alphatimer-ares-serial`, `alphatimer-refinedmessages-api`, `alphatimer-refinedmessages`, `alphatimer-serial-api` | Copied from `../alphatimer` (`module-info.java` removed): protocol messages, byte→message parsing, message refining, `SerialPortReader`, `SerialConfiguration`. Independent copies — never make them depend on alphatimer. `SerialPortReader` has the additions `start()`, `isConnected()` and `addConnectionLostListener(…)`. `RefinedMessage` has the addition `getDeviceTimeInMillis()` (the time value the device sent, where the message has one; `getTimestamp()` is the local arrival time) and `TakeOverTimeMessage` keeps its time. |
+| `alphatimer-serial-core` | The `SerialPortReader` implementations: `TcpReader` (`serial.tcp`, copied from `../alphatimer`; `close()` waits up to 5 s for the reader thread to end) and `NrSerialReader`, `SerialPorts`, `SerialConnectionException` (`serial.com`, on nrjavaserial as in AlphaServer; line settings from `SerialConfiguration`; a read error or vanished port closes it and is reported to its connection-lost listeners, never reconnected). Never depends on the UI modules. |
 | `alphatimer-heats` | Heat model, placing, `HeatService`, `RunningClock`, `LiveHeats`, the heat/lane DTOs and enums. Works on refined messages only; stores through the `HeatRepository` interface. No database. |
-| `alphatimer-legacy-server` | alphatimer-compatible heats (`LegacyService`, `legacy.dto`) and the JDK `HttpServer` endpoints (`LegacyHttpServer`). Stores `LaneTime`s through the `LaneTimeRepository` interface. No database. |
-| `alphatimer-project-db` | The `.timing` project file: Hibernate on SQLite (`ProjectDatabase`, entities) and the stores that implement the repositories (`HeatStore`, `LaneTimeStore`) or write the recording (`MessageStore`, `RawDataRecorder`). `replay` (`FileReplayReader`: binary file or the raw data of a `.timing` file, paced like 9600 baud; reads the `rawdata` table with plain JDBC). The only module with Hibernate/SQLite. |
-| `alphatimer-ui-core` | No Swing. The application layer: `settings` (`SerialMode` maps to a `SerialConfiguration`), `project` (`ProjectDocument`, `AutoSaver`), `recording` (`RecordingSession` wires reader, parser, heats, stores and the legacy server). |
-| `alphatimer-ui-common` | What every front end shares, no Swing: `AppController` (document workflow), `SavePrompt` (the questions it asks, implemented per front end), `I18n` with the `messages*.properties`, `AppStatus` (title, file, state text, Start/Stop), `SettingsFormRules` (required/editable fields, record button), `LaneRows`, `TimeFormat`, `MessageText`. |
+| `alphatimer-legacy-server` | alphatimer-compatible heats (`LegacyService`, `legacy.dto`) and the JDK `HttpServer` endpoints (`LegacyHttpServer`; its requests run on the bounded `HandlerPool`, which closes connections beyond its queue and those over the time limit). Stores `LaneTime`s through the `LaneTimeRepository` interface. No database. |
+| `alphatimer-project-db` | The `.timing` project file: Hibernate on SQLite (`TimingDatabase`, entities), the save protocol of the project file (`TimingFileWriter`), the work folder with its work files, their locks and origin notes and the crash leftovers (`TimingWorkFolder`, `CrashLeftover`) and the stores that implement the repositories (`HeatStore`, `LaneTimeStore`) or write the recording (`MessageStore`, `RawDataRecorder`). `replay` (`FileReplayReader`: binary file or the raw data of a `.timing` file, paced like 9600 baud; reads the `rawdata` table with plain JDBC). The only module with Hibernate/SQLite. |
+| `alphatimer-ui-core` | No Swing. The application layer: `settings` (`SerialMode` maps to a `SerialConfiguration`), `project` (`TimingDocument`: the open project with its database, project file and lock, unsaved state and save lock and its settings, kept in memory so the 1 s refresh reads them without the database lock; `AutoSaver`), `recording` (`RecordingSession` wires reader, parser, heats, stores and the legacy server; its `WriteListener` hears which `RecordedData` could not be stored, when it is stored again and how many bytes of it were dropped when the recording stopped; a lost serial connection stops it and is reported to its connection-lost listeners). |
+| `alphatimer-ui-common` | What every front end shares, no Swing: `AppController` (document workflow), `SavePrompt` (the questions it asks, implemented per front end; `RecoveryTexts` builds the texts of the recovery questions), `ProjectFiles` (file extensions; the Save As path choice the prompts share: default extension, then the overwrite question), `I18n` with the `messages*.properties`, `FileFailure` (classifies the cause chain of a failed file action — not found, no permission, disk full, folder, corrupt, locked, other — so error texts name the reason and the file instead of the exception message), `AppStatus` (title, file, state text, warning summary and details, Start/Stop), `StatusWarnings` (the active status-bar warnings, each kind with its own clearing rule, all of them cleared when the document is replaced or closed; `WriteFailures` raises and clears the write-error warning; the lost serial connection is cleared by the next start), `SettingsFormRules` (required/editable fields, record button), `ShownDocument` (a field being edited keeps its text on a refresh, but not when the document is replaced), `LaneRows`, `TimeFormat`, `MessageText`, `LogFileCleanup` (old log files, run by every launcher). |
 | `alphatimer-ui` | Swing UI on the JUtils `JButtonBar` in the layout of the JAuswertung plugin window (`JAlphaTiming.createBody`: `SelectorScrollPane` with the bar left, 4 dlu gap, the panel right with a labeled border of its name, 5 px space around; window sized like `JPFrame`), `SwingSavePrompt`, `AlphaTimingLauncher`. Panels: "Settings & Recording" and "Live View" (lane rows built from `LaneRows`, no `JTable`). Builds `alphatiming.jar` with its dependencies in `target/lib/`. |
 | `alphatimer-tui` | Text UI on Lanterna with the structure of the GUI (`TuiMainWindow`: menu bar, panel buttons left, status line; `TuiSettingsPanel`, `TuiLiveViewPanel`, `TuiSavePrompt` with text dialogs). All logic comes from `alphatimer-ui-common`; listeners go through `gui.getGUIThread().invokeLater`. Shortcuts are function keys (F2 save, F5/F6 panels, F10 exit), Ctrl+N/O, and Ctrl+C asks like Exit — never Ctrl+S/Ctrl+Q, which terminals use for flow control. Logs to the file only. Builds `alphatiming-tui.jar` with `target/lib/`. |
-| `alphatimer-cli` | Command line recording into an existing project file (`RecordLauncher`, `RecordCommand`): opens it through `AppController` with the non-interactive `CliSavePrompt`, records with its stored settings until `TerminalStopTrigger` (JLine raw mode: any key, Ctrl+C) or SIGTERM fires, saves. Prints `MessageText` lines and finished heats (`FinishedHeats`). Exit codes in `ExitCode`. Logs to the file only. Builds `alphatiming-cli.jar` with `target/lib/`. |
+| `alphatimer-cli` | Command line recording into an existing project file (`RecordLauncher`, `RecordCommand`): opens it through `AppController` with the non-interactive `CliSavePrompt` (stops and saves without asking), records with its stored settings until `TerminalStopTrigger` (JLine raw mode: any key, Ctrl+C) or SIGTERM fires or the serial connection is lost, saves. Prints `MessageText` lines and finished heats (`FinishedHeats`). Exit codes in `ExitCode` (a lost connection has its own). Logs to the file only. Builds `alphatiming-cli.jar` with `target/lib/`. |
 
 ### Dependency Rules
 
@@ -53,13 +53,25 @@ that solve problems this application does not have:
 - Swing components are only accessed on the EDT. Callbacks from the reader thread (`RecordingSession` listeners) must
   go through `SwingUtilities.invokeLater`, as `JAlphaTiming` does; `AppController` itself contains no Swing code and calls
   its listeners on whatever thread caused the change.
-- All database access goes through `ProjectDatabase.read/write` (one lock, one connection). Never open sessions on the
+- All database access goes through `TimingDatabase.read/write` (one lock, one connection). Never open sessions on the
   side. Lock order: component locks (`RecordingSession`, `HeatService`, `RawDataRecorder`) first, the database lock
-  second.
+  second. Saves (Save, Save As, auto-save) run one after another on the save lock of `TimingDocument`, taken
+  before the database lock; `TimingDatabase.snapshotTo` holds the database lock only while copying the database, so the
+  recording keeps writing while `TimingFileWriter` moves the copy to the target. `TimingDocument` switches to a new file
+  (Save As), records the work file's origin note and closes under the same save lock, so a running save finishes before
+  the database closes. Its dirty flag is set by a write listener of `TimingDatabase`, which runs under the database lock.
+- `AppController` pauses the `AutoSaver` while it asks the user about the document (stop recording, Save / Discard /
+  Cancel, Save As path, recovery) and until a discarded document is closed; `pause()` waits for a running auto-save. If
+  New or Open fails after Discard, it replaces the discarded document with the saved state of its file (a new project
+  without a file; closes it if that fails too) before auto-save resumes.
 - An exception inside the recording pipeline must never reach the reader thread (`RecordingSession.safe`); a failing
   listener must not affect the others.
-- Long-running work (saving, opening) must not be added to the EDT without thought — saving takes the database lock
-  (see `docs/issues/`).
+- Replacing the document (New, Open, the crash recovery at program start) builds a Hibernate session factory and takes
+  seconds, so the Swing UI runs these controller calls through `JAlphaTiming.runDocumentWork` on a `SwingWorker`: the
+  window stays disabled with a wait cursor, is not refreshed and holds the commits of the settings form until the work
+  is done (also after a failure). `SwingSavePrompt` hands each question to the EDT and waits for the answer, so the
+  controller may ask from that worker. The TUI and the CLI call the controller synchronously. Saving stays on the EDT;
+  it holds the database lock only for the `VACUUM INTO` of a small file. Do not add other long-running work to the EDT.
 - Every thread, socket, REST port and file lock that a recording or a document opens must be released on stop/close;
   start → stop → start must be repeatable.
 
@@ -67,20 +79,60 @@ that solve problems this application does not have:
 
 - A `.timing` project file (earlier versions saved `.heat`; the Open dialog still accepts it) is a SQLite file written through JPA/Hibernate (native bootstrap, no `persistence.xml`,
   `hibernate-community-dialects`). Tables: `settings`, `rawdata`, `aresmessage`, `lanetime`, `heat`, `lane`. Columns added later (e.g. the connection type in `settings`) are nullable and read as the earlier behavior (TCP), so files of earlier versions still open.
-- Save = `VACUUM INTO` a temp file + atomic move (`ProjectDatabase.snapshotTo`); a failed save keeps the old file and
-  the dirty flag. Open copies the file to `~/.alphatiming/work/` and rejects files that are not AlphaTiming projects.
-- Work files are protected by an OS lock (`.lock` next to them); only unlocked ones are offered for crash recovery.
+- Save (`TimingDocument`) = `TimingDatabase.snapshotTo`: under the database lock, `VACUUM INTO` a temp file next to the
+  work file, flushed to disk; then, outside the database lock, `TimingFileWriter` moves that file to a temp file next to
+  the target (across filesystems, where an atomic move fails, copied and flushed), renames the existing file to
+  `<name>-previous.timing` (replacing an older one), moves the temp file into place and flushes the directory. The
+  document is marked clean only if nothing was written since the `VACUUM INTO` (`snapshotTo` returns that write count,
+  `ifUnchangedSince` checks it under the database lock).
+  A failed save keeps the old file (at worst as `-previous`) and the dirty flag and removes its temp files.
+  Open copies the file to `~/.alphatiming/work/` and rejects files that are not AlphaTiming projects.
+- Work files are protected by an OS lock (`.lock` next to them); only unlocked ones are offered for crash recovery. The
+  same scan deletes the snapshot temp files of a save that crashed (`<work file>.<uuid>.tmp` whose work file is unlocked
+  or gone); a snapshot of a locked work file stays, its program may be saving. The scan probes a lock by taking it for
+  a moment, so a program locking its own work file retries briefly (`LockFile.acquireOwn`); project-file locks are never
+  probed, so Open and Save As learn at once that another instance holds one. A
+  `.project` note next to a work file names the project file it was last opened from or saved to, with that file's
+  modification time (`TimingWorkFolder.Origin`). A recovered document keeps that project file only if it is unchanged since and
+  its lock can be taken; otherwise Save would overwrite newer data, so it has no file.
+- The project file of an open document is protected the same way (`wk.timing.lock`, `LockFile`), never by a lock on the
+  file itself, which the renames of a save would break on Windows. Open and Save As refuse a file another instance holds
+  (`ProjectFileInUseException`); Save As moves the lock, closing releases it. Only a held lock counts, so a lock file left
+  behind by a crash blocks nothing. Whoever takes that lock (Open, a recovery that keeps its file) deletes a
+  `<name>.timing.tmp` a crashed save left next to the file; without the lock it stays.
 - **Users open files from earlier versions.** Every change to an entity (table or column) must keep older project files
   loadable; `hbm2ddl=update` only adds, it never migrates data. Renaming or removing a column or table requires an
   explicit migration. Prove compatibility with a test that opens a fixture file created by the previous version
   (`alphatimer-ui-core/src/test/resources`).
+- Explicit migrations are `MigrationStep`s in `SchemaMigrations` (`alphatimer-project-db`). The schema version is SQLite's
+  `user_version`: 0 for files of the first versions, otherwise the number of steps applied; `VACUUM INTO` keeps it. Opening
+  (`openCopy`, `adopt`) runs every step above the file's version on the work copy, each in its own transaction, before
+  Hibernate's `update` sees the file; a new file is created with the current version and gets no step. To add a step,
+  append it to `SchemaMigrations.STEPS` (never reorder or change a released step) and extend the fixture test. SQLite
+  cannot drop a constraint or a column with ALTER TABLE; such a step rebuilds the table with `TableRebuild`.
+- Enum attributes are stored as their name through an `EnumNameConverter` (`EnumNameConverters`), never with
+  `@Enumerated`: Hibernate writes a CHECK with the enum's values for `@Enumerated`, so a value added later could not be
+  stored in existing files. Files of the first versions have such CHECKs; step 1 (`RemoveCheckConstraints`) removes them.
+- Hibernate's SQLite dialect silently skips foreign keys and unique keys over several columns, so `TimingDatabase`
+  creates them itself for a new file (`HeatEntity.UNIQUE_KEY`, `AddLaneKeys.addTo`); an older file gets them from its
+  migration step. Step 2 (`RemoveHeatCompetition`) rebuilds `heat` without its `competition` column and with the unique
+  key (event, heatNumber); a heat stored under several competition tags keeps only its most recently changed row
+  (`changeSeq`) and that row's lanes. Step 3 (`AddLaneKeys`) rebuilds `lane` with `heat_id` not null, a foreign key to
+  `heat` (no `ON DELETE` action: lanes are deleted before their heat) and the unique key (heat_id, number); lanes without
+  an existing heat and, of lanes sharing a number, all but the oldest row are removed first. The other tables have no
+  keys besides their id: `settings` is read as its first row, `rawdata` and `aresmessage` record what arrived, and
+  `lanetime` legitimately holds the same finish several times (one row per result message).
+- Hibernate's connections enforce foreign keys (`foreign_keys`); the migration connection does not, as `TableRebuild`
+  requires.
 - The settings of the last opened/saved project are kept in `~/.alphatiming/defaults.json` (`DefaultSettingsStore`);
   unknown or corrupt content falls back to the built-in defaults.
 - A project holds exactly one competition. Its key is a setting (`Settings.competitionKey`, the `competitionKey` column of
   `settings`), stored once per project file and required to start a recording; changing it applies to all data of the
-  project, including what was recorded before. Recorded data is therefore not tagged with the key: the copied pipeline
-  still tags messages and heats with a competition, which `RecordingSession` fills with a constant, and queries do not
-  filter by competition. Older project files keep their stored tags; files written while the key was ignored have no key.
+  project, including what was recorded before. Recorded data is therefore not tagged with the key: a heat is identified
+  by event and heat number only (`heat` has no competition column). The copied pipeline still tags messages with a
+  competition, which `RecordingSession` fills with a constant; heats ignore it, `aresmessage.competitionKey` and
+  `lanetime.competition` store it, and queries do not filter by it. Older project files keep their stored tags there;
+  files written while the key was ignored have no key.
 - The legacy REST format (`/legacy/heats.xml`, `/legacy/heats.json`) is consumed by JAuswertung; keep it unchanged.
 
 ## Validation
@@ -91,8 +143,11 @@ untrusted input:
 - Settings are validated by `Settings.validate()` (a list of `SettingsProblem`) before a recording starts; the UI surfaces the first problem at the
   fields and a failing start ends in the ERROR state, never in an exception dialog.
 - A serial port that is missing or in use ends the start in the ERROR state (`SerialConnectionException`), never in a crash.
+- nrjavaserial aborts the whole JVM natively on a port name of 54 bytes or more. Every name passes
+  `SerialPorts.fitsDriver` (`MAX_NAME_BYTES`) before nrjavaserial sees it: `Settings.validate()`, `NrSerialReader.start()`
+  and `SerialPorts.list()` reject longer ones. Never let a test open such a name inside the test JVM.
 - Bytes from the device are validated by the copied parsers; unknown or garbled data is dropped and logged, never fatal.
-- Files from disk are checked before use (`ProjectDatabase.openCopy`, `DefaultSettingsStore.load`).
+- Files from disk are checked before use (`TimingDatabase.openCopy`, `DefaultSettingsStore.load`).
 - The REST server is intentionally without authentication: it serves read-only heat data to JAuswertung on the local
   network, as alphatimer did. Do not add authentication unless JAuswertung supports it.
 
@@ -107,7 +162,9 @@ untrusted input:
   of all front ends; add a new front end to its list). A key built
   dynamically (`"problem." + name`) needs its family enumerated in that test.
 - Never put UI text into `alphatimer-ui-core`: core reports problems as data (`SettingsProblem`, `RecordingError`,
-  `SerialConnectionException.Reason`, `InvalidProjectFileException`) and the UI describes them with `I18n.describe(…)`.
+  `RecordedData`, `SerialConnectionException.Reason`, `InvalidProjectFileException`, `ProjectFileInUseException`) and
+  `alphatimer-ui-common` turns them into text — with `I18n.describe(…)`, or for the project-file exceptions in
+  `AppController`, which catches them by type.
 - Numbers shown to the user follow the locale (`TimeFormat` uses the locale's decimal separator).
 
 ## Documentation and Issues
@@ -122,8 +179,11 @@ untrusted input:
   change.
 - `docs/chores/` tracks planned clean-ups of code or data model that are not bugs, with the same rules: one file per
   chore, listed in `docs/chores/README.md`, deleted once done.
-- Every row in both tables has a severity (High/Medium/Low) and a size (S/M/L) as defined in the respective
-  `README.md`; keep the rows ordered by severity, then by size. Rate new entries when you add them.
+- `docs/features/` tracks planned features, with the same rules: one file per feature, listed in
+  `docs/features/README.md`, deleted once implemented.
+- Every row in the issue and chore tables has a severity (High/Medium/Low), every feature a priority (High/Medium/Low),
+  and every row a size (S/M/L), as defined in the respective `README.md`; keep the rows ordered by severity or priority,
+  then by size. Rate new entries when you add them.
 
 ## Build, Test, Run
 
@@ -136,6 +196,10 @@ untrusted input:
 - Single module: `mvn -pl <module> -am test` (e.g. `mvn -pl alphatimer-ui-core -am test`)
 - Single test class / method: `mvn -pl <module> -am test -Dtest=ClassName` / `-Dtest=ClassName#methodName` (add
   `-Dsurefire.failIfNoSpecifiedTests=false` when `-am` pulls in modules without that test)
+- Mutation testing (PIT, profile `mutation`): `mvn -Pmutation -pl <module> -am clean test-compile
+  org.pitest:pitest-maven:mutationCoverage`; the report is in `<module>/target/pit-reports/`. Only AlphaTiming's own
+  classes (`org.lisasp.alphatiming.*`) are mutated, not the copied `alphatimer-*` modules. Narrow a run with
+  `-DtargetClasses=<classes> -DtargetTests=<tests>`.
 - Run: `java -jar alphatimer-ui/target/alphatiming.jar` (after `mvn package`); state lives in `~/.alphatiming/`
   (`defaults.json`, `work/`). Main class `org.lisasp.alphatiming.ui.AlphaTimingLauncher`.
 - Text UI: `java -jar alphatimer-tui/target/alphatiming-tui.jar`; main class `org.lisasp.alphatiming.tui.TuiLauncher`.
@@ -145,17 +209,17 @@ untrusted input:
   `org.lisasp.alphatiming.cli.RecordLauncher`.
 - `alphatiming.jar` references its dependencies in `lib/` through the manifest class path (no fat jar); keep `lib/`
   next to the jar when copying it.
-- Captured event data (`../alphatimer/data/*.serial`) contains personal data: never commit it or paste its content.
+- Captured event data (`data/*.dat`, ignored by Git) contains personal data: never commit it or paste its content.
   Use it only locally, e.g. replayed through a fake TCP server; tests use the sample bytes in
   `alphatimer-project-db/src/test/java/org/lisasp/alphatiming/project/db/testdata/`.
 
 ## Tests
 
 - JUnit 5 (Jupiter) with AssertJ and Awaitility. Name test classes `*Test`; there are no integration-test conventions —
-  tests that need a database use `ProjectDatabase.createNew(@TempDir)`, tests that need a device use a local
+  tests that need a database use `TimingDatabase.createNew(@TempDir)`, tests that need a device use a local
   `ServerSocket` or a fake `SerialPortReader`. `HeatServiceTest` and `LegacyServiceTest` run against the real stores and
   therefore live in `alphatimer-project-db`.
-- Shared test helpers are published as test-jars: `Msg` (refined messages) from `alphatimer-heats`,
+- Shared test helpers are published as test-jars: `TestMessageCreator` from `alphatimer-heats`,
   `DataHandlingMessageTestData` from `alphatimer-project-db`.
 - Prefer tests on the non-Swing modules and `AppController`; keep heat, placing and clock logic and the document workflow
   out of Swing classes so they can be tested without a GUI. Swing classes get a smoke test at most.
@@ -217,7 +281,9 @@ untrusted input:
 ## Logging
 
 - SLF4J with Logback, configured like JAuswertung (`alphatimer-ui/src/main/resources/logback.xml`): console plus one
-  file per program start, `~/.alphatiming/logs/alphatiming-<timestamp>.log`; root level DEBUG, Hibernate INFO. Tests use
+  file per program start, `~/.alphatiming/logs/alphatiming-<timestamp>.log` (TUI/CLI: `alphatiming-tui-…`/`alphatiming-cli-…`,
+  file only); root level DEBUG, Hibernate INFO. Each launcher runs `LogFileCleanup` at start: it deletes the program's own
+  log files older than 30 days except its 10 newest, and only logs a WARN if that fails. Tests use
   `logback-test.xml` (console only) so they never write into the home directory. `AlphaTimingLauncher` logs uncaught exceptions of all
   threads. Use Lombok's `@Slf4j` in new code; do not add `System.out.println` or `printStackTrace()`.
 - `DEBUG` for diagnostic detail, `INFO` sparingly for lifecycle events (recording started/stopped, file opened/saved),

@@ -12,7 +12,7 @@ class RunningClockTest {
     private static final LocalDateTime START = LocalDateTime.of(2026, 5, 1, 10, 0, 0);
 
     private static HeatDto heat(HeatStatus status, LocalDateTime started, LocalDateTime ended) {
-        return new HeatDto("WK", 1, 1, status, started, ended, 2, List.of());
+        return new HeatDto(1, 1, status, started, ended, 2, List.of());
     }
 
     @Test
@@ -44,7 +44,7 @@ class RunningClockTest {
     }
 
     private static HeatDto started(LocalDateTime started, LocalDateTime lastMessage) {
-        return new HeatDto("WK", 1, 1, HeatStatus.Started, started, null, 2, List.of(), lastMessage);
+        return new HeatDto(1, 1, HeatStatus.Started, started, null, 2, List.of(), lastMessage);
     }
 
     @Test
@@ -75,7 +75,7 @@ class RunningClockTest {
 
     @Test
     void anEndedHeatIsFrozenAtItsEndWhateverElse() {
-        HeatDto heat = new HeatDto("WK", 1, 1, HeatStatus.Finished, START, START.plusSeconds(20), 2, List.of(), START.plusSeconds(20));
+        HeatDto heat = new HeatDto(1, 1, HeatStatus.Finished, START, START.plusSeconds(20), 2, List.of(), START.plusSeconds(20));
         assertThat(RunningClock.millis(heat, START.plusSeconds(2 * 3600), true)).isEqualTo(20_000);
     }
 }

@@ -45,9 +45,82 @@ class LegacyServiceTest {
                                        TimeMarker.Empty);
     }
 
+    private static DataHandlingMessage deleted(int event, int heat, int lane, int lap, int millis) {
+        return new DataHandlingMessage(LocalDateTime.of(2021, 6, 21, 14, 54),
+                                       "WK",
+                                       "a",
+                                       "b",
+                                       MessageType.OnLineTime,
+                                       KindOfTime.SplitTime,
+                                       TimeType.DeletedTime,
+                                       DataHandlingMessageTestData.createUsedLanes(),
+                                       (byte) 2,
+                                       (short) event,
+                                       (byte) heat,
+                                       (byte) 0,
+                                       RankInfo.Normal,
+                                       (byte) lane,
+                                       (byte) lap,
+                                       millis,
+                                       TimeInfo.Normal,
+                                       TimeMarker.Empty);
+    }
+
+    private static long[] times(LegacyService service, int laneIndex) {
+        return service.getHeats()[0].getLanes().get(laneIndex).getTimes();
+    }
+
+    @Test
+    void aDeletedFinishIsWithdrawnUntilTheNextFinish() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            LegacyService service = new LegacyService(new LaneTimeStore(db));
+            service.accept(msg("WK", 1, 1, 2, KindOfTime.Finish, MessageType.OnLineTime, 25_000));
+            service.accept(msg("WK", 1, 1, 3, KindOfTime.Finish, MessageType.OnLineTime, 26_000));
+
+            service.accept(deleted(1, 1, 2, 2, 25_000));
+
+            assertThat(times(service, 1)).isEmpty();
+            assertThat(times(service, 2)).containsExactly(26_000);
+
+            service.accept(msg("WK", 1, 1, 2, KindOfTime.Finish, MessageType.OnLineTime, 27_000));
+            assertThat(times(service, 1)).containsExactly(27_000);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void aDeletedFinishKeepsTheEarlierFinishesOfTheLane() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            LegacyService service = new LegacyService(new LaneTimeStore(db));
+            service.accept(msg("WK", 1, 1, 2, KindOfTime.Finish, MessageType.OnLineTime, 24_000));
+            service.accept(msg("WK", 1, 1, 2, KindOfTime.Finish, MessageType.OnLineTime, 25_000));
+
+            service.accept(deleted(1, 1, 2, 2, 25_000));
+
+            assertThat(times(service, 1)).containsExactly(24_000);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void aDeletedTimeOtherThanTheFinishKeepsTheFinish() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            LegacyService service = new LegacyService(new LaneTimeStore(db));
+            service.accept(msg("WK", 1, 1, 2, KindOfTime.Finish, MessageType.OnLineTime, 25_000));
+
+            service.accept(deleted(1, 1, 2, 1, 25_000));
+            service.accept(deleted(1, 1, 2, 2, 24_000));
+            service.accept(deleted(1, 2, 2, 2, 25_000));
+
+            assertThat(service.getHeats()).hasSize(1);
+            assertThat(times(service, 1)).containsExactly(25_000);
+            db.closeAndDelete();
+        }
+    }
+
     @Test
     void storesFinishTimesPerHeatAndIgnoresEverythingElse() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             LegacyService service = new LegacyService(new LaneTimeStore(db));
             assertThat(service.getHeats()).isEmpty();
 

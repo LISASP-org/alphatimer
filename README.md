@@ -28,7 +28,9 @@ java -jar alphatimer-ui/target/alphatiming.jar
 1. **Settings & Recording** panel: choose the input in the *Connection type* list:
    - **TCP** (host/port of the timekeeping system),
    - **Serial port** (port from the list or typed, protocol ARES21 = 9600 baud 7E1 or Quantum = 9600 baud 8N1, as in
-     AlphaServer),
+     AlphaServer). Port names longer than 48 bytes are not offered and cannot be recorded, since the serial driver
+     cannot open them; use a shorter path or link. If the port is lost (e.g. the USB adapter is unplugged), the recording stops, keeps what it recorded
+     and the status bar warns until the recording is started again by hand; TCP reconnects by itself instead,
    - **File replay**: a pure binary data file (e.g. a recorded `.serial` file) or another AlphaTiming project (`.timing`,
      its stored raw data is used). The data is replayed at 9600 baud (960 bytes per second) and the recording stops by
      itself at the end of the file.
@@ -68,7 +70,8 @@ It uses the settings stored in the project file (create and configure the projec
 received messages and the result of every finished heat, and records until a key is pressed (or Ctrl+C / SIGTERM).
 Then it saves the file. A replay stops by itself at the end of the data. Auto-save runs as in the UI. Exit codes: 0 =
 saved, 1 = wrong arguments, 2 = the file could not be opened, 3 = the recording could not start (e.g. invalid
-settings, serial port missing), 4 = saving failed. Without a terminal (input redirected) only Ctrl+C / SIGTERM end it.
+settings, serial port missing), 4 = saving failed, 5 = saved, but the recording ended because the serial connection
+was lost. Without a terminal (input redirected) only Ctrl+C / SIGTERM end it.
 
 ## Project file
 
@@ -76,9 +79,32 @@ One SQLite file (`*.timing`; files of earlier versions named `*.heat` still open
 ARES messages and the heats. While a project is open, the app works on a temporary copy in `~/.alphatiming/work/`:
 
 - **File → Save** writes a consistent snapshot of that copy (atomic replace of the `.timing` file); auto-save does the same
-  periodically for projects that already have a file.
-- Closing (or New/Open) stops the recording first and asks Save / Discard / Cancel when there are unsaved changes.
-- After a crash the next start offers to recover the leftover work file.
+  periodically for projects that already have a file, but never while a question about the project or the Save As
+  dialog is open, so changes the user then discards do not reach the file.
+- **File → Save As** adds `.timing` to a name typed without it (a name ending in `.heat` is kept) and asks before
+  overwriting the file that will actually be written.
+- Each save keeps the state before it as `<name>-previous.timing` next to the project file (replacing an older one). Open
+  it like any project to go back one save.
+- Closing (or New/Open) during a recording first asks whether to stop it; Cancel keeps the recording running and the
+  project open. Then Save / Discard / Cancel is asked when there are unsaved changes (Cancel keeps the project open, the
+  recording stays stopped). If New or Open fails after Discard, the project goes back to its saved state (a project
+  without a file becomes a new one), so the discarded changes never reach the file.
+- A failed auto-save or data a recording could not store (raw data, messages, heats, lane times; e.g. a full disk) shows
+  a red warning in the status bar; with several, the most important one and the number of the others. Its tooltip (in the
+  text UI: the message log on *Settings & Recording*) names what failed and why. An auto-save warning disappears with the
+  next successful save; a recording warning once that data has been stored again and the project saved afterwards.
+  Raw data that still cannot be stored when the recording stops is lost; the details say how many bytes.
+  A lost serial connection shows such a warning too, until the recording is started again. Opening or creating another
+  project clears all of these warnings, as they belong to the project they were raised for.
+- After a crash the next start offers to recover the leftover work file and names its project file and the time it was
+  last changed. A recovered project keeps its project file unless that file was saved since or is open elsewhere (then
+  use Save As). Discard asks a second time before it deletes the data; Back returns to the recovery question. If the
+  data cannot be recovered, an error names the reason and the question comes back, so the data can be discarded or
+  kept for a later start.
+  Temporary files of a save interrupted by the crash are removed: in the work folder at the next start, next to the
+  project file when it is opened again.
+- A project file can be open in only one running AlphaTiming (window, text UI or command line) at a time; another one
+  refuses to open it or to save over it. While it is open, a `<name>.timing.lock` file lies next to it.
 - The settings of the last opened/saved project are kept in `~/.alphatiming/defaults.json` and used for new projects and
   at program start.
 
@@ -86,13 +112,14 @@ ARES messages and the heats. While a project is open, the app works on a tempora
 
 Every program start writes a log file `~/.alphatiming/logs/alphatiming-<date-time>.log` (and to the console); the
 text UI and the command line program write `alphatiming-tui-<date-time>.log` / `alphatiming-cli-<date-time>.log` and
-nothing to the console. Attach it
-when reporting a problem. Old log files are not deleted automatically.
+nothing to the console. Attach it when reporting a problem. At its start, each program deletes its own log files that
+are older than 30 days, but always keeps its 10 newest ones.
 
 ## REST endpoints
 
 While recording (server toggle on): `GET /legacy/heats.xml` and `GET /legacy/heats.json` — the same data as alphatimer
-(finish times per heat and lane).
+(finish times per heat and lane). The server answers up to 4 requests at a time and keeps up to 16 more waiting.
+Further connections are closed at once, as is a connection whose request and response take longer than 10 seconds.
 
 The endpoints have no authentication on purpose: they serve read-only data to JAuswertung on the local network, as
 alphatimer did. Enable the server only on a network you trust.

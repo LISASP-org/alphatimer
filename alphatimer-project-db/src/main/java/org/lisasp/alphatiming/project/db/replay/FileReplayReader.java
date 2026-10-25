@@ -23,7 +23,7 @@ import java.util.Properties;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Replays recorded data as if it arrived on a serial line: a pure binary file is sent as is, a AlphaTiming project file
+ * Replays recorded data as if it arrived on a serial line: a pure binary file is sent as is, an AlphaTiming project file
  * contributes its stored raw data. Bytes are paced like a serial line with 10 bits per byte (start, 8 data/parity
  * bits, stop), so 9600 baud are 960 bytes per second.
  */

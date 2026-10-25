@@ -50,7 +50,7 @@ public final class HeatService implements Consumer<RefinedMessage> {
     }
 
     private static boolean sameHeat(HeatDto a, HeatDto b) {
-        return a.competition().equals(b.competition()) && a.event() == b.event() && a.heat() == b.heat();
+        return a.event() == b.event() && a.heat() == b.heat();
     }
 
     public synchronized void register(Consumer<LiveHeats> listener) {
@@ -73,8 +73,8 @@ public final class HeatService implements Consumer<RefinedMessage> {
             return;
         }
         try {
-            Optional<HeatDto> stored = store.find(message.getCompetition(), message.getEvent(), message.getHeat());
-            HeatDto before = stored.orElseGet(() -> HeatDto.empty(message.getCompetition(), message.getEvent(), message.getHeat(), LANE_COUNT));
+            Optional<HeatDto> stored = store.find(message.getEvent(), message.getHeat());
+            HeatDto before = stored.orElseGet(() -> HeatDto.empty(message.getEvent(), message.getHeat(), LANE_COUNT));
             Heat heat = new Heat(before);
             if (message instanceof StartMessage m) {
                 heat.start(m);
@@ -93,22 +93,33 @@ public final class HeatService implements Consumer<RefinedMessage> {
                 return;
             }
             HeatDto after = heat.createDto();
-            if (!after.equals(before)) {
-                if (stored.isPresent()) {
-                    store.save(after);
-                } else {
-                    store.create(after);
-                }
-                LiveHeats shown = live;
-                HeatDto previous = shown.current() != null && !sameHeat(shown.current(), after) ? shown.current() : shown.previous();
-                after.lanes().stream().filter(l -> l.status() == LaneStatus.Used).forEach(l -> usedLanes.add(l.number()));
-                live = new LiveHeats(after, previous, usedLanes);
-                LiveHeats announced = live;
-                listeners.forEach(l -> l.accept(announced));
+            if (after.equals(before)) {
+                return;
             }
+            if (stored.isPresent()) {
+                store.save(after);
+            } else {
+                store.create(after);
+            }
+            LiveHeats shown = live;
+            HeatDto previous = shown.current() != null && !sameHeat(shown.current(), after) ? shown.current() : shown.previous();
+            after.lanes().stream().filter(l -> l.status() == LaneStatus.Used).forEach(l -> usedLanes.add(l.number()));
+            live = new LiveHeats(after, previous, usedLanes);
         } catch (RuntimeException ex) {
             log.warn("Could not apply message '{}'.", message, ex);
             onError.accept(ex);
+            return;
+        }
+        announce(live);
+    }
+
+    private void announce(LiveHeats heats) {
+        for (Consumer<LiveHeats> listener : listeners) {
+            try {
+                listener.accept(heats);
+            } catch (RuntimeException ex) {
+                log.warn("Heat listener failed", ex);
+            }
         }
     }
 }

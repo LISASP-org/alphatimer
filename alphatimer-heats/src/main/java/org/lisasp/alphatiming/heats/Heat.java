@@ -9,16 +9,15 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.NoSuchElementException;
 
 final class Heat {
 
-    private final String competition;
     private final int event;
     private final int heat;
     private HeatStatus status;
@@ -29,7 +28,6 @@ final class Heat {
     private final List<Lane> lanes = new ArrayList<>();
 
     Heat(HeatDto dto) {
-        this.competition = dto.competition();
         this.event = dto.event();
         this.heat = dto.heat();
         this.status = dto.status();
@@ -41,17 +39,28 @@ final class Heat {
     }
 
     HeatDto createDto() {
-        return new HeatDto(competition, event, heat, status, started, ended, lapCount, lanes.stream().map(Lane::createDto).toList(), lastMessage);
+        return new HeatDto(event, heat, status, started, ended, lapCount, lanes.stream().map(Lane::createDto).toList(), lastMessage);
     }
 
-    /** A start signal always (re)starts the heat: the clock restarts and the lanes are reset (false start, repeated start). */
+    /**
+     * A live start (re)starts the heat: the clock restarts and the lanes are reset (false start, repeated start). Repeats
+     * of the results and corrected or deleted starts arrive after the race and must not reset a heat that has started.
+     */
     void start(StartMessage message) {
+        if (status != HeatStatus.Open && !isLiveStart(message)) {
+            return;
+        }
         status = HeatStatus.Started;
         started = message.getTimestamp();
         lastMessage = message.getTimestamp();
         ended = null;
         lapCount = message.getLapCount();
         lanes.forEach(Lane::start);
+    }
+
+    private static boolean isLiveStart(StartMessage message) {
+        return message.getMessageType() == RefinedMessageType.Live
+                && (message.getTimeType() == RefinedTimeType.Normal || message.getTimeType() == RefinedTimeType.ManualTime);
     }
 
     void usedLanes(UsedLanesMessage message) {
@@ -62,12 +71,30 @@ final class Heat {
 
     void touch(TimeMessage message) {
         Lane lane = lane(message.getLane());
+        if (message.getTimeType() == RefinedTimeType.DeletedTime) {
+            deleteTime(lane, message);
+            return;
+        }
         assureStarted(message);
         lastMessage = message.getTimestamp();
         syncStart(message);
         lapCount = message.getLapCount();
         lane.touch(message);
         update(message);
+    }
+
+    /**
+     * The device withdraws a time by sending it again as deleted, after the race time has moved on; a deleted final time
+     * comes as a split time of the last lap. Only the lane's current time can be withdrawn, older ones are already gone.
+     */
+    private void deleteTime(Lane lane, TimeMessage message) {
+        lastMessage = message.getTimestamp();
+        if (lane.deleteTime(message)) {
+            computePlaces();
+            if (status != HeatStatus.Finished && !lane.isDone()) {
+                ended = null;
+            }
+        }
     }
 
     /**
@@ -130,7 +157,7 @@ final class Heat {
         return lanes.stream()
                     .filter(l -> l.number() == number)
                     .findFirst()
-                    .orElseThrow(() -> new NoSuchElementException(String.format("%s %d %d: Lane %d not found.", competition, event, heat, number)));
+                    .orElseThrow(() -> new UnknownLaneException(event, heat, number));
     }
 
     private void assureStarted(RefinedMessage message) {

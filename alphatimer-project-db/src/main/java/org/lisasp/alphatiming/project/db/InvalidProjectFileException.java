@@ -8,7 +8,7 @@ public class InvalidProjectFileException extends IOException {
     private final transient Path file;
 
     public InvalidProjectFileException(Path file, Throwable cause) {
-        super("Not a AlphaTiming project file: " + file, cause);
+        super("Not an AlphaTiming project file: " + file, cause);
         this.file = file;
     }
 

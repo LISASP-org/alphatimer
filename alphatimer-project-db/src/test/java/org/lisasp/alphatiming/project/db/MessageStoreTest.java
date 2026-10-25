@@ -44,7 +44,7 @@ class MessageStoreTest {
 
     @Test
     void storesAndFindsByCompetitionEventAndHeat() throws Exception {
-        try (ProjectDatabase db = ProjectDatabase.createNew(dir)) {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             MessageStore store = new MessageStore(db);
             DataHandlingMessage m = message("TestWK", (short) 1, (byte) 1);
             store.put(m);
