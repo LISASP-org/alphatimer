@@ -23,6 +23,13 @@ mvn clean install
 java -jar alphatimer-ui/target/alphatiming.jar
 ```
 
+`mvn clean install` (or `mvn package`) also builds a ready-to-run zip for Linux and macOS (Intel):
+`alphatimer-distribution/target/alphatiming-<version>.zip`. Unpack it anywhere; it needs only Java 25 or newer
+(`JAVA_HOME`, otherwise `java` from `PATH`) and is started with `./alphatiming.sh` (window), `./alphatiming-tui.sh`
+(text UI) or `./alphatiming-cli.sh <file.timing>` (command line). The scripts can be linked, e.g. into `~/bin`. If no
+suitable Java is found, they say so and exit with code 127. On Windows, AlphaTiming comes with the JAuswertung
+installer.
+
 ## Workflow
 
 1. **Settings & Recording** panel: choose the input in the *Connection type* list:

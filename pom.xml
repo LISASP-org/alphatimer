@@ -39,6 +39,8 @@
         <sqlite.version>3.53.2.0</sqlite.version>
         <jutils.version>18.0.2</jutils.version>
         <filechooser.version>1.0.0-SNAPSHOT</filechooser.version>
+        <!-- Must match the JavaFX version of filechooser; the distribution adds the JavaFX jars of each platform. -->
+        <javafx.version>25.0.4</javafx.version>
         <nrjavaserial.version>5.2.1</nrjavaserial.version>
         <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
         <logback.version>1.6.5</logback.version>
