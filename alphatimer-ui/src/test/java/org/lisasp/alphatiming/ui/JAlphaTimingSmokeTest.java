@@ -112,6 +112,7 @@ class JAlphaTimingSmokeTest {
                 assertThat(frame.settingsPanel().isShowing()).isTrue();
                 assertThat(frame.liveViewPanel().isShowing()).isFalse();
                 assertThat(frame.settingsPanel().recordToggle().isEnabled()).isFalse();
+                assertThat(frame.getIconImages()).hasSize(5);
             });
 
             onEdt(() -> {

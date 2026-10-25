@@ -70,6 +70,7 @@ public final class JAlphaTiming extends JFrame {
 
     public JAlphaTiming(AppController controller, SwingSavePrompt prompt) {
         super(I18n.get("app.title"));
+        setIconImages(AppIcons.application());
         this.controller = controller;
         this.prompt = prompt;
         this.settingsPanel = new SettingsRecordingPanel(controller);

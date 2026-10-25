@@ -21,6 +21,11 @@ class AppIconsTest {
     }
 
     @Test
+    void theWindowGetsTheProgramIconInEverySize() {
+        assertThat(AppIcons.application()).extracting(image -> image.getWidth(null)).containsExactly(16, 32, 48, 128, 256);
+    }
+
+    @Test
     void theButtonIconsAreSmall() {
         for (Icon icon : new Icon[]{AppIcons.reload(), AppIcons.info()}) {
             assertThat(icon.getIconWidth()).isEqualTo(16);

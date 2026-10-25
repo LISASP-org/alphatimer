@@ -35,6 +35,11 @@ public final class AppIcons {
         return load("refresh-cw", BUTTON_SIZE);
     }
 
+    /** The program icon for the window and the task bar, rendered from {@code src/icons}. */
+    public static List<Image> application() {
+        return List.of(16, 32, 48, 128, 256).stream().map(size -> read("icons/app/alphatiming-" + size + ".png")).toList();
+    }
+
     public static Icon info() {
         return load("info", BUTTON_SIZE);
     }
