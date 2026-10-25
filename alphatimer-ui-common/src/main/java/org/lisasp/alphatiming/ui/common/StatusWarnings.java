@@ -27,6 +27,10 @@ public final class StatusWarnings {
         active.remove(kind);
     }
 
+    public synchronized boolean isActive(Kind kind) {
+        return active.containsKey(kind);
+    }
+
     public synchronized List<Warning> active() {
         return List.copyOf(active.values());
     }

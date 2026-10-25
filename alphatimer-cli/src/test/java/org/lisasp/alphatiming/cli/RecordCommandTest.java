@@ -44,6 +44,7 @@ class RecordCommandTest {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final ManualTrigger trigger = new ManualTrigger();
     private volatile Runnable loseConnection;
+    private final List<ByteConsumer> consumers = new CopyOnWriteArrayList<>();
     private Locale original;
     private Path work;
     private AppController controller;
@@ -68,6 +69,7 @@ class RecordCommandTest {
         return new SerialPortReader() {
             @Override
             public SerialPortReader register(ByteConsumer listener) {
+                consumers.add(listener);
                 return this;
             }
 
@@ -163,6 +165,39 @@ class RecordCommandTest {
         assertThat(Files.getLastModifiedTime(file).toMillis()).isPositive();
         String printed = out.toString(StandardCharsets.UTF_8);
         assertThat(printed).containsSubsequence("was lost", "Stopping", "Saved");
+    }
+
+    private void recordBytesThatCannotBeStored() {
+        controller.document().database().write(em -> em.createNativeQuery(
+                "CREATE TRIGGER block_rawdata BEFORE INSERT ON rawdata BEGIN SELECT RAISE(ABORT, 'disk full'); END").executeUpdate());
+        for (byte b : "data".getBytes(StandardCharsets.US_ASCII)) {
+            consumers.forEach(c -> c.accept(b));
+        }
+    }
+
+    @Test
+    void aRecordingThatCouldNotStoreItsDataIsSavedAndEndsWithDataLost() throws Exception {
+        Path file = project(VALID);
+
+        Future<ExitCode> result = executor.submit(() -> command.run(file, trigger));
+        await().atMost(Duration.ofSeconds(10)).until(() -> trigger.onStop != null);
+        recordBytesThatCannotBeStored();
+        trigger.onStop.run();
+
+        assertThat(result.get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.DATA_LOST);
+        assertThat(out.toString(StandardCharsets.UTF_8)).contains("bytes could not be stored and were lost", "Saved");
+    }
+
+    @Test
+    void lostDataWinsOverALostConnection() throws Exception {
+        Path file = project(VALID);
+
+        Future<ExitCode> result = executor.submit(() -> command.run(file, trigger));
+        await().atMost(Duration.ofSeconds(10)).until(() -> trigger.onStop != null);
+        recordBytesThatCannotBeStored();
+        loseConnection.run();
+
+        assertThat(result.get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.DATA_LOST);
     }
 
     private void giveTheCommandTimeToPrint(String text) {

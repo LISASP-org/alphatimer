@@ -81,12 +81,16 @@ public final class RecordCommand {
         controller.stopRecording();
         out.println(I18n.get("cli.stopping"));
         boolean saved = controller.save();
+        boolean dataMissing = controller.recordedDataMissing();
         controller.requestClose();
         if (!saved) {
             return ExitCode.NOT_SAVED;
         }
         log.info("Recording into {} ended", file.getFileName());
         out.println(I18n.get("cli.saved", file));
+        if (dataMissing) {
+            return ExitCode.DATA_LOST;
+        }
         return connectionLost ? ExitCode.CONNECTION_LOST : ExitCode.OK;
     }
 }

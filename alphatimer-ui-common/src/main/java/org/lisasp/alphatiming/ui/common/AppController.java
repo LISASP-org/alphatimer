@@ -282,6 +282,11 @@ public final class AppController implements AutoCloseable {
     }
 
     /** The problems the user should see until they are resolved, the most important first. */
+    /** Recorded data that is not in the project file even after saving; the write warning stays until it is. */
+    public boolean recordedDataMissing() {
+        return warnings.isActive(StatusWarnings.Kind.RECORDING_WRITE);
+    }
+
     public List<StatusWarnings.Warning> warnings() {
         return warnings.active();
     }
