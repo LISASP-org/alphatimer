@@ -6,8 +6,8 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.KindOfTime;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.MessageType;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeType;
-import org.lisasp.alphatiming.legacy.server.dto.Heat;
-import org.lisasp.alphatiming.legacy.server.dto.LaneStatus;
+import org.lisasp.alphatiming.legacy.api.Heat;
+import org.lisasp.alphatiming.legacy.api.LaneStatus;
 
 import java.util.HashMap;
 import java.util.List;

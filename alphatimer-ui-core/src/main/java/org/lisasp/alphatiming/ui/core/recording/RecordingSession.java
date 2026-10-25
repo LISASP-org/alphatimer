@@ -22,7 +22,7 @@ import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.project.db.LaneTimeStore;
 import org.lisasp.alphatiming.legacy.server.LegacyHttpServer;
 import org.lisasp.alphatiming.legacy.server.LegacyService;
-import org.lisasp.alphatiming.legacy.server.dto.Heat;
+import org.lisasp.alphatiming.legacy.api.Heat;
 import org.lisasp.alphatiming.project.db.replay.FileReplayReader;
 import org.lisasp.alphatiming.project.db.replay.ReplayFileException;
 import org.lisasp.alphatimer.serial.com.NrSerialReader;

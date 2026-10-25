@@ -1,6 +1,4 @@
-package org.lisasp.alphatiming.legacy.server;
-
-import org.lisasp.alphatiming.legacy.server.dto.Heat;
+package org.lisasp.alphatiming.legacy.api;
 
 public class LegacySerialization {
 

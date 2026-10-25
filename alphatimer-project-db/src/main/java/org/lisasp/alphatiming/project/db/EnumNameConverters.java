@@ -33,9 +33,9 @@ final class EnumNameConverters {
         }
     }
 
-    public static final class LegacyLaneStatusConverter extends EnumNameConverter<org.lisasp.alphatiming.legacy.server.dto.LaneStatus> {
+    public static final class LegacyLaneStatusConverter extends EnumNameConverter<org.lisasp.alphatiming.legacy.api.LaneStatus> {
         public LegacyLaneStatusConverter() {
-            super(org.lisasp.alphatiming.legacy.server.dto.LaneStatus.class);
+            super(org.lisasp.alphatiming.legacy.api.LaneStatus.class);
         }
     }
 

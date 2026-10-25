@@ -1,6 +1,6 @@
 package org.lisasp.alphatiming.project.db;
 
-import org.lisasp.alphatiming.legacy.server.LegacySerialization;
+import org.lisasp.alphatiming.legacy.api.LegacySerialization;
 import org.lisasp.alphatiming.legacy.server.LegacyService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -11,7 +11,7 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.RankInfo;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeInfo;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeMarker;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeType;
-import org.lisasp.alphatiming.legacy.server.dto.Heat;
+import org.lisasp.alphatiming.legacy.api.Heat;
 import org.lisasp.alphatiming.project.db.testdata.DataHandlingMessageTestData;
 
 import java.nio.file.Path;
