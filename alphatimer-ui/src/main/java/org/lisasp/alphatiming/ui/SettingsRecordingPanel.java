@@ -66,6 +66,7 @@ public final class SettingsRecordingPanel extends JPanel {
     private String portAccessInfoText = "";
     private final JComboBox<SerialMode> serialMode = new JComboBox<>(SerialMode.values());
     private final JWarningTextField competitionKey = new JWarningTextField(true, false);
+    private final JSpinner timekeepingOffset = new JSpinner(new SpinnerNumberModel(0, -Settings.MAX_TIMEKEEPING_OFFSET_HOURS, Settings.MAX_TIMEKEEPING_OFFSET_HOURS, 1));
     private final JSpinner autoSave = new JSpinner(new SpinnerNumberModel(60, 5, 3600, 5));
     private final JSpinner restPort = new JSpinner(new SpinnerNumberModel(Settings.DEFAULT_REST_PORT, 1, 65535, 1));
     private final JToggleButton serverToggle = new JToggleButton();
@@ -137,6 +138,7 @@ public final class SettingsRecordingPanel extends JPanel {
         competitionKey.addFocusListener(commitOnFocusLost);
         serialPort.getEditor().getEditorComponent().addFocusListener(commitOnFocusLost);
         port.addChangeListener(e -> commit());
+        timekeepingOffset.addChangeListener(e -> commit());
         autoSave.addChangeListener(e -> commit());
         restPort.addChangeListener(e -> commit());
         serverToggle.addActionListener(e -> commit());
@@ -149,7 +151,7 @@ public final class SettingsRecordingPanel extends JPanel {
     private static final String FILE_CARD = "file";
 
     private JPanel createForm() {
-        for (JSpinner spinner : new JSpinner[]{port, autoSave, restPort}) {
+        for (JSpinner spinner : new JSpinner[]{port, timekeepingOffset, autoSave, restPort}) {
             ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().setHorizontalAlignment(JTextField.LEFT);
         }
 
@@ -209,6 +211,7 @@ public final class SettingsRecordingPanel extends JPanel {
 
         SimpleFormBuilder competitionForm = newBuilder();
         competitionForm.add(I18n.get("general.competitionKey"), competitionKey);
+        competitionForm.add(I18n.get("general.timekeepingOffset"), timekeepingOffset);
         competitionForm.add(I18n.get("general.autoSave"), autoSave);
         competitionForm.add(I18n.get("general.serverPort"), restPort);
         competitionForm.add((Component) null, serverToggle);
@@ -250,7 +253,7 @@ public final class SettingsRecordingPanel extends JPanel {
 
     private Settings readFields() {
         Object selectedPort = serialPort.getEditor().getItem();
-        return new Settings(selectedType(), host.getText().trim(), (Integer) port.getValue(), selectedPort == null ? "" : selectedPort.toString().trim(), (SerialMode) serialMode.getSelectedItem(), (Integer) autoSave.getValue(), (Integer) restPort.getValue(), serverToggle.isSelected(), replayFile.getText().trim(), competitionKey.getText().trim());
+        return new Settings(selectedType(), host.getText().trim(), (Integer) port.getValue(), selectedPort == null ? "" : selectedPort.toString().trim(), (SerialMode) serialMode.getSelectedItem(), (Integer) autoSave.getValue(), (Integer) restPort.getValue(), serverToggle.isSelected(), replayFile.getText().trim(), competitionKey.getText().trim(), (Integer) timekeepingOffset.getValue());
     }
 
     private void chooseReplayFile() {
@@ -345,6 +348,7 @@ public final class SettingsRecordingPanel extends JPanel {
                     host.setText(s.tcpHost());
                 }
                 port.setValue(clamp(s.tcpPort(), 1, 65535));
+                timekeepingOffset.setValue(clamp(s.timekeepingOffsetHours(), -Settings.MAX_TIMEKEEPING_OFFSET_HOURS, Settings.MAX_TIMEKEEPING_OFFSET_HOURS));
                 autoSave.setValue(clamp(s.autoSaveSeconds(), 5, 3600));
                 restPort.setValue(clamp(s.restPort(), 1, 65535));
                 serverToggle.setSelected(s.restEnabled());
@@ -377,7 +381,7 @@ public final class SettingsRecordingPanel extends JPanel {
             case SERIAL -> SERIAL_CARD;
             case FILE -> FILE_CARD;
         });
-        for (Component field : new Component[]{connectionType, host, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, competitionKey, autoSave, serverToggle}) {
+        for (Component field : new Component[]{connectionType, host, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, competitionKey, timekeepingOffset, autoSave, serverToggle}) {
             field.setEnabled(rules.editable());
         }
         restPort.setEnabled(rules.restPortEditable());
@@ -418,7 +422,7 @@ public final class SettingsRecordingPanel extends JPanel {
     }
 
     List<Component> lockableInputs() {
-        return List.of(connectionType, host, competitionKey, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, autoSave, restPort, serverToggle);
+        return List.of(connectionType, host, competitionKey, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, timekeepingOffset, autoSave, restPort, serverToggle);
     }
 
     JComboBox<ConnectionType> connectionTypeCombo() {

@@ -5,7 +5,8 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 /**
- * @param lastMessage arrival time of the last message that was applied to the heat; null when unknown (older project files)
+ * @param lastMessage          arrival time of the last message that was applied to the heat; null when unknown (older project files)
+ * @param startTimeOfDayMillis time of day on the clock of the device that the start carried, as sent; null when unknown
  */
 public record HeatDto(int event,
                       int heat,
@@ -14,7 +15,12 @@ public record HeatDto(int event,
                       LocalDateTime ended,
                       int lapCount,
                       List<LaneDto> lanes,
-                      LocalDateTime lastMessage) {
+                      LocalDateTime lastMessage,
+                      Integer startTimeOfDayMillis) {
+
+    public HeatDto(int event, int heat, HeatStatus status, LocalDateTime started, LocalDateTime ended, int lapCount, List<LaneDto> lanes, LocalDateTime lastMessage) {
+        this(event, heat, status, started, ended, lapCount, lanes, lastMessage, null);
+    }
 
     public HeatDto(int event, int heat, HeatStatus status, LocalDateTime started, LocalDateTime ended, int lapCount, List<LaneDto> lanes) {
         this(event, heat, status, started, ended, lapCount, lanes, null);

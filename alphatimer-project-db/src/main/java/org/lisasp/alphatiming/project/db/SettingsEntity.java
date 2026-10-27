@@ -34,6 +34,8 @@ public class SettingsEntity {
     private Boolean restEnabled;
     /** Added after the first version: null in older project files. */
     private String replayFile;
+    /** Added after the first version: null in older project files, which means no offset. */
+    private Integer timekeepingOffsetHours;
 
     public SettingsEntity(String tcpHost, int tcpPort, int autoSaveSeconds, int restPort) {
         this.tcpHost = tcpHost;

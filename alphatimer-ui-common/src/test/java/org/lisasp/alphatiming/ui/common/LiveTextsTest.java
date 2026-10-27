@@ -50,22 +50,32 @@ class LiveTextsTest {
     void theTimesTellWhenTheHeatStartedAndFinished() {
         HeatDto finished = new HeatDto(3, 2, HeatStatus.Finished, START, START.plusSeconds(65).plusNanos(700_000_000), 0, List.of());
 
-        assertThat(LiveTexts.times(finished)).isEqualTo("10:00:00 \u2192 10:01:05");
+        assertThat(LiveTexts.times(finished, 0)).isEqualTo("10:00:00 \u2192 10:01:05");
     }
 
     @Test
     void withoutAnEndTheLastMessageOfTheHeatIsShownInstead() {
-        assertThat(LiveTexts.times(started())).isEqualTo("10:00:00 \u2192 10:01:00");
+        assertThat(LiveTexts.times(started(), 0)).isEqualTo("10:00:00 \u2192 10:01:00");
     }
 
     @Test
     void withoutEndAndLastMessageOnlyTheStartIsShown() {
-        assertThat(LiveTexts.times(new HeatDto(3, 2, HeatStatus.Started, START, null, 0, List.of()))).isEqualTo("10:00:00 \u2192");
+        assertThat(LiveTexts.times(new HeatDto(3, 2, HeatStatus.Started, START, null, 0, List.of()), 0)).isEqualTo("10:00:00 \u2192");
+    }
+
+    @Test
+    void theTimesFollowTheClockOfTheDeviceWithTheOffsetWhenTheStartCarriedItsTimeOfDay() {
+        int halfPastSeven = 7 * 3_600_000 + 30 * 60_000;
+        HeatDto finished = new HeatDto(3, 2, HeatStatus.Finished, START, START.plusSeconds(65).plusNanos(700_000_000), 0, List.of(), null, halfPastSeven);
+
+        assertThat(LiveTexts.times(finished, 0)).isEqualTo("07:30:00 \u2192 07:31:05");
+        assertThat(LiveTexts.times(finished, 1)).isEqualTo("08:30:00 \u2192 08:31:05");
+        assertThat(LiveTexts.times(finished, -8)).isEqualTo("23:30:00 \u2192 23:31:05");
     }
 
     @Test
     void aHeatWithoutStartHasNoTimes() {
-        assertThat(LiveTexts.times(new HeatDto(3, 2, HeatStatus.Open, null, null, 0, List.of()))).isEmpty();
-        assertThat(LiveTexts.times(null)).isEmpty();
+        assertThat(LiveTexts.times(new HeatDto(3, 2, HeatStatus.Open, null, null, 0, List.of()), 0)).isEmpty();
+        assertThat(LiveTexts.times(null, 0)).isEmpty();
     }
 }

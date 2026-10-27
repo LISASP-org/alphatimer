@@ -32,6 +32,10 @@ public final class TestMessageCreator {
         return new StartMessage(at, "WK", (short) event, (byte) heat, type, (byte) 2, (byte) 0, 0, timeType);
     }
 
+    public static StartMessage startAtTimeOfDay(int event, int heat, LocalDateTime at, int timeOfDayMillis) {
+        return new StartMessage(at, "WK", (short) event, (byte) heat, RefinedMessageType.Live, (byte) 2, (byte) 0, timeOfDayMillis, RefinedTimeType.Normal);
+    }
+
     /** The device repeating the results of an earlier race. */
     public static StartMessage startPrevious(int event, int heat, LocalDateTime at) {
         return new StartMessage(at, "WK", (short) event, (byte) heat, RefinedMessageType.PreviousRaceResult, (byte) 2, (byte) 0, 0, RefinedTimeType.Normal);

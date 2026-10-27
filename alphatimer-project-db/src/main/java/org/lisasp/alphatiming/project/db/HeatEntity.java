@@ -41,6 +41,8 @@ public class HeatEntity {
     private LocalDateTime ended;
     /** Added after the first version: null in older project files. */
     private LocalDateTime lastMessage;
+    /** Added after the first version: null in older project files. */
+    private Integer startTimeOfDayMillis;
     private int lapCount;
     /** Increases with every change, so the most recently changed heat can be found. */
     private long changeSeq;

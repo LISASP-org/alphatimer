@@ -44,6 +44,8 @@ public final class LiveViewPanel extends JPanel {
     private final JGlassPanel<JPanel> glass;
 
     private HeatDto heat;
+    private LiveHeats heats;
+    private int timekeepingOffsetHours;
     private boolean recording;
     private List<LaneRows.Row> displayed = List.of();
     private List<LaneRows.Row> displayedPrevious = List.of();
@@ -104,6 +106,14 @@ public final class LiveViewPanel extends JPanel {
         return clockTimer;
     }
 
+    /** The start and end of a heat are shown on the clock of the device with this offset. Call on the EDT. */
+    public void setTimekeepingOffset(int hours) {
+        if (hours != timekeepingOffsetHours) {
+            timekeepingOffsetHours = hours;
+            setHeats(heats);
+        }
+    }
+
     /**
      * The clock only runs while a recording is running. Call on the EDT.
      */
@@ -120,6 +130,7 @@ public final class LiveViewPanel extends JPanel {
      * Shows the live heat and the previous heat (null parts are cleared). Call on the EDT.
      */
     public void setHeats(LiveHeats heats) {
+        this.heats = heats;
         HeatDto current = heats == null ? null : heats.current();
         HeatDto previous = heats == null ? null : heats.previous();
 
@@ -128,14 +139,14 @@ public final class LiveViewPanel extends JPanel {
         displayed = LaneRows.from(current, heats == null ? Set.of() : heats.usedLanes());
         fill(liveRows, displayed);
         title.setText(LiveTexts.title(current));
-        showTimes(times, LiveTexts.times(current));
+        showTimes(times, LiveTexts.times(current, timekeepingOffsetHours));
 
         displayedPrevious = LaneRows.from(previous, heats == null ? Set.of() : heats.usedLanes());
         fill(previousRows, displayedPrevious);
         previousSection.setVisible(previous != null);
         if (previous != null) {
             previousTitle.setText(LiveTexts.title(previous));
-            showTimes(previousTimes, LiveTexts.times(previous));
+            showTimes(previousTimes, LiveTexts.times(previous, timekeepingOffsetHours));
         }
         revalidate();
         repaint();

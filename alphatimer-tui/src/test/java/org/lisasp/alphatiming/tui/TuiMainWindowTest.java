@@ -175,6 +175,22 @@ class TuiMainWindowTest {
     }
 
     @Test
+    void aNegativeTimekeepingOffsetCanBeTypedCharacterByCharacter() throws IOException {
+        TuiSettingsPanel settings = window.settingsPanel();
+        settings.timekeepingOffsetField().setText("");
+        window.setFocusedInteractable(settings.timekeepingOffsetField());
+
+        for (char c : "-2".toCharArray()) {
+            window.handleInput(new KeyStroke(c, false, false));
+        }
+        settings.commit();
+        render();
+
+        assertThat(controller.document().settings().timekeepingOffsetHours()).isEqualTo(-2);
+        assertThat(screenText()).contains("Timekeeping offset (hours)");
+    }
+
+    @Test
     void theFieldsFollowTheConnectionType() throws IOException {
         TuiSettingsPanel settings = window.settingsPanel();
         settings.connectionTypeCombo().setSelectedIndex(ConnectionType.FILE.ordinal());
@@ -274,6 +290,19 @@ class TuiMainWindowTest {
         List<String> lines = screenText().lines().toList();
         assertCentered(lines.stream().filter(l -> l.contains("Event 3 \u00B7 Heat 2")).findFirst().orElseThrow(), "Event 3 \u00B7 Heat 2", "10:03:00 \u2192", "0:00.0");
         assertCentered(lines.stream().filter(l -> l.contains("Event 3 \u00B7 Heat 1")).findFirst().orElseThrow(), "Event 3 \u00B7 Heat 1", "10:00:00 \u2192 10:01:05", "Previous heat");
+    }
+
+    @Test
+    void theLiveViewShowsTheTimesOfTheDeviceClockPlusTheOffsetOfTheProject() throws IOException {
+        LocalDateTime start = LocalDateTime.of(2026, 5, 1, 10, 0, 0);
+        int halfPastSeven = 7 * 3_600_000 + 30 * 60_000;
+        window.showLiveView();
+        window.liveViewPanel().setHeats(new LiveHeats(new HeatDto(3, 1, HeatStatus.Finished, start, start.plusSeconds(65), 0, List.of(), null, halfPastSeven), null));
+
+        controller.applySettingsIfChanged(controller.document().settings().withTimekeepingOffset(2));
+        render();
+
+        assertThat(screenText()).contains("09:30:00 \u2192 09:31:05");
     }
 
     @Test

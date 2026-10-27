@@ -39,6 +39,16 @@ class HeatServiceTest {
     }
 
     @Test
+    void theTimeOfDayOfTheStartIsStoredWithTheHeat() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            HeatStore store = new HeatStore(db);
+            new HeatService(store).accept(TestMessageCreator.startAtTimeOfDay(1, 1, T0, 36_000_000));
+            assertThat(store.find(1, 1).orElseThrow().startTimeOfDayMillis()).isEqualTo(36_000_000);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
     void listenersGetCurrentHeatOnRegistrationAndChangesAfterwards() throws Exception {
         try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatService service = new HeatService(new HeatStore(db));

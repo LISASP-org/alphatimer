@@ -181,6 +181,7 @@ public final class TimingDocument implements AutoCloseable {
             e.setRestEnabled(s.restEnabled());
             e.setReplayFile(s.replayFile());
             e.setCompetitionKey(s.competitionKey());
+            e.setTimekeepingOffsetHours(s.timekeepingOffsetHours());
             return toSettings(e);
         });
     }
@@ -190,7 +191,8 @@ public final class TimingDocument implements AutoCloseable {
                             s.getRestPort() == 0 ? Settings.DEFAULT_REST_PORT : s.getRestPort(),
                             s.getRestEnabled() == null ? s.getRestPort() != 0 : s.getRestEnabled(),
                             s.getReplayFile(),
-                            s.getCompetitionKey());
+                            s.getCompetitionKey(),
+                            s.getTimekeepingOffsetHours() == null ? 0 : s.getTimekeepingOffsetHours());
     }
 
     private static <E extends Enum<E>> E parse(Class<E> type, String name) {

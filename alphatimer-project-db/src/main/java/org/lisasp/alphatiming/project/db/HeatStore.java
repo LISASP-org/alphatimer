@@ -71,6 +71,7 @@ public final class HeatStore implements HeatRepository {
         e.setStarted(dto.started());
         e.setEnded(dto.ended());
         e.setLastMessage(dto.lastMessage());
+        e.setStartTimeOfDayMillis(dto.startTimeOfDayMillis());
         e.setLapCount(dto.lapCount());
         e.setChangeSeq(nextSeq(em));
         e.getLanes().removeIf(l -> dto.lanes().stream().noneMatch(d -> d.number() == l.getNumber()));
@@ -116,6 +117,7 @@ public final class HeatStore implements HeatRepository {
                             .sorted(java.util.Comparator.comparingInt(LaneEntity::getNumber))
                             .map(l -> new LaneDto(l.getNumber(), l.getTimeInMillis(), l.getLap(), l.getStatus(), l.getPenalty(), l.getPlace(), l.isFinished()))
                             .toList(),
-                           e.getLastMessage());
+                           e.getLastMessage(),
+                           e.getStartTimeOfDayMillis());
     }
 }

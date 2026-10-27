@@ -16,7 +16,7 @@ class DefaultSettingsStoreTest {
     @Test
     void roundTripCreatesParentDirectories() {
         DefaultSettingsStore store = new DefaultSettingsStore(dir.resolve("a/b/defaults.json"));
-        Settings s = new Settings("host", 1234, 30, 2000).withCompetitionKey("WK");
+        Settings s = new Settings("host", 1234, 30, 2000).withCompetitionKey("WK").withTimekeepingOffset(2);
         store.save(s);
         assertThat(store.load()).isEqualTo(s);
     }

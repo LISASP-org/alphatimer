@@ -312,6 +312,11 @@ public final class AppController implements AutoCloseable {
         return lastHeats;
     }
 
+    public int timekeepingOffsetHours() {
+        TimingDocument doc = document;
+        return doc == null ? 0 : doc.settings().timekeepingOffsetHours();
+    }
+
     public Optional<HeatDto> currentHeat() {
         return Optional.ofNullable(lastHeats.current());
     }
@@ -406,7 +411,7 @@ public final class AppController implements AutoCloseable {
             stateListeners.forEach(l -> l.accept(st));
             fireChange();
         });
-        next.addMessageListener(message -> announce(MessageText.describe(message)));
+        next.addMessageListener(message -> announce(MessageText.describe(message, doc.settings().timekeepingOffsetHours())));
         next.addPingListener(() -> pingListeners.forEach(Runnable::run));
         next.addConnectionLostListener(this::onConnectionLost);
         next.addErrorListener(ex -> announce(MessageText.processingError(ex)));

@@ -40,6 +40,27 @@ class HeatTest {
     }
 
     @Test
+    void eachStartKeepsTheTimeOfDayTheDeviceSent() {
+        Heat heat = new Heat(emptyHeat());
+
+        heat.start(TestMessageCreator.startAtTimeOfDay(1, 1, T0, 36_000_000));
+        assertThat(heat.createDto().startTimeOfDayMillis()).isEqualTo(36_000_000);
+
+        heat.start(TestMessageCreator.startAtTimeOfDay(1, 1, T0.plusSeconds(60), 36_060_000));
+        assertThat(heat.createDto().startTimeOfDayMillis()).isEqualTo(36_060_000);
+    }
+
+    @Test
+    void aStartWithoutTimeOfDayLeavesItUnknown() {
+        Heat heat = new Heat(emptyHeat());
+        heat.start(TestMessageCreator.startAtTimeOfDay(1, 1, T0, 36_000_000));
+
+        heat.start(TestMessageCreator.start(1, 1, T0.plusSeconds(60)));
+
+        assertThat(heat.createDto().startTimeOfDayMillis()).isNull();
+    }
+
+    @Test
     void splitSetsLatestTimeAndLapWithoutFinishing() {
         Heat heat = prepared();
         heat.touch(TestMessageCreator.split(1, 1, 2, 1, 1234));
