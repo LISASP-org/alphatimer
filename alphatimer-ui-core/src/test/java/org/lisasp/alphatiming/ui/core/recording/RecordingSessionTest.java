@@ -12,6 +12,7 @@ import org.lisasp.alphatimer.api.serial.SerialPortReader;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.heats.HeatDto;
+import org.lisasp.alphatiming.legacy.api.LegacySerialization;
 import org.lisasp.alphatimer.serial.com.NrSerialReader;
 import org.lisasp.alphatimer.serial.com.SerialPorts;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
@@ -22,8 +23,13 @@ import org.lisasp.alphatimer.serial.tcp.TcpReader;
 import org.lisasp.alphatiming.project.db.testdata.DataHandlingMessageTestData;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ServerSocket;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,6 +42,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 class RecordingSessionTest {
@@ -142,35 +149,108 @@ class RecordingSessionTest {
         assertThat(states).containsExactly(RecordingState.ERROR);
     }
 
-    @Test
-    void restPortInUseGivesErrorAndClosesTheReader() throws Exception {
-        try (ServerSocket blocker = new ServerSocket(0)) {
-            session.start(settings(blocker.getLocalPort()));
-            assertThat(session.state()).isEqualTo(RecordingState.ERROR);
-            assertThat(session.error().kind()).isEqualTo(RecordingError.Kind.REST_PORT);
-            assertThat(session.error().detail()).isEqualTo(String.valueOf(blocker.getLocalPort()));
-            assertThat(reader().closes).isEqualTo(1);
-            assertThat(reader().starts).isZero();
+    private static int freePort() throws Exception {
+        try (ServerSocket probe = new ServerSocket(0)) {
+            return probe.getLocalPort();
+        }
+    }
+
+    private static HttpResponse<String> fetchHeats(int port) throws Exception {
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/legacy/heats.xml")).build(), HttpResponse.BodyHandlers.ofString());
+        }
+    }
+
+    private static boolean isOpen(int port) {
+        try (Socket ignored = new Socket("localhost", port)) {
+            return true;
+        } catch (IOException ex) {
+            return false;
         }
     }
 
     @Test
-    void canBeStartedAndStoppedRepeatedlyOnTheSameRestPort() throws Exception {
-        int port;
-        try (ServerSocket probe = new ServerSocket(0)) {
-            port = probe.getLocalPort();
-        }
+    void theServerServesTheRecordedTimesWithoutARunningRecording() throws Exception {
+        int port = freePort();
+        session.serve(true, port);
+        assertThat(fetchHeats(port).body()).isEqualTo("<AlphaServer.Heat-array/>");
+
+        session.start(settings(0));
+        reader().push(DataHandlingMessageTestData.message1);
+        reader().push(DataHandlingMessageTestData.message2);
+        session.stop();
+
+        HttpResponse<String> response = fetchHeats(port);
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).isEqualTo(LegacySerialization.toXML(session.legacyHeats()));
+    }
+
+    @Test
+    void startingAndStoppingRecordingsKeepsTheServerRunning() throws Exception {
+        int port = freePort();
+        session.serve(true, port);
         for (int i = 0; i < 3; i++) {
-            session.start(settings(port));
+            session.start(settings(0));
             assertThat(session.state()).isEqualTo(RecordingState.RUNNING);
+            assertThat(fetchHeats(port).statusCode()).isEqualTo(200);
             session.stop();
             assertThat(session.state()).isEqualTo(RecordingState.STOPPED);
+            assertThat(fetchHeats(port).statusCode()).isEqualTo(200);
         }
         assertThat(created).hasSize(3);
         assertThat(created).allSatisfy(r -> {
             assertThat(r.starts).isEqualTo(1);
             assertThat(r.closes).isEqualTo(1);
         });
+    }
+
+    @Test
+    void aPortInUseIsReportedAndDoesNotKeepARecordingFromStarting() throws Exception {
+        try (ServerSocket blocker = new ServerSocket(0)) {
+            assertThatThrownBy(() -> session.serve(true, blocker.getLocalPort())).isInstanceOf(IOException.class);
+            session.start(settings(0));
+            assertThat(session.state()).isEqualTo(RecordingState.RUNNING);
+        }
+    }
+
+    @Test
+    void theSameSettingsTryTheServerAgainAfterThePortWasInUse() throws Exception {
+        int port;
+        try (ServerSocket blocker = new ServerSocket(0)) {
+            port = blocker.getLocalPort();
+            assertThatThrownBy(() -> session.serve(true, port)).isInstanceOf(IOException.class);
+        }
+        session.serve(true, port);
+        assertThat(fetchHeats(port).statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void switchingTheServerOffOrToAnotherPortClosesTheOldPort() throws Exception {
+        int first = freePort();
+        session.serve(true, first);
+        int second = freePort();
+        session.serve(true, second);
+        assertThat(isOpen(first)).isFalse();
+        assertThat(fetchHeats(second).statusCode()).isEqualTo(200);
+
+        session.serve(false, second);
+        assertThat(isOpen(second)).isFalse();
+    }
+
+    @Test
+    void aRecordingDoesNotOpenTheServerPortOfItsSettings() throws Exception {
+        int port = freePort();
+        session.start(settings(port));
+        assertThat(session.state()).isEqualTo(RecordingState.RUNNING);
+        assertThat(isOpen(port)).isFalse();
+    }
+
+    @Test
+    void closingTheSessionClosesTheServer() throws Exception {
+        int port = freePort();
+        session.serve(true, port);
+        session.close();
+        assertThat(isOpen(port)).isFalse();
     }
 
     @Test
@@ -381,14 +461,6 @@ class RecordingSessionTest {
         session.stop();
 
         assertThat(heard).containsExactly(RecordingState.RUNNING, RecordingState.STOPPED);
-    }
-
-    @Test
-    void aDisabledServerDoesNotOpenItsPort() throws Exception {
-        try (ServerSocket blocker = new ServerSocket(0)) {
-            session.start(new Settings("localhost", 8585, 60, 1).withCompetitionKey("WK").withRest(blocker.getLocalPort(), false));
-            assertThat(session.state()).isEqualTo(RecordingState.RUNNING);
-        }
     }
 
     @Test

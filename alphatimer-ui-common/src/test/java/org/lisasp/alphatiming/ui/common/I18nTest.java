@@ -175,7 +175,6 @@ class I18nTest {
         RecordingError invalid = new RecordingError(RecordingError.Kind.INVALID_SETTINGS, "", List.of(SettingsProblem.TCP_HOST_EMPTY, SettingsProblem.TCP_PORT_RANGE));
         assertThat(I18n.describe(invalid)).isEqualTo("TCP host must not be empty; TCP port must be between 1 and 65535");
         assertThat(I18n.describe(new RecordingError(RecordingError.Kind.SERIAL_PORT_NOT_FOUND, "COM7"))).isEqualTo("Serial port COM7 was not found");
-        assertThat(I18n.describe(new RecordingError(RecordingError.Kind.REST_PORT, "1999"))).contains("1999");
     }
 
     @Test

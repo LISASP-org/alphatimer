@@ -130,8 +130,9 @@ are older than 30 days, but always keeps its 10 newest ones.
 
 ## REST endpoints
 
-While recording (server toggle on): `GET /legacy/heats.xml` and `GET /legacy/heats.json` — the same data as alphatimer
-(finish times per heat and lane). The server answers up to 4 requests at a time and keeps up to 16 more waiting.
+While the server toggle is on, whether or not a recording runs: `GET /legacy/heats.xml` and `GET /legacy/heats.json` —
+the same data as alphatimer (finish times per heat and lane recorded so far in the open project). A port that cannot be
+opened is shown as a warning in the status bar and does not keep a recording from starting. The server answers up to 4 requests at a time and keeps up to 16 more waiting.
 Further connections are closed at once, as is a connection whose request and response take longer than 10 seconds.
 
 The endpoints have no authentication on purpose: they serve read-only data to JAuswertung on the local network, as

@@ -9,7 +9,6 @@ public record RecordingError(Kind kind, String detail, List<SettingsProblem> pro
 
     public enum Kind {
         INVALID_SETTINGS,
-        REST_PORT,
         SERIAL_PORT_NOT_FOUND,
         SERIAL_PORT_IN_USE,
         SERIAL_PORT_NAME_TOO_LONG,
