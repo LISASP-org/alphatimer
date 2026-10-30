@@ -1,4 +1,4 @@
-package org.lisasp.alphatiming.legacy.server.dto;
+package org.lisasp.alphatiming.legacy.api;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;

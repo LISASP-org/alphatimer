@@ -24,6 +24,7 @@ final class Heat {
     private LocalDateTime started;
     private LocalDateTime ended;
     private LocalDateTime lastMessage;
+    private Integer startTimeOfDayMillis;
     private int lapCount;
     private final List<Lane> lanes = new ArrayList<>();
 
@@ -34,12 +35,13 @@ final class Heat {
         this.started = dto.started();
         this.ended = dto.ended();
         this.lastMessage = dto.lastMessage();
+        this.startTimeOfDayMillis = dto.startTimeOfDayMillis();
         this.lapCount = dto.lapCount();
         dto.lanes().forEach(l -> lanes.add(new Lane(l)));
     }
 
     HeatDto createDto() {
-        return new HeatDto(event, heat, status, started, ended, lapCount, lanes.stream().map(Lane::createDto).toList(), lastMessage);
+        return new HeatDto(event, heat, status, started, ended, lapCount, lanes.stream().map(Lane::createDto).toList(), lastMessage, startTimeOfDayMillis);
     }
 
     /**
@@ -52,6 +54,7 @@ final class Heat {
         }
         status = HeatStatus.Started;
         started = message.getTimestamp();
+        startTimeOfDayMillis = message.getDeviceTimeInMillis().isPresent() ? message.getDeviceTimeInMillis().getAsInt() : null;
         lastMessage = message.getTimestamp();
         ended = null;
         lapCount = message.getLapCount();

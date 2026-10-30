@@ -9,7 +9,7 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.lisasp.alphatiming.legacy.server.dto.LaneStatus;
+import org.lisasp.alphatiming.legacy.api.LaneStatus;
 
 import java.time.LocalDateTime;
 

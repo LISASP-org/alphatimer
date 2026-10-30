@@ -322,6 +322,18 @@ class TimingDocumentTest {
     }
 
     @Test
+    void timekeepingOffsetSurvivesSaveAndOpen() throws Exception {
+        Settings s = new Settings("host", 8585, 60, 1999).withCompetitionKey("WK").withTimekeepingOffset(-2);
+        Path file = dir.resolve("offset.timing");
+        try (TimingDocument doc = TimingDocument.create(work(), s)) {
+            doc.saveAs(file);
+        }
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
+            assertThat(doc.settings().timekeepingOffsetHours()).isEqualTo(-2);
+        }
+    }
+
+    @Test
     void serverSettingSurvivesSaveAndOpen() throws Exception {
         Settings s = new Settings("host", 8585, 60, 1999).withCompetitionKey("WK").withRest(2222, false);
         Path file = dir.resolve("rest.heat");

@@ -12,3 +12,5 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Chore | Severity | Size | Summary |
 | --- | --- | --- | --- |
+| [Associate `.timing` files in the JAuswertung installer](associate-timing-files.md) | Low | S | Register `.timing` files with the AlphaTiming launcher in the install4j project; blocked by opening a project from the command line |
+| [Properties files use \uXXXX escapes](properties-utf-8.md) | Low | S | Convert `messages.properties` and `messages_de.properties` to plain UTF-8 |

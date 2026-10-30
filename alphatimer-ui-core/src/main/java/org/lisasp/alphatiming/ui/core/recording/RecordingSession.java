@@ -22,7 +22,7 @@ import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.project.db.LaneTimeStore;
 import org.lisasp.alphatiming.legacy.server.LegacyHttpServer;
 import org.lisasp.alphatiming.legacy.server.LegacyService;
-import org.lisasp.alphatiming.legacy.server.dto.Heat;
+import org.lisasp.alphatiming.legacy.api.Heat;
 import org.lisasp.alphatiming.project.db.replay.FileReplayReader;
 import org.lisasp.alphatiming.project.db.replay.ReplayFileException;
 import org.lisasp.alphatimer.serial.com.NrSerialReader;
@@ -31,6 +31,7 @@ import org.lisasp.alphatimer.serial.com.SerialConnectionException;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 import org.lisasp.alphatiming.ui.core.settings.SettingsProblem;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -38,7 +39,8 @@ import java.util.function.Consumer;
 
 /**
  * One recording at a time. {@link #start} builds a fresh pipeline from a settings snapshot, {@link #stop} tears it down,
- * so the settings can be changed between recordings without restarting the program.
+ * so the settings can be changed between recordings without restarting the program. The server for former AlphaServer
+ * consumers is independent of the recordings: {@link #serve} switches it, and it serves what was recorded so far.
  */
 @Slf4j
 public final class RecordingSession implements AutoCloseable {
@@ -70,12 +72,13 @@ public final class RecordingSession implements AutoCloseable {
     private volatile SerialPortReader reader;
     private RawDataRecorder rawRecorder;
     private LegacyHttpServer restServer;
-    private volatile LegacyService legacy;
+    private final LegacyService legacy;
 
     public RecordingSession(TimingDatabase db, ReaderFactory readers, DateTimeFacade time) {
         this.db = db;
         this.readers = readers;
         this.time = time;
+        this.legacy = new LegacyService(writes.laneTimes(new LaneTimeStore(db)));
     }
 
     /** TCP or serial reader, depending on the connection type of the settings. */
@@ -112,10 +115,33 @@ public final class RecordingSession implements AutoCloseable {
         }
     }
 
-    private static RecordingError toError(RuntimeException ex) {
-        if (ex instanceof RestServerStartException rest) {
-            return new RecordingError(RecordingError.Kind.REST_PORT, String.valueOf(rest.port()));
+    /**
+     * Runs the server on the port or closes it, independent of the recordings; unchanged settings leave a running server
+     * alone, so they also retry a port that could not be opened before.
+     */
+    public synchronized void serve(boolean enabled, int port) throws IOException {
+        if (enabled && restServer != null && restServer.getPort() == port) {
+            return;
         }
+        closeServer();
+        if (enabled) {
+            restServer = new LegacyHttpServer(port, legacy::getHeats);
+            log.info("Server started on port {}", port);
+        }
+    }
+
+    private void closeServer() {
+        try {
+            if (restServer != null) {
+                restServer.close();
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Could not close REST server", ex);
+        }
+        restServer = null;
+    }
+
+    private static RecordingError toError(RuntimeException ex) {
         if (ex instanceof ReplayFileException replay) {
             RecordingError.Kind kind = replay.reason() == ReplayFileException.Reason.NOT_FOUND ? RecordingError.Kind.REPLAY_FILE_NOT_FOUND : RecordingError.Kind.REPLAY_FILE_UNREADABLE;
             return new RecordingError(kind, replay.file().toString());
@@ -134,7 +160,6 @@ public final class RecordingSession implements AutoCloseable {
     }
 
     private void build(Settings s) {
-        legacy = new LegacyService(writes.laneTimes(new LaneTimeStore(db)));
         MessageStore messageStore = new MessageStore(db);
         HeatService heatService = new HeatService(writes.heats(new HeatStore(db)), this::reportError);
         heatListeners.forEach(heatService::register);
@@ -165,14 +190,6 @@ public final class RecordingSession implements AutoCloseable {
         reader.addConnectionLostListener(() -> connectionLost(created, new LostConnection(s.connectionType(), addressOf(s))));
         if (reader instanceof FileReplayReader replay) {
             replay.addFinishedListener(this::stop);
-        }
-
-        if (s.restEnabled()) {
-            try {
-                restServer = new LegacyHttpServer(s.restPort(), legacy::getHeats);
-            } catch (java.io.IOException | RuntimeException ex) {
-                throw new RestServerStartException(s.restPort(), ex);
-            }
         }
     }
 
@@ -275,13 +292,6 @@ public final class RecordingSession implements AutoCloseable {
             log.warn("Could not close reader", ex);
         }
         try {
-            if (restServer != null) {
-                restServer.close();
-            }
-        } catch (RuntimeException ex) {
-            log.warn("Could not close REST server", ex);
-        }
-        try {
             if (rawRecorder != null) {
                 rawRecorder.close();
             }
@@ -289,7 +299,6 @@ public final class RecordingSession implements AutoCloseable {
             log.warn("Could not close raw data recorder", ex);
         }
         reader = null;
-        restServer = null;
         rawRecorder = null;
     }
 
@@ -354,12 +363,12 @@ public final class RecordingSession implements AutoCloseable {
     }
 
     public Heat[] legacyHeats() {
-        LegacyService l = legacy;
-        return l == null ? new Heat[0] : l.getHeats();
+        return legacy.getHeats();
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         stop();
+        closeServer();
     }
 }

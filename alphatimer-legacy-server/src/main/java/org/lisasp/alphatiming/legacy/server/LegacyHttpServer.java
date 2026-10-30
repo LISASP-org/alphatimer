@@ -4,7 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import lombok.extern.slf4j.Slf4j;
-import org.lisasp.alphatiming.legacy.server.dto.Heat;
+import org.lisasp.alphatiming.legacy.api.Heat;
+import org.lisasp.alphatiming.legacy.api.LegacySerialization;
 
 import java.io.IOException;
 import java.io.OutputStream;

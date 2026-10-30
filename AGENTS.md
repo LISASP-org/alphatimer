@@ -29,17 +29,19 @@ that solve problems this application does not have:
 | `alphatimer-ares-serial-api`, `alphatimer-ares-serial`, `alphatimer-refinedmessages-api`, `alphatimer-refinedmessages`, `alphatimer-serial-api` | Copied from `../alphatimer` (`module-info.java` removed): protocol messages, byte→message parsing, message refining, `SerialPortReader`, `SerialConfiguration`. Independent copies — never make them depend on alphatimer. `SerialPortReader` has the additions `start()`, `isConnected()` and `addConnectionLostListener(…)`. `RefinedMessage` has the addition `getDeviceTimeInMillis()` (the time value the device sent, where the message has one; `getTimestamp()` is the local arrival time) and `TakeOverTimeMessage` keeps its time. |
 | `alphatimer-serial-core` | The `SerialPortReader` implementations: `TcpReader` (`serial.tcp`, copied from `../alphatimer`; `close()` waits up to 5 s for the reader thread to end) and `NrSerialReader`, `SerialPorts`, `SerialConnectionException` (`serial.com`, on nrjavaserial as in AlphaServer; nrjavaserial silently leaves out ports it cannot open, so on Linux `SerialPorts.withoutAccess` reports the USB adapters (`/dev/ttyUSB*`, `/dev/ttyACM*`) this user may not open, with the group that may (`InaccessiblePort`), and `UserGroups` tells whether the user's account is in that group (`id -nG <user>`, not the groups of this process) and how to add it; line settings from `SerialConfiguration`; a read error or vanished port closes it and is reported to its connection-lost listeners, never reconnected). Never depends on the UI modules. |
 | `alphatimer-heats` | Heat model, placing, `HeatService`, `RunningClock`, `LiveHeats`, the heat/lane DTOs and enums. Works on refined messages only; stores through the `HeatRepository` interface. No database. |
-| `alphatimer-legacy-server` | alphatimer-compatible heats (`LegacyService`, `legacy.dto`) and the JDK `HttpServer` endpoints (`LegacyHttpServer`; its requests run on the bounded `HandlerPool`, which closes connections beyond its queue and those over the time limit). Stores `LaneTime`s through the `LaneTimeRepository` interface. No database. |
+| `alphatimer-legacy-api` | The legacy heat format that JAuswertung consumes: `Heat`, `Lane`, `LaneStatus` and `LegacySerialization` (package `legacy.api`), which writes the XML and reads it back — also the XStream output of AlphaServer (`class` attributes, any lane order) —, rejecting malformed or inconsistent data and any DOCTYPE with `InvalidLegacyXmlException`; `AresResultFile` reads the result file (CSV) of ARES21 into heats, ported unchanged in behavior from AlphaServer's `FileReader`. JAuswertung depends on this module, so it depends on no other module; changing it changes JAuswertung's input. |
+| `alphatimer-legacy-server` | alphatimer-compatible heats (`LegacyService`) and the JDK `HttpServer` endpoints (`LegacyHttpServer`; its requests run on the bounded `HandlerPool`, which closes connections beyond its queue and those over the time limit). Stores `LaneTime`s through the `LaneTimeRepository` interface. No database. |
 | `alphatimer-project-db` | The `.timing` project file: Hibernate on SQLite (`TimingDatabase`, entities), the save protocol of the project file (`TimingFileWriter`), the work folder with its work files, their locks and origin notes and the crash leftovers (`TimingWorkFolder`, `CrashLeftover`) and the stores that implement the repositories (`HeatStore`, `LaneTimeStore`) or write the recording (`MessageStore`, `RawDataRecorder`). `replay` (`FileReplayReader`: binary file or the raw data of a `.timing` file, paced like 9600 baud; reads the `rawdata` table with plain JDBC). The only module with Hibernate/SQLite. |
-| `alphatimer-ui-core` | No Swing. The application layer: `settings` (`SerialMode` maps to a `SerialConfiguration`), `project` (`TimingDocument`: the open project with its database, project file and lock, unsaved state and save lock and its settings, kept in memory so the 1 s refresh reads them without the database lock; `AutoSaver`), `recording` (`RecordingSession` wires reader, parser, heats, stores and the legacy server; its `WriteListener` hears which `RecordedData` could not be stored, when it is stored again and how many bytes of it were dropped when the recording stopped; a lost connection stops it and is reported to its connection-lost listeners as `LostConnection`, with the connection type and its address). |
+| `alphatimer-ui-core` | No Swing. The application layer: `settings` (`SerialMode` maps to a `SerialConfiguration`), `project` (`TimingDocument`: the open project with its database, project file and lock, unsaved state and save lock and its settings, kept in memory so the 1 s refresh reads them without the database lock; `AutoSaver`), `recording` (`RecordingSession` wires reader, parser, heats and stores per recording, and runs the legacy server independently of the recordings via `serve`, as long as its document is open; its `WriteListener` hears which `RecordedData` could not be stored, when it is stored again and how many bytes of it were dropped when the recording stopped; a lost connection stops it and is reported to its connection-lost listeners as `LostConnection`, with the connection type and its address). |
 | `alphatimer-ui-common` | What every front end shares, no Swing: `AppController` (document workflow), `SavePrompt` (the questions it asks, implemented per front end; `RecoveryTexts` builds the texts of the recovery questions), `ProjectFiles` (file extensions; the Save As path choice the prompts share: default extension, a folder is rejected, then the overwrite question), `I18n` with the `messages*.properties`, `FileFailure` (classifies the cause chain of a failed file action — not found, no permission, disk full, folder, corrupt, locked, other — so error texts name the reason and the file instead of the exception message), `AppStatus` (title, file, state text, warning summary and details, Start/Stop), `StatusWarnings` (the active status-bar warnings, each kind with its own clearing rule, all of them cleared when the document is replaced or closed; `WriteFailures` raises and clears the write-error warning; the lost serial connection is cleared by the next start), `SettingsFormRules` (required/editable fields, record button), `SerialPortTexts` (the hint below the port list that names the ports without access, and the info behind its icon: the group to join with its command, or that only a new login is missing), `ShownDocument` (a field being edited keeps its text on a refresh, but not when the document is replaced), `LaneRows`, `TimeFormat`, `MessageText`, `LogFileCleanup` (old log files, run by every launcher). |
 | `alphatimer-ui` | Swing UI on the JUtils `JButtonBar` in the layout of the JAuswertung plugin window (`JAlphaTiming.createBody`: `SelectorScrollPane` with the bar left, 4 dlu gap, the panel right with a labeled border of its name, 5 px space around; window sized like `JPFrame`), `SwingSavePrompt`, `AlphaTimingLauncher`. Panels: "Settings & Recording" and "Live View" (lane rows built from `LaneRows`, no `JTable`). Builds `alphatiming.jar` with its dependencies in `target/lib/`. The program icon and the icon of `.timing` files are rendered from the SVGs in `alphatimer-ui/src/icons` (`yarn build`, as in JAuswertung's `jauswertung-files/src/icons`) into `icons/app/`: PNGs for the window, `.ico` files for the JAuswertung installer that bundles AlphaTiming. |
 | `alphatimer-tui` | Text UI on Lanterna with the structure of the GUI (`TuiMainWindow`: menu bar, panel buttons left, status line; `TuiSettingsPanel`, `TuiLiveViewPanel`, `TuiSavePrompt` with text dialogs). All logic comes from `alphatimer-ui-common`; listeners go through `gui.getGUIThread().invokeLater`. Shortcuts are function keys (F2 save, F5/F6 panels, F10 exit), Ctrl+N/O, and Ctrl+C asks like Exit — never Ctrl+S/Ctrl+Q, which terminals use for flow control; they are handled before the focused component, and the settings form commits the text being typed before a document action. Logs to the file only. Builds `alphatiming-tui.jar` with `target/lib/`. |
 | `alphatimer-cli` | Command line recording into an existing project file (`RecordLauncher`, `RecordCommand`): opens it through `AppController` with the non-interactive `CliSavePrompt` (stops and saves without asking), records with its stored settings until `TerminalStopTrigger` (JLine raw mode: any key, Ctrl+C) or SIGTERM fires or the serial connection is lost, saves. Prints `MessageText` lines and finished heats (`FinishedHeats`). Exit codes in `ExitCode` (a lost connection has its own; recorded data still missing after the final save, `AppController.recordedDataMissing`, has its own and wins over it). Logs to the file only. Builds `alphatiming-cli.jar` with `target/lib/`. |
+| `alphatimer-distribution` | Two zips. The `files` zip (`alphatimer-distribution-<version>-files.zip`, `assembly.xml`, installed into `~/.m2`) that the JAuswertung installer bundles: `alphatiming.jar`, `alphatiming-tui.jar`, `alphatiming-cli.jar`, their shared `lib/` and the program and file icons in `icons/`; the platform jars of JavaFX are left out, the installer adds those of each platform to `lib/`. The standalone bundle (`target/alphatiming-<version>.zip`, `bundle.xml`, not attached): in `alphatiming-<version>/` only the start scripts from `src/bin` and `README.txt`; `lib/` holds the three program jars, `launch.sh` (from `src/lib`: Java check, class path, JVM options), `dependencies/` and `javafx/linux`, `javafx/mac` (copied by the dependency plugin, `javafx.version` in the root POM must match filechooser's). The scripts put only their own program jar on the class path, since each brings its own `logback.xml`, and use `-cp` rather than `-jar`, whose manifest class path names the JavaFX jars of the build machine. |
 
 ### Dependency Rules
 
-- `alphatimer-*` copies → `alphatimer-serial-core`, `alphatimer-heats`, `alphatimer-legacy-server` → `alphatimer-project-db`
+- `alphatimer-*` copies → `alphatimer-serial-core`, `alphatimer-heats`, `alphatimer-legacy-api` → `alphatimer-legacy-server` → `alphatimer-project-db`
   → `alphatimer-ui-core` → `alphatimer-ui-common` → front ends (`alphatimer-ui`, `alphatimer-tui`, `alphatimer-cli`). Lower modules never depend on higher ones; `alphatimer-heats` and
   `alphatimer-legacy-server` never depend on the database (they define repository interfaces, project-db implements them).
 - `alphatimer-ui-core` and `alphatimer-ui-common` must not depend on Swing. UI text lives in `alphatimer-ui-common`, dialogs
@@ -72,7 +74,8 @@ that solve problems this application does not have:
   is done (also after a failure). `SwingSavePrompt` hands each question to the EDT and waits for the answer, so the
   controller may ask from that worker. The TUI and the CLI call the controller synchronously. Saving stays on the EDT;
   it holds the database lock only for the `VACUUM INTO` of a small file. Do not add other long-running work to the EDT.
-- Every thread, socket, REST port and file lock that a recording or a document opens must be released on stop/close;
+- Every thread, socket and file lock that a recording opens must be released on stop, and the server port and everything
+  a document opens on close;
   start → stop → start must be repeatable.
 
 ## Persistence and Compatibility
@@ -161,7 +164,8 @@ untrusted input:
   `alphatimer-ui-common/src/main/resources/org/lisasp/alphatiming/ui/common/messages.properties` (English) and `messages_de.properties`
   and is looked up with `I18n.get(key, args…)` (`MessageFormat` placeholders `{0}`). The language follows the JVM's
   default locale (`-Duser.language=de` to force it); other languages fall back to English. Never hardcode UI text in Java.
-- Write non-ASCII characters in the properties files as `\uXXXX` escapes. Both files must have identical keys and
+- Write non-ASCII characters in the properties files as `\uXXXX` escapes, until `docs/chores/properties-utf-8.md` moves
+  them to plain UTF-8. Both files must have identical keys and
   placeholders; `I18nTest` checks this, that every key used in code exists, and that no key is dead (it scans the sources
   of all front ends; add a new front end to its list). A key built
   dynamically (`"problem." + name`) needs its family enumerated in that test.
@@ -213,13 +217,16 @@ untrusted input:
   `org.lisasp.alphatiming.cli.RecordLauncher`.
 - `alphatiming.jar` references its dependencies in `lib/` through the manifest class path (no fat jar); keep `lib/`
   next to the jar when copying it.
+- JAuswertung's installer (`../JAuswertung-Project/jauswertung-setup`) unpacks the zip of `alphatimer-distribution` into
+  its own `alphatiming/` folder with its own class path, so AlphaTiming's libraries never mix with JAuswertung's. Install
+  this project (`mvn clean install`) before building the installer.
 - Captured event data (`data/*.dat`, ignored by Git) contains personal data: never commit it or paste its content.
   Use it only locally, e.g. replayed through a fake TCP server; tests use the sample bytes in
   `alphatimer-project-db/src/test/java/org/lisasp/alphatiming/project/db/testdata/`.
 
 ## Tests
 
-- JUnit 5 (Jupiter) with AssertJ and Awaitility. Name test classes `*Test`; there are no integration-test conventions —
+- JUnit 6 (Jupiter) with AssertJ and Awaitility. Name test classes `*Test`; there are no integration-test conventions —
   tests that need a database use `TimingDatabase.createNew(@TempDir)`, tests that need a device use a local
   `ServerSocket` or a fake `SerialPortReader`. `HeatServiceTest` and `LegacyServiceTest` run against the real stores and
   therefore live in `alphatimer-project-db`.
@@ -234,11 +241,12 @@ untrusted input:
 - **Comments**: do not write a comment unless it provides benefit on its own — standing alone, with no other context,
   it must tell the reader something they could not already get from the code around it (names, types, structure, a
   nearby signature). A comment that restates what the code does, restates a parameter's name/type/default in prose, or
-  explains something inferable in a few seconds of reading does not clear this bar. The only comments that clear it: a
-  hidden constraint, a subtle invariant, or a workaround for a specific bug that isn't obvious from the code itself.
-  When in doubt, don't add the comment. This is a hard rule, not a default that yields to matching a file's existing
-  style — a comment already present in a file is not evidence it belongs there. Whenever you touch a file or area of
-  code, also remove any existing comment in that area that fails this test.
+  explains something inferable in a few seconds of reading does not clear this bar — do not write it. The only comments
+  that clear it: a hidden constraint, a subtle invariant, or a workaround for a specific bug that isn't obvious from the
+  code itself. When in doubt, don't add the comment. This is a hard rule, not a default that yields to convenience or to
+  matching a file's existing style — a comment already present in a file is not evidence it belongs there. Whenever you
+  touch a file or area of code, also remove any existing comment in that area that fails this test; do not leave it in
+  place because it predates this rule or because removing it feels out of scope.
 - **PTDD (Predictive TDD)**: follow Red-Green-Refactor, but make two predictions explicit. Before writing a test, state
   precisely what the code should do and how you'll observe it (e.g. Given-When-Then). Before running a newly written or
   adjusted test, predict exactly how it will fail; if the actual failure differs, or the test passes unexpectedly, stop
@@ -253,6 +261,16 @@ untrusted input:
 - **Language**: identifiers are English and follow the timing vocabulary already used (`heat`, `lane`, `event`,
   `competitionKey`, `place`, `penalty`, `split`/`finish`); reuse those terms instead of introducing synonyms. The
   `alphatimer-*` copies keep their own names.
+
+## Git Workflow
+
+- While developing a feature, work on a feature branch and stay on it until the feature is finished. Do not merge into
+  `main` in between, not even to hand a library change to another project early; build and install from the branch
+  instead (`mvn install`).
+- Start a branch before the first commit when `main` is checked out. Follow-up work goes on the branch that is checked
+  out; do not create further branches unasked.
+- Merge into `main` only when the feature is finished and the user asks for it, with a real merge commit
+  (`git merge --no-ff`), never a fast-forward.
 - **Commit messages**: write them in German, as in JAuswertung. The body is a brief bullet list of at most 3–4 one-line
   bullets. Focus on intention — why the change was made and what behavior it affects — not mechanics visible in the
   diff. Don't mention tests that accompany a code change; do state it when a commit only adds or changes tests.

@@ -217,8 +217,12 @@ public final class AppController implements AutoCloseable {
 
     private void closeDocument() {
         TimingDocument doc = document;
+        RecordingSession s = session;
         document = null;
         session = null;
+        if (s != null) {
+            s.close();
+        }
         clearWarningsOfTheDocument();
         if (doc != null) {
             doc.close();
@@ -255,7 +259,24 @@ public final class AppController implements AutoCloseable {
         }
         doc.updateSettings(settings);
         scheduleAutoSave(settings);
+        if (s != null) {
+            serve(s, settings);
+        }
         fireChange();
+    }
+
+    /** The server runs whenever it is switched on, with or without a recording. */
+    private void serve(RecordingSession s, Settings settings) {
+        try {
+            s.serve(settings.restEnabled(), settings.restPort());
+            warnings.clear(StatusWarnings.Kind.SERVER);
+        } catch (IOException ex) {
+            log.warn("Could not start the server on port {}", settings.restPort(), ex);
+            StatusWarnings.Warning warning = new StatusWarnings.Warning(I18n.get("warn.serverPort", String.valueOf(settings.restPort())),
+                                                                        I18n.get("warn.serverPort.detail", String.valueOf(settings.restPort())));
+            warnings.raise(StatusWarnings.Kind.SERVER, warning);
+            announce(warning.details());
+        }
     }
 
     /** Applies settings entered in a form unless they are unchanged or a recording runs; true when they were applied. */
@@ -310,6 +331,11 @@ public final class AppController implements AutoCloseable {
 
     public LiveHeats liveHeats() {
         return lastHeats;
+    }
+
+    public int timekeepingOffsetHours() {
+        TimingDocument doc = document;
+        return doc == null ? 0 : doc.settings().timekeepingOffsetHours();
     }
 
     public Optional<HeatDto> currentHeat() {
@@ -384,6 +410,10 @@ public final class AppController implements AutoCloseable {
 
     private void replaceDocument(TimingDocument next) {
         TimingDocument old = document;
+        RecordingSession oldSession = session;
+        if (oldSession != null) {
+            oldSession.close(); // frees the server port for the next project
+        }
         install(next);
         if (old != null) {
             old.close();
@@ -393,6 +423,7 @@ public final class AppController implements AutoCloseable {
     private void clearWarningsOfTheDocument() {
         writeFailures.reset();
         warnings.clear(StatusWarnings.Kind.CONNECTION_LOST);
+        warnings.clear(StatusWarnings.Kind.SERVER);
         warnings.clear(StatusWarnings.Kind.AUTO_SAVE);
     }
 
@@ -406,7 +437,7 @@ public final class AppController implements AutoCloseable {
             stateListeners.forEach(l -> l.accept(st));
             fireChange();
         });
-        next.addMessageListener(message -> announce(MessageText.describe(message)));
+        next.addMessageListener(message -> announce(MessageText.describe(message, doc.settings().timekeepingOffsetHours())));
         next.addPingListener(() -> pingListeners.forEach(Runnable::run));
         next.addConnectionLostListener(this::onConnectionLost);
         next.addErrorListener(ex -> announce(MessageText.processingError(ex)));
@@ -444,6 +475,7 @@ public final class AppController implements AutoCloseable {
         session = next;
         Settings settings = doc.settings();
         scheduleAutoSave(settings);
+        serve(next, settings);
         HeatStore heatStore = new HeatStore(doc.database());
         List<HeatDto> recent = heatStore.findRecent(2);
         lastHeats = recent.isEmpty() ? LiveHeats.NONE : new LiveHeats(recent.get(0), recent.size() > 1 ? recent.get(1) : null, heatStore.findUsedLanes());

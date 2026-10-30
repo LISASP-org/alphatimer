@@ -45,14 +45,22 @@ class MessageTextTest {
 
     @Test
     void describesTheInterpretedMessageWithoutTheRawText() {
-        String text = MessageText.describe(message(KindOfTime.Finish, MessageType.OnLineTime, 2, 1, 25_010));
+        String text = MessageText.describe(message(KindOfTime.Finish, MessageType.OnLineTime, 2, 1, 25_010), 0);
         assertThat(text).isEqualTo("E3 H2 L2  Finish  OnLineTime  25.01  #1");
         assertThat(text).doesNotContain("raw1").doesNotContain("raw2");
     }
 
     @Test
+    void theTimeOfDayOfAStartGetsTheOffsetAndRaceTimesStayAsSent() {
+        int halfPastSeven = 7 * 3_600_000 + 30 * 60_000;
+        assertThat(MessageText.describe(message(KindOfTime.Start, MessageType.OnLineTime, 0, 0, halfPastSeven), 2)).endsWith("  09:30:00.0");
+        assertThat(MessageText.describe(message(KindOfTime.Start, MessageType.OnLineTime, 0, 0, halfPastSeven), -8)).endsWith("  23:30:00.0");
+        assertThat(MessageText.describe(message(KindOfTime.Finish, MessageType.OnLineTime, 2, 0, 25_010), 2)).endsWith("  25.01");
+    }
+
+    @Test
     void omitsTheRankWhenThereIsNoneAndShowsTheTimeOfDayForStarts() {
-        assertThat(MessageText.describe(message(KindOfTime.SplitTime, MessageType.OnLineTime, 4, 0, 12_340))).isEqualTo("E3 H2 L4  SplitTime  OnLineTime  12.34");
-        assertThat(MessageText.describe(message(KindOfTime.Start, MessageType.OnLineTime, 0, 0, 112_853_930))).isEqualTo("E3 H2 L0  Start  OnLineTime  31:20:53.9");
+        assertThat(MessageText.describe(message(KindOfTime.SplitTime, MessageType.OnLineTime, 4, 0, 12_340), 0)).isEqualTo("E3 H2 L4  SplitTime  OnLineTime  12.34");
+        assertThat(MessageText.describe(message(KindOfTime.Start, MessageType.OnLineTime, 0, 0, 112_853_930), 0)).isEqualTo("E3 H2 L0  Start  OnLineTime  07:20:53.9");
     }
 }

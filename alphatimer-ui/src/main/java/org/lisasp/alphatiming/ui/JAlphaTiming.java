@@ -268,6 +268,7 @@ public final class JAlphaTiming extends JFrame {
         startItem.setEnabled(status.canStart());
         stopItem.setEnabled(status.canStop());
         settingsPanel.refresh();
+        liveViewPanel.setTimekeepingOffset(controller.timekeepingOffsetHours());
         liveViewPanel.setRecording(status.recording());
     }
 

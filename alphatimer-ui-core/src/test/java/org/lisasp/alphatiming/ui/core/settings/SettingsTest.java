@@ -47,6 +47,15 @@ class SettingsTest {
     }
 
     @Test
+    void theTimekeepingOffsetShiftsTheClockByLessThanADayInEitherDirection() {
+        assertThat(valid().timekeepingOffsetHours()).isZero();
+        assertThat(valid().withTimekeepingOffset(-23).validate()).isEmpty();
+        assertThat(valid().withTimekeepingOffset(23).validate()).isEmpty();
+        assertThat(valid().withTimekeepingOffset(-24).validate()).containsExactly(SettingsProblem.TIMEKEEPING_OFFSET_RANGE);
+        assertThat(valid().withTimekeepingOffset(24).validate()).containsExactly(SettingsProblem.TIMEKEEPING_OFFSET_RANGE);
+    }
+
+    @Test
     void defaultsNeedAHostAndACompetitionKeyBeforeTheyAreValid() {
         assertThat(Settings.defaults().validate()).containsExactly(SettingsProblem.TCP_HOST_EMPTY, SettingsProblem.COMPETITION_KEY_EMPTY);
         assertThat(Settings.defaults().withTcp("h", 9).tcpPort()).isEqualTo(9);

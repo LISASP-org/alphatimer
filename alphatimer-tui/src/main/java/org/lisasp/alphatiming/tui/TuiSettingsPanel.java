@@ -40,6 +40,7 @@ final class TuiSettingsPanel extends Panel {
 
     private static final int MAX_LOG_LINES = 300;
     private static final Pattern DIGITS = Pattern.compile("\\d{0,5}");
+    private static final Pattern SIGNED_DIGITS = Pattern.compile("-?\\d{0,2}");
 
     private final AppController controller;
     private final WindowBasedTextGUI gui;
@@ -58,6 +59,7 @@ final class TuiSettingsPanel extends Panel {
     private final CommitTextBox replayFile = new CommitTextBox(40, this::commit);
     private final Button chooseFile = new Button(I18n.get("input.chooseFile"), this::chooseReplayFile);
     private final CommitTextBox competitionKey = new CommitTextBox(30, this::commit);
+    private final CommitTextBox timekeepingOffset = new CommitTextBox(4, this::commit);
     private final CommitTextBox autoSave = new CommitTextBox(6, this::commit);
     private final CommitTextBox restPort = new CommitTextBox(6, this::commit);
     private final CheckBox server = new CheckBox();
@@ -84,6 +86,7 @@ final class TuiSettingsPanel extends Panel {
         for (TextBox number : new TextBox[]{port, autoSave, restPort}) {
             number.setValidationPattern(DIGITS);
         }
+        timekeepingOffset.setValidationPattern(SIGNED_DIGITS);
         serialPort.setReadOnly(false);
         // Stable names (/dev/serial/by-id/…) would otherwise make the form as wide as the longest of them.
         serialPort.setPreferredSize(new TerminalSize(30, 1));
@@ -140,6 +143,8 @@ final class TuiSettingsPanel extends Panel {
         Panel general = new Panel(new GridLayout(2));
         general.addComponent(new Label(I18n.get("general.competitionKey")));
         general.addComponent(competitionKey);
+        general.addComponent(new Label(I18n.get("general.timekeepingOffset")));
+        general.addComponent(timekeepingOffset);
         general.addComponent(new Label(I18n.get("general.autoSave")));
         general.addComponent(autoSave);
         general.addComponent(new Label(I18n.get("general.serverPort")));
@@ -171,12 +176,13 @@ final class TuiSettingsPanel extends Panel {
                             number(restPort),
                             server.isChecked(),
                             replayFile.getText().trim(),
-                            competitionKey.getText().trim());
+                            competitionKey.getText().trim(),
+                            number(timekeepingOffset));
     }
 
     private static int number(TextBox box) {
         String text = box.getText().trim();
-        return text.isEmpty() ? 0 : Integer.parseInt(text);
+        return text.isEmpty() || text.equals("-") ? 0 : Integer.parseInt(text);
     }
 
     void commit() {
@@ -282,6 +288,7 @@ final class TuiSettingsPanel extends Panel {
                 setUnlessEdited(host, s.tcpHost(), replaced);
                 setUnlessEdited(port, String.valueOf(s.tcpPort()), replaced);
                 setUnlessEdited(replayFile, s.replayFile(), replaced);
+                setUnlessEdited(timekeepingOffset, String.valueOf(s.timekeepingOffsetHours()), replaced);
                 setUnlessEdited(autoSave, String.valueOf(s.autoSaveSeconds()), replaced);
                 setUnlessEdited(restPort, String.valueOf(s.restPort()), replaced);
                 server.setChecked(s.restEnabled());
@@ -322,6 +329,7 @@ final class TuiSettingsPanel extends Panel {
         replayFile.setEnabled(rules.editable());
         chooseFile.setEnabled(rules.editable());
         competitionKey.setEnabled(rules.editable());
+        timekeepingOffset.setEnabled(rules.editable());
         autoSave.setEnabled(rules.editable());
         server.setEnabled(rules.editable());
         restPort.setEnabled(rules.restPortEditable());
@@ -346,6 +354,10 @@ final class TuiSettingsPanel extends Panel {
 
     TextBox competitionKeyField() {
         return competitionKey;
+    }
+
+    TextBox timekeepingOffsetField() {
+        return timekeepingOffset;
     }
 
     TextBox hostField() {

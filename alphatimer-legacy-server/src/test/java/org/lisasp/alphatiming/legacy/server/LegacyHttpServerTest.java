@@ -1,8 +1,9 @@
 package org.lisasp.alphatiming.legacy.server;
 
 import org.junit.jupiter.api.Test;
-import org.lisasp.alphatiming.legacy.server.dto.Heat;
-import org.lisasp.alphatiming.legacy.server.dto.LaneStatus;
+import org.lisasp.alphatiming.legacy.api.Heat;
+import org.lisasp.alphatiming.legacy.api.LaneStatus;
+import org.lisasp.alphatiming.legacy.api.LegacySerialization;
 
 import java.io.IOException;
 import java.net.Socket;

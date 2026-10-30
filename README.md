@@ -23,6 +23,13 @@ mvn clean install
 java -jar alphatimer-ui/target/alphatiming.jar
 ```
 
+`mvn clean install` (or `mvn package`) also builds a ready-to-run zip for Linux and macOS (Intel):
+`alphatimer-distribution/target/alphatiming-<version>.zip`. Unpack it anywhere; it needs only Java 25 or newer
+(`JAVA_HOME`, otherwise `java` from `PATH`) and is started with `./alphatiming.sh` (window), `./alphatiming-tui.sh`
+(text UI) or `./alphatiming-cli.sh <file.timing>` (command line). The scripts can be linked, e.g. into `~/bin`. If no
+suitable Java is found, they say so and exit with code 127. On Windows, AlphaTiming comes with the JAuswertung
+installer.
+
 ## Workflow
 
 1. **Settings & Recording** panel: choose the input in the *Connection type* list:
@@ -35,8 +42,13 @@ java -jar alphatimer-ui/target/alphatiming.jar
      its stored raw data is used). The data is replayed at 9600 baud (960 bytes per second) and the recording stops by
      itself at the end of the file.
 
-   Also set the competition key (required; one per project file, a change applies to all of its data), the auto-save
-   interval and the server port with its on/off toggle.
+   Also set the competition key (required; one per project file, a change applies to all of its data), the timekeeping
+   offset, the auto-save interval and the server port with its on/off toggle. The timekeeping offset (whole hours,
+   -23 to 23) corrects the clock of the timekeeping system: every time of day shown for it is the transmitted value plus
+   the offset — the start of a heat in the Live View (its end follows by the time that passed) and the start lines of
+   the message log. Race times are not changed and the project keeps the transmitted values, so a change of the offset
+   also applies to heats recorded before. Heats whose start carried no time of day show the arrival times on this
+   computer.
 2. **Start recording.** The settings are locked while recording.
 3. **Live View** panel shows the live heat on top (with its running time) and, below it, the last state of the heat that
    was active before (times and places). A lane that was used in any heat keeps its row, without a time, while it is
@@ -118,8 +130,9 @@ are older than 30 days, but always keeps its 10 newest ones.
 
 ## REST endpoints
 
-While recording (server toggle on): `GET /legacy/heats.xml` and `GET /legacy/heats.json` — the same data as alphatimer
-(finish times per heat and lane). The server answers up to 4 requests at a time and keeps up to 16 more waiting.
+While the server toggle is on, whether or not a recording runs: `GET /legacy/heats.xml` and `GET /legacy/heats.json` —
+the same data as alphatimer (finish times per heat and lane recorded so far in the open project). A port that cannot be
+opened is shown as a warning in the status bar and does not keep a recording from starting. The server answers up to 4 requests at a time and keeps up to 16 more waiting.
 Further connections are closed at once, as is a connection whose request and response take longer than 10 seconds.
 
 The endpoints have no authentication on purpose: they serve read-only data to JAuswertung on the local network, as

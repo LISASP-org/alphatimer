@@ -20,6 +20,11 @@ import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
 import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -121,6 +126,7 @@ class AppControllerTest {
     void setUp() throws IOException {
         work = Files.createDirectories(dir.resolve("work"));
         defaults = new DefaultSettingsStore(dir.resolve("defaults.json"));
+        defaults.save(Settings.defaults().withRest(Settings.DEFAULT_REST_PORT, false));
         prompt = new RecordingPrompt(events);
         controller = new AppController(work, defaults, prompt, () -> s -> fakeReader(), LocalDateTime::now);
     }
@@ -132,6 +138,76 @@ class AppControllerTest {
     }
 
     private static final Settings S = new Settings("localhost", 8585, 60, 0).withCompetitionKey("WK");
+
+    private static int freePort() throws IOException {
+        try (ServerSocket probe = new ServerSocket(0)) {
+            return probe.getLocalPort();
+        }
+    }
+
+    private static boolean serves(int port) {
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/legacy/heats.xml")).build();
+            return client.send(request, HttpResponse.BodyHandlers.ofString()).statusCode() == 200;
+        } catch (IOException ex) {
+            return false;
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    @Test
+    void theSwitchedOnServerRunsWithoutARecordingAndKeepsRunningWhenTheRecordingStops() throws IOException {
+        int port = freePort();
+        controller.init();
+        controller.applySettings(S.withRest(port, true));
+        assertThat(serves(port)).isTrue();
+
+        controller.startRecording();
+        assertThat(controller.isRecording()).isTrue();
+        assertThat(serves(port)).isTrue();
+        controller.stopRecording();
+        assertThat(serves(port)).isTrue();
+
+        controller.applySettings(S.withRest(port, false));
+        assertThat(serves(port)).isFalse();
+    }
+
+    @Test
+    void aServerPortInUseIsAWarningUntilTheServerIsSwitchedOffAndDoesNotKeepTheRecordingFromStarting() throws IOException {
+        controller.init();
+        try (ServerSocket blocker = new ServerSocket(0)) {
+            int port = blocker.getLocalPort();
+            controller.applySettings(S.withRest(port, true));
+            assertThat(controller.warnings()).singleElement().satisfies(w -> {
+                assertThat(w.text()).contains(String.valueOf(port));
+                assertThat(w.details()).contains(String.valueOf(port));
+            });
+
+            controller.startRecording();
+            assertThat(controller.isRecording()).isTrue();
+            controller.stopRecording();
+
+            controller.applySettings(S.withRest(port, false));
+            assertThat(controller.warnings()).isEmpty();
+        }
+    }
+
+    @Test
+    void theNextProjectGetsThePortOfTheProjectItReplacesAndClosingTheProjectClosesThePort() throws IOException {
+        int port = freePort();
+        defaults.save(S.withRest(port, true));
+        controller.init();
+        assertThat(serves(port)).isTrue();
+
+        controller.newProject();
+        assertThat(controller.warnings()).isEmpty();
+        assertThat(serves(port)).isTrue();
+
+        assertThat(controller.requestClose()).isTrue();
+        assertThat(serves(port)).isFalse();
+    }
 
     @Test
     void afterRequestCloseANewProjectCanBeOpenedAndAutoSaveScheduledAgain() {
