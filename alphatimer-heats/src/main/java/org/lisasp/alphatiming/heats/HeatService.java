@@ -14,7 +14,6 @@ import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedRefinedMessage;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -31,7 +30,7 @@ public final class HeatService implements Consumer<RefinedMessage> {
 
     private final List<Consumer<LiveHeats>> listeners = new CopyOnWriteArrayList<>();
     private final SortedSet<Integer> usedLanes = new TreeSet<>();
-    private final Map<HeatKey, HeatDto> known = new LinkedHashMap<>();
+    private final LinkedHashMap<HeatKey, HeatDto> known = new LinkedHashMap<>();
     private volatile LiveHeats live = LiveHeats.NONE;
 
     public HeatService(HeatRepository store) {
@@ -42,11 +41,9 @@ public final class HeatService implements Consumer<RefinedMessage> {
         this.store = store;
         this.onError = onError;
         usedLanes.addAll(store.findUsedLanes());
-        store.findAll().forEach(h -> known.put(HeatKey.of(h), h));
-        List<HeatDto> recent = store.findRecent(2);
-        if (!recent.isEmpty()) {
-            live = new LiveHeats(recent.get(0), recent.size() > 1 ? recent.get(1) : null, usedLanes, List.copyOf(known.values()));
-        }
+        List<HeatDto> newestFirst = store.findAll();
+        newestFirst.reversed().forEach(h -> known.put(HeatKey.of(h), h));
+        live = LiveHeats.of(newestFirst, usedLanes);
     }
 
     private static boolean isRepeatOfAPreviousRace(RefinedMessage message) {
@@ -108,17 +105,16 @@ public final class HeatService implements Consumer<RefinedMessage> {
             if (after.equals(before)) {
                 return;
             }
+            estimateEndsOfOtherHeats(after, message.getTimestamp());
             if (stored.isPresent()) {
                 store.save(after);
             } else {
                 store.create(after);
             }
-            LiveHeats shown = live;
-            HeatDto previous = shown.current() != null && !sameHeat(shown.current(), after) ? shown.current() : shown.previous();
             after.lanes().stream().filter(l -> l.status() == LaneStatus.Used).forEach(l -> usedLanes.add(l.number()));
+            known.remove(HeatKey.of(after));
             known.put(HeatKey.of(after), after);
-            estimateEndsOfOtherHeats(after, message.getTimestamp());
-            live = new LiveHeats(after, previous == null ? null : known.get(HeatKey.of(previous)), usedLanes, List.copyOf(known.values()));
+            live = LiveHeats.of(List.copyOf(known.sequencedValues().reversed()), usedLanes);
         } catch (RuntimeException ex) {
             log.warn("Could not apply message '{}'.", message, ex);
             onError.accept(ex);
@@ -129,7 +125,8 @@ public final class HeatService implements Consumer<RefinedMessage> {
 
     /**
      * The device does not always send the official end; a heat that another heat follows is over by then at the latest,
-     * and when it fell silent long before (a stopped recording, an older project), by the time its clock stopped.
+     * and when it fell silent long before (a stopped recording, an older project), by the time its clock stopped. Saved
+     * before the active heat, so that the active heat stays the most recently changed one in the project.
      */
     private void estimateEndsOfOtherHeats(HeatDto active, LocalDateTime at) {
         List<HeatDto> unended = known.values()

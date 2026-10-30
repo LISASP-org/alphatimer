@@ -33,7 +33,7 @@ public final class HeatStore implements HeatRepository {
                                               .getResultList()));
     }
 
-    @Override
+    /** The most recently changed heats, newest first. */
     public List<HeatDto> findRecent(int count) {
         return db.read(em -> em.createQuery("select h from HeatEntity h order by h.changeSeq desc", HeatEntity.class)
                                .setMaxResults(count)
@@ -44,7 +44,7 @@ public final class HeatStore implements HeatRepository {
 
     @Override
     public List<HeatDto> findAll() {
-        return db.read(em -> em.createQuery("select h from HeatEntity h", HeatEntity.class)
+        return db.read(em -> em.createQuery("select h from HeatEntity h order by h.changeSeq desc", HeatEntity.class)
                                .getResultStream()
                                .map(HeatStore::toDto)
                                .toList());

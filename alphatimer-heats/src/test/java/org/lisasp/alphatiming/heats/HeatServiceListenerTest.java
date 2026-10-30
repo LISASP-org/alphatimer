@@ -67,11 +67,6 @@ class HeatServiceListenerTest {
         }
 
         @Override
-        public List<HeatDto> findRecent(int count) {
-            return List.of();
-        }
-
-        @Override
         public List<HeatDto> findAll() {
             return List.copyOf(heats.values());
         }

@@ -10,9 +10,7 @@ public interface HeatRepository {
 
     SortedSet<Integer> findUsedLanes();
 
-    /** The most recently changed heats, newest first. */
-    List<HeatDto> findRecent(int count);
-
+    /** Every heat, the most recently changed first. */
     List<HeatDto> findAll();
 
     HeatDto create(HeatDto dto);

@@ -15,7 +15,7 @@ import java.util.stream.Stream;
  * @param previous  null until a second heat was received; holds the last state of that heat
  * @param usedLanes every lane number that was used in any heat of the project, so the view keeps a (time-less) row for a
  *                  lane that is not used in the shown heat
- * @param known     every heat of the project with its latest state, in no particular order
+ * @param known     every heat of the project with its latest state, the most recently changed first
  */
 public record LiveHeats(HeatDto current, HeatDto previous, SortedSet<Integer> usedLanes, List<HeatDto> known) {
 
@@ -34,6 +34,18 @@ public record LiveHeats(HeatDto current, HeatDto previous, SortedSet<Integer> us
     /** The two given heats are the only known heats. */
     public LiveHeats(HeatDto current, HeatDto previous, Set<Integer> usedLanes) {
         this(current, previous, new TreeSet<>(usedLanes), Stream.of(current, previous).filter(Objects::nonNull).toList());
+    }
+
+    /**
+     * The most recently changed heat is the current one; the previous one is the most recently changed of the others that
+     * has started, since an announced heat that never started would only hide the heat that was swum before.
+     */
+    public static LiveHeats of(List<HeatDto> newestFirst, Set<Integer> usedLanes) {
+        if (newestFirst.isEmpty()) {
+            return NONE;
+        }
+        HeatDto previous = newestFirst.stream().skip(1).filter(h -> h.status() != HeatStatus.Open).findFirst().orElse(null);
+        return new LiveHeats(newestFirst.getFirst(), previous, new TreeSet<>(usedLanes), newestFirst);
     }
 
     private static SortedSet<Integer> usedIn(HeatDto... heats) {

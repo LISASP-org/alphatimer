@@ -102,7 +102,7 @@ class HeatServiceTest {
         try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService first = new HeatService(store);
-            first.accept(TestMessageCreator.used(1, 1, "1100000000"));
+            first.accept(TestMessageCreator.start(1, 1, T0));
             first.accept(TestMessageCreator.used(1, 2, "1100000000"));
 
             HeatService second = new HeatService(store);
@@ -233,6 +233,48 @@ class HeatServiceTest {
 
             assertThat(store.find(1, 2).orElseThrow().status()).isEqualTo(HeatStatus.Started);
             assertThat(store.find(1, 2).orElseThrow().ended()).isNull();
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void anEmptyHeatDoesNotBecomeThePreviousHeat() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            HeatStore store = new HeatStore(db);
+            HeatService service = new HeatService(store);
+            List<LiveHeats> seen = new ArrayList<>();
+            service.register(seen::add);
+            service.accept(TestMessageCreator.used(1, 1, "1100000000"));
+            service.accept(TestMessageCreator.start(1, 1, T0));
+            service.accept(TestMessageCreator.end(1, 1, T0.plusMinutes(1)));
+            service.accept(TestMessageCreator.used(1, 2, "1100000000"));
+
+            service.accept(TestMessageCreator.start(1, 3, T0.plusMinutes(3)));
+
+            assertThat(seen.get(seen.size() - 1).current().heat()).isEqualTo(3);
+            assertThat(seen.get(seen.size() - 1).previous().heat()).isEqualTo(1);
+
+            List<LiveHeats> restored = new ArrayList<>();
+            new HeatService(store).register(restored::add);
+            assertThat(restored.get(0).current().heat()).isEqualTo(3);
+            assertThat(restored.get(0).previous().heat()).isEqualTo(1);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void anEstimatedEndDoesNotMakeTheEstimatedHeatTheCurrentHeatOfTheProject() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            HeatStore store = new HeatStore(db);
+            HeatService service = new HeatService(store);
+            service.accept(TestMessageCreator.start(1, 1, T0));
+            service.accept(TestMessageCreator.start(1, 2, T0.plusMinutes(3)));
+
+            List<LiveHeats> restored = new ArrayList<>();
+            new HeatService(store).register(restored::add);
+
+            assertThat(restored.get(0).current().heat()).isEqualTo(2);
+            assertThat(restored.get(0).previous().heat()).isEqualTo(1);
             db.closeAndDelete();
         }
     }
