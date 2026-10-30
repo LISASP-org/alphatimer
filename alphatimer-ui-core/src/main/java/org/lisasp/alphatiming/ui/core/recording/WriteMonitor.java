@@ -93,6 +93,11 @@ final class WriteMonitor {
             }
 
             @Override
+            public List<HeatDto> findAll() {
+                return store.findAll();
+            }
+
+            @Override
             public HeatDto create(HeatDto dto) {
                 return write(RecordedData.HEATS, () -> store.create(dto));
             }

@@ -1,5 +1,6 @@
 package org.lisasp.alphatiming.ui;
 
+import org.lisasp.alphatiming.ui.common.HeatRows;
 import org.lisasp.alphatiming.ui.common.I18n;
 import org.lisasp.alphatiming.ui.common.LiveTexts;
 import org.lisasp.alphatiming.ui.common.LaneRows;
@@ -22,11 +23,13 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * The live heat with its running time on top and, below it, the last state of the heat that was active before.
+ * The live heat with its running time on top and, below it, the last state of the heat that was active before; on the right
+ * every known heat.
  */
 public final class LiveViewPanel extends JPanel {
 
     private static final String HEAT_GAP = "20dlu";
+    private static final String COLUMNS = "fill:0px:grow, 8dlu, fill:180dlu";
     /** Both outer columns grow alike, so the start and finish times stand in the middle of the heading. */
     private static final String HEADING_COLUMNS = "fill:0px:grow, 8dlu, center:default, 8dlu, fill:0px:grow";
 
@@ -42,6 +45,8 @@ public final class LiveViewPanel extends JPanel {
     private final Timer clockTimer = new Timer(100, e -> updateClock());
     private final JLabel information = new JLabel(I18n.get("live.none"));
     private final JGlassPanel<JPanel> glass;
+    private final HeatTableModel heatTableModel = new HeatTableModel();
+    private final JTable heatTable = new JTable(heatTableModel);
 
     private HeatDto heat;
     private LiveHeats heats;
@@ -51,7 +56,7 @@ public final class LiveViewPanel extends JPanel {
     private List<LaneRows.Row> displayedPrevious = List.of();
 
     public LiveViewPanel() {
-        super(new BorderLayout());
+        super(new FormLayout(COLUMNS, "fill:0px:grow"));
         JPanel live = new JPanel(new FormLayout("fill:0px:grow", "fill:default, 8dlu, fill:default:grow"));
 
         title.setFont(LiveFonts.heading());
@@ -87,7 +92,11 @@ public final class LiveViewPanel extends JPanel {
         glass.getGlassPanel().setLayout(new CenterLayout());
         glass.getGlassPanel().add(info);
         glass.setEnabled(false);
-        add(glass, BorderLayout.CENTER);
+        add(glass, CC.xy(1, 1));
+
+        heatTable.getTableHeader().setReorderingAllowed(false);
+        heatTable.setFillsViewportHeight(true);
+        add(new JScrollPane(heatTable), CC.xy(3, 1));
     }
 
     @Override
@@ -148,6 +157,7 @@ public final class LiveViewPanel extends JPanel {
             previousTitle.setText(LiveTexts.title(previous));
             showTimes(previousTimes, LiveTexts.times(previous, timekeepingOffsetHours));
         }
+        heatTableModel.setRows(HeatRows.from(heats == null ? List.of() : heats.known(), timekeepingOffsetHours));
         revalidate();
         repaint();
         updateClock();
@@ -170,6 +180,14 @@ public final class LiveViewPanel extends JPanel {
 
     private void updateClock() {
         clock.setText(LiveTexts.clock(heat, LocalDateTime.now(), recording));
+    }
+
+    JTable heatTable() {
+        return heatTable;
+    }
+
+    Rectangle liveAreaBounds() {
+        return glass.getBounds();
     }
 
     List<Component> rowComponents() {

@@ -13,6 +13,8 @@ public interface HeatRepository {
     /** The most recently changed heats, newest first. */
     List<HeatDto> findRecent(int count);
 
+    List<HeatDto> findAll();
+
     HeatDto create(HeatDto dto);
 
     void save(HeatDto dto);

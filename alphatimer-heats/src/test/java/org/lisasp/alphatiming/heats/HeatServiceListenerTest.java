@@ -72,6 +72,11 @@ class HeatServiceListenerTest {
         }
 
         @Override
+        public List<HeatDto> findAll() {
+            return List.copyOf(heats.values());
+        }
+
+        @Override
         public HeatDto create(HeatDto dto) {
             save(dto);
             return dto;

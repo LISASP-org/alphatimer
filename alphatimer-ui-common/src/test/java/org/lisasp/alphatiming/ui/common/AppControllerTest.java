@@ -622,6 +622,21 @@ class AppControllerTest {
     }
 
     @Test
+    void openingAProjectMakesAllItsHeatsKnown() throws Exception {
+        Path file = dir.resolve("three.timing");
+        try (TimingDocument a = TimingDocument.create(work, S)) {
+            HeatStore store = new HeatStore(a.database());
+            store.create(1, 1, 8);
+            store.create(1, 2, 8);
+            store.create(1, 3, 8);
+            a.saveAs(file);
+        }
+        controller.init();
+        controller.open(file);
+        assertThat(controller.liveHeats().known()).extracting(HeatDto::heat).containsExactlyInAnyOrder(1, 2, 3);
+    }
+
+    @Test
     void openingAProjectWithoutHeatsClearsTheLiveHeat() throws Exception {
         Path withHeat = dir.resolve("with.heat");
         Path without = dir.resolve("without.heat");

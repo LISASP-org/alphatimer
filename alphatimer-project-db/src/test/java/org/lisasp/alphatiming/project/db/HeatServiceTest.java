@@ -139,6 +139,28 @@ class HeatServiceTest {
     }
 
     @Test
+    void everyHeatOfTheProjectIsKnownWithItsLatestState() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            HeatStore store = new HeatStore(db);
+            HeatService first = new HeatService(store);
+            first.accept(TestMessageCreator.used(1, 1, "1100000000"));
+            first.accept(TestMessageCreator.used(1, 2, "1100000000"));
+
+            HeatService second = new HeatService(store);
+            List<LiveHeats> seen = new ArrayList<>();
+            second.register(seen::add);
+            assertThat(seen.get(0).known()).extracting(HeatDto::heat).containsExactlyInAnyOrder(1, 2);
+
+            second.accept(TestMessageCreator.used(1, 3, "1100000000"));
+            second.accept(TestMessageCreator.start(1, 1, T0));
+            List<HeatDto> known = seen.get(seen.size() - 1).known();
+            assertThat(known).extracting(HeatDto::heat).containsExactlyInAnyOrder(1, 2, 3);
+            assertThat(known).filteredOn(h -> h.heat() == 1).singleElement().extracting(HeatDto::status).isEqualTo(HeatStatus.Started);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
     void findRecentReturnsTheLatestChangedHeatsNewestFirst() throws Exception {
         try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);

@@ -29,9 +29,14 @@ public final class LiveTexts {
         if (heat == null || heat.started() == null) {
             return "";
         }
-        LocalTime start = heat.startTimeOfDayMillis() == null ? heat.started().toLocalTime() : DeviceClock.timeOfDay(heat.startTimeOfDayMillis(), timekeepingOffsetHours);
-        String started = TimeFormat.clock(start) + " \u2192";
+        String started = TimeFormat.clock(timeOfDay(heat, heat.started(), timekeepingOffsetHours)) + " \u2192";
         LocalDateTime end = heat.ended() != null ? heat.ended() : heat.lastMessage();
-        return end == null ? started : started + " " + TimeFormat.clock(start.plus(Duration.between(heat.started(), end)));
+        return end == null ? started : started + " " + TimeFormat.clock(timeOfDay(heat, end, timekeepingOffsetHours));
+    }
+
+    /** The time of day of a moment of a started heat, on the clock that {@link #times} describes. */
+    static LocalTime timeOfDay(HeatDto heat, LocalDateTime moment, int timekeepingOffsetHours) {
+        LocalTime start = heat.startTimeOfDayMillis() == null ? heat.started().toLocalTime() : DeviceClock.timeOfDay(heat.startTimeOfDayMillis(), timekeepingOffsetHours);
+        return start.plus(Duration.between(heat.started(), moment));
     }
 }

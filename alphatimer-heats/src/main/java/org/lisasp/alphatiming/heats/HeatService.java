@@ -11,7 +11,9 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedRefinedMessage;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -28,6 +30,7 @@ public final class HeatService implements Consumer<RefinedMessage> {
 
     private final List<Consumer<LiveHeats>> listeners = new CopyOnWriteArrayList<>();
     private final SortedSet<Integer> usedLanes = new TreeSet<>();
+    private final Map<HeatKey, HeatDto> known = new LinkedHashMap<>();
     private volatile LiveHeats live = LiveHeats.NONE;
 
     public HeatService(HeatRepository store) {
@@ -38,15 +41,23 @@ public final class HeatService implements Consumer<RefinedMessage> {
         this.store = store;
         this.onError = onError;
         usedLanes.addAll(store.findUsedLanes());
+        store.findAll().forEach(h -> known.put(HeatKey.of(h), h));
         List<HeatDto> recent = store.findRecent(2);
         if (!recent.isEmpty()) {
-            live = new LiveHeats(recent.get(0), recent.size() > 1 ? recent.get(1) : null, usedLanes);
+            live = new LiveHeats(recent.get(0), recent.size() > 1 ? recent.get(1) : null, usedLanes, List.copyOf(known.values()));
         }
     }
 
     private static boolean isRepeatOfAPreviousRace(RefinedMessage message) {
         return (message instanceof StartMessage m && m.getMessageType() == RefinedMessageType.PreviousRaceResult)
                 || (message instanceof TimeMessage t && t.getMessageType() == RefinedMessageType.PreviousRaceResult);
+    }
+
+    private record HeatKey(int event, int heat) {
+
+        static HeatKey of(HeatDto heat) {
+            return new HeatKey(heat.event(), heat.heat());
+        }
     }
 
     private static boolean sameHeat(HeatDto a, HeatDto b) {
@@ -104,7 +115,8 @@ public final class HeatService implements Consumer<RefinedMessage> {
             LiveHeats shown = live;
             HeatDto previous = shown.current() != null && !sameHeat(shown.current(), after) ? shown.current() : shown.previous();
             after.lanes().stream().filter(l -> l.status() == LaneStatus.Used).forEach(l -> usedLanes.add(l.number()));
-            live = new LiveHeats(after, previous, usedLanes);
+            known.put(HeatKey.of(after), after);
+            live = new LiveHeats(after, previous, usedLanes, List.copyOf(known.values()));
         } catch (RuntimeException ex) {
             log.warn("Could not apply message '{}'.", message, ex);
             onError.accept(ex);

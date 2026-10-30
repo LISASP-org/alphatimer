@@ -42,6 +42,14 @@ public final class HeatStore implements HeatRepository {
                                .toList());
     }
 
+    @Override
+    public List<HeatDto> findAll() {
+        return db.read(em -> em.createQuery("select h from HeatEntity h", HeatEntity.class)
+                               .getResultStream()
+                               .map(HeatStore::toDto)
+                               .toList());
+    }
+
     public HeatDto create(int event, int heat, int laneCount) {
         return create(HeatDto.empty(event, heat, laneCount));
     }
