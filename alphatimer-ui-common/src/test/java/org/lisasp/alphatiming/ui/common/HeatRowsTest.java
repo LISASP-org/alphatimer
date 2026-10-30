@@ -46,6 +46,13 @@ class HeatRowsTest {
     }
 
     @Test
+    void anEstimatedFinishIsMarked() {
+        HeatDto estimated = new HeatDto(3, 2, HeatStatus.FinishedEstimated, TEN, TEN.plusSeconds(65), 0, List.of());
+
+        assertThat(HeatRows.from(List.of(estimated), 0)).containsExactly(new HeatRows.Row("10:00:00", "\u224810:01:05", "03-002"));
+    }
+
+    @Test
     void aHeatWithoutStartIsNotListed() {
         assertThat(HeatRows.from(List.of(heat(3, 2, null, null), heat(3, 1, TEN, null)), 0)).containsExactly(new HeatRows.Row("10:00:00", "", "03-001"));
     }

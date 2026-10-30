@@ -29,7 +29,7 @@ public final class HeatRows {
 
     private static Row toRow(HeatDto heat, int timekeepingOffsetHours) {
         return new Row(TimeFormat.clock(LiveTexts.timeOfDay(heat, heat.started(), timekeepingOffsetHours)),
-                       heat.ended() == null ? "" : TimeFormat.clock(LiveTexts.timeOfDay(heat, heat.ended(), timekeepingOffsetHours)),
+                       heat.ended() == null ? "" : LiveTexts.endTime(heat, heat.ended(), timekeepingOffsetHours),
                        String.format(Locale.ROOT, "%02d-%03d", heat.event(), heat.heat()));
     }
 }

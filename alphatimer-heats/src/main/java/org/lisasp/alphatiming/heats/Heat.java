@@ -94,7 +94,7 @@ final class Heat {
         lastMessage = message.getTimestamp();
         if (lane.deleteTime(message)) {
             computePlaces();
-            if (status != HeatStatus.Finished && !lane.isDone()) {
+            if (status == HeatStatus.Started && !lane.isDone()) {
                 ended = null;
             }
         }
@@ -126,8 +126,16 @@ final class Heat {
         update(message);
     }
 
+    void estimateEnd(LocalDateTime at) {
+        status = HeatStatus.FinishedEstimated;
+        ended = at;
+    }
+
     void finish(OfficialEndMessage message) {
         assureStarted(message);
+        if (status == HeatStatus.FinishedEstimated) {
+            ended = null;
+        }
         status = HeatStatus.Finished;
         lastMessage = message.getTimestamp();
         if (ended == null) {

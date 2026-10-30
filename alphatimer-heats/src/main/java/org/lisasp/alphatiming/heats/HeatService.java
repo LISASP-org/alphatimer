@@ -11,6 +11,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedRefinedMessage;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -116,13 +117,34 @@ public final class HeatService implements Consumer<RefinedMessage> {
             HeatDto previous = shown.current() != null && !sameHeat(shown.current(), after) ? shown.current() : shown.previous();
             after.lanes().stream().filter(l -> l.status() == LaneStatus.Used).forEach(l -> usedLanes.add(l.number()));
             known.put(HeatKey.of(after), after);
-            live = new LiveHeats(after, previous, usedLanes, List.copyOf(known.values()));
+            estimateEndsOfOtherHeats(after, message.getTimestamp());
+            live = new LiveHeats(after, previous == null ? null : known.get(HeatKey.of(previous)), usedLanes, List.copyOf(known.values()));
         } catch (RuntimeException ex) {
             log.warn("Could not apply message '{}'.", message, ex);
             onError.accept(ex);
             return;
         }
         announce(live);
+    }
+
+    /**
+     * The device does not always send the official end; a heat that another heat follows is over by then at the latest,
+     * and when it fell silent long before (a stopped recording, an older project), by the time its clock stopped.
+     */
+    private void estimateEndsOfOtherHeats(HeatDto active, LocalDateTime at) {
+        List<HeatDto> unended = known.values()
+                                     .stream()
+                                     .filter(h -> !sameHeat(h, active) && h.status() == HeatStatus.Started && h.ended() == null)
+                                     .toList();
+        for (HeatDto before : unended) {
+            Heat heat = new Heat(before);
+            LocalDateTime last = before.lastMessage() != null ? before.lastMessage() : before.started();
+            LocalDateTime stale = last == null ? at : last.plus(RunningClock.STALE_AFTER);
+            heat.estimateEnd(at.isBefore(stale) ? at : stale);
+            HeatDto after = heat.createDto();
+            store.save(after);
+            known.put(HeatKey.of(after), after);
+        }
     }
 
     private void announce(LiveHeats heats) {

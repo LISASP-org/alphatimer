@@ -54,6 +54,13 @@ class LiveTextsTest {
     }
 
     @Test
+    void anEstimatedEndIsMarked() {
+        HeatDto estimated = new HeatDto(3, 2, HeatStatus.FinishedEstimated, START, START.plusSeconds(65), 0, List.of());
+
+        assertThat(LiveTexts.times(estimated, 0)).isEqualTo("10:00:00 \u2192 \u224810:01:05");
+    }
+
+    @Test
     void withoutAnEndTheLastMessageOfTheHeatIsShownInstead() {
         assertThat(LiveTexts.times(started(), 0)).isEqualTo("10:00:00 \u2192 10:01:00");
     }

@@ -1,6 +1,7 @@
 package org.lisasp.alphatiming.ui.common;
 
 import org.lisasp.alphatiming.heats.HeatDto;
+import org.lisasp.alphatiming.heats.HeatStatus;
 import org.lisasp.alphatiming.heats.RunningClock;
 
 import java.time.Duration;
@@ -31,7 +32,12 @@ public final class LiveTexts {
         }
         String started = TimeFormat.clock(timeOfDay(heat, heat.started(), timekeepingOffsetHours)) + " \u2192";
         LocalDateTime end = heat.ended() != null ? heat.ended() : heat.lastMessage();
-        return end == null ? started : started + " " + TimeFormat.clock(timeOfDay(heat, end, timekeepingOffsetHours));
+        return end == null ? started : started + " " + endTime(heat, end, timekeepingOffsetHours);
+    }
+
+    static String endTime(HeatDto heat, LocalDateTime end, int timekeepingOffsetHours) {
+        String time = TimeFormat.clock(timeOfDay(heat, end, timekeepingOffsetHours));
+        return heat.status() == HeatStatus.FinishedEstimated ? I18n.get("time.estimated", time) : time;
     }
 
     /** The time of day of a moment of a started heat, on the clock that {@link #times} describes. */
