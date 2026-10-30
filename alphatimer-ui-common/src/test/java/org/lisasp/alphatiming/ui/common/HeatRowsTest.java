@@ -37,13 +37,17 @@ class HeatRowsTest {
     void aRowShowsStartFinishAndTheHeat() {
         List<HeatRows.Row> rows = HeatRows.from(List.of(heat(3, 2, TEN, TEN.plusSeconds(65))), 0);
 
-        assertThat(rows).containsExactly(new HeatRows.Row("10:00:00", "10:01:05", "Event 3 · Heat 2"));
+        assertThat(rows).containsExactly(new HeatRows.Row("10:00:00", "10:01:05", "03-002"));
     }
 
     @Test
-    void anUnfinishedHeatHasNoFinishAndAHeatWithoutStartHasNoTimes() {
-        assertThat(HeatRows.from(List.of(heat(3, 2, TEN, null)), 0)).containsExactly(new HeatRows.Row("10:00:00", "", "Event 3 · Heat 2"));
-        assertThat(HeatRows.from(List.of(heat(3, 2, null, null)), 0)).containsExactly(new HeatRows.Row("", "", "Event 3 · Heat 2"));
+    void anUnfinishedHeatHasNoFinish() {
+        assertThat(HeatRows.from(List.of(heat(3, 2, TEN, null)), 0)).containsExactly(new HeatRows.Row("10:00:00", "", "03-002"));
+    }
+
+    @Test
+    void aHeatWithoutStartIsNotListed() {
+        assertThat(HeatRows.from(List.of(heat(3, 2, null, null), heat(3, 1, TEN, null)), 0)).containsExactly(new HeatRows.Row("10:00:00", "", "03-001"));
     }
 
     @Test
@@ -51,32 +55,37 @@ class HeatRowsTest {
         int halfPastSeven = 7 * 3_600_000 + 30 * 60_000;
         HeatDto heat = new HeatDto(3, 2, HeatStatus.Finished, TEN, TEN.plusSeconds(65), 0, List.of(), null, halfPastSeven);
 
-        assertThat(HeatRows.from(List.of(heat), 1)).containsExactly(new HeatRows.Row("08:30:00", "08:31:05", "Event 3 · Heat 2"));
+        assertThat(HeatRows.from(List.of(heat), 1)).containsExactly(new HeatRows.Row("08:30:00", "08:31:05", "03-002"));
     }
 
     @Test
     void theRowsAreSortedByStartThenFinishThenHeatWithEmptyCellsLast() {
-        List<HeatDto> heats = List.of(heat(2, 1, null, null),
+        List<HeatDto> heats = List.of(heat(2, 1, TEN.plusMinutes(7), null),
                                       heat(1, 3, TEN.plusMinutes(5), TEN.plusMinutes(6)),
                                       heat(1, 1, TEN, null),
-                                      heat(1, 4, null, null),
+                                      heat(1, 4, TEN.plusMinutes(7), null),
                                       heat(1, 2, TEN, TEN.plusMinutes(1)),
                                       heat(1, 5, TEN.plusMinutes(5), TEN.plusMinutes(6)));
 
         assertThat(HeatRows.from(heats, 0)).extracting(HeatRows.Row::heat)
-                                           .containsExactly("Event 1 · Heat 2",
-                                                            "Event 1 · Heat 1",
-                                                            "Event 1 · Heat 3",
-                                                            "Event 1 · Heat 5",
-                                                            "Event 1 · Heat 4",
-                                                            "Event 2 · Heat 1");
+                                           .containsExactly("01-002",
+                                                            "01-001",
+                                                            "01-003",
+                                                            "01-005",
+                                                            "01-004",
+                                                            "02-001");
+    }
+
+    @Test
+    void numbersTooLongForTheirPlacesAreShownInFull() {
+        assertThat(HeatRows.from(List.of(heat(123, 4567, TEN, null)), 0)).extracting(HeatRows.Row::heat).containsExactly("123-4567");
     }
 
     @Test
     void anEventSortsByItsNumberNotByItsText() {
-        List<HeatDto> heats = List.of(heat(10, 1, null, null), heat(9, 1, null, null), heat(1, 10, null, null), heat(1, 9, null, null));
+        List<HeatDto> heats = List.of(heat(10, 1, TEN, null), heat(9, 1, TEN, null), heat(1, 10, TEN, null), heat(1, 9, TEN, null));
 
         assertThat(HeatRows.from(heats, 0)).extracting(HeatRows.Row::heat)
-                                           .containsExactly("Event 1 · Heat 9", "Event 1 · Heat 10", "Event 9 · Heat 1", "Event 10 · Heat 1");
+                                           .containsExactly("01-009", "01-010", "09-001", "10-001");
     }
 }

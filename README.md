@@ -52,9 +52,10 @@ installer.
 2. **Start recording.** The settings are locked while recording.
 3. **Live View** panel shows the live heat on top (with its running time) and, below it, the last state of the heat that
    was active before (times and places). A lane that was used in any heat keeps its row, without a time, while it is
-   unused. On the right, a table lists every heat of the project with its start and finish time (on the clock described
-   above), ordered by start, then finish, then heat; heats without a start or finish come last. It keeps updating while
-   recording continues in the background. The marker at the left end of the status bar
+   unused. On the right, a table lists every started heat of the project with its start and finish time (on the clock
+   described above) and its number as `event-heat` (`03-002`), ordered by start, then finish, then heat; heats without a
+   finish come last. Until data arrives, an information covers both. It keeps updating while recording continues in the
+   background. The marker at the left end of the status bar
    switches between dark and bright green with every ping of the timekeeping system.
 4. To change settings: **Stop recording**, edit, **Start recording** again.
 

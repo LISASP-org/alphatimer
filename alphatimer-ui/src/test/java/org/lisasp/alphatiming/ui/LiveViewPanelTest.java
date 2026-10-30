@@ -74,10 +74,9 @@ class LiveViewPanelTest {
 
         javax.swing.JTable table = panel.heatTable();
         assertThat(List.of(table.getColumnName(0), table.getColumnName(1), table.getColumnName(2))).containsExactly("Start", "Finish", "Heat");
-        assertThat(table.getRowCount()).isEqualTo(3);
-        assertThat(List.of(table.getValueAt(0, 0), table.getValueAt(0, 1), table.getValueAt(0, 2))).containsExactly("10:00:00", "10:01:05", "Event 3 · Heat 1");
-        assertThat(List.of(table.getValueAt(1, 0), table.getValueAt(1, 1), table.getValueAt(1, 2))).containsExactly("10:03:00", "", "Event 3 · Heat 2");
-        assertThat(List.of(table.getValueAt(2, 0), table.getValueAt(2, 1), table.getValueAt(2, 2))).containsExactly("", "", "Event 4 · Heat 1");
+        assertThat(table.getRowCount()).as("the heat without a start is not listed").isEqualTo(2);
+        assertThat(List.of(table.getValueAt(0, 0), table.getValueAt(0, 1), table.getValueAt(0, 2))).containsExactly("10:00:00", "10:01:05", "03-001");
+        assertThat(List.of(table.getValueAt(1, 0), table.getValueAt(1, 1), table.getValueAt(1, 2))).containsExactly("10:03:00", "", "03-002");
         java.awt.Rectangle tableBounds = javax.swing.SwingUtilities.convertRectangle(table.getParent(), table.getBounds(), panel);
         assertThat(tableBounds.x).isGreaterThan((int) panel.liveAreaBounds().getMaxX());
     }
@@ -214,6 +213,7 @@ class LiveViewPanelTest {
         LiveViewPanel panel = new LiveViewPanel();
         assertThat(panel.isInformationShown()).isTrue();
         assertThat(panel.informationText()).isEqualTo(I18n.get("live.none"));
+        assertThat(javax.swing.SwingUtilities.isDescendingFrom(panel.heatTable(), panel.coveredByGlass())).as("the table of the heats is covered too").isTrue();
 
         panel.setHeats(new LiveHeats(heat(1, HeatStatus.Started, 0, false), null));
         assertThat(panel.isInformationShown()).isFalse();

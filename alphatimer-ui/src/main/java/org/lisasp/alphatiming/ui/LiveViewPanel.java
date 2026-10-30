@@ -24,7 +24,7 @@ import java.util.Set;
 
 /**
  * The live heat with its running time on top and, below it, the last state of the heat that was active before; on the right
- * every known heat.
+ * every started heat.
  */
 public final class LiveViewPanel extends JPanel {
 
@@ -44,6 +44,7 @@ public final class LiveViewPanel extends JPanel {
     private final JPanel previousSection = new JPanel(new FormLayout("fill:0px:grow", "fill:default, 4dlu, fill:default"));
     private final Timer clockTimer = new Timer(100, e -> updateClock());
     private final JLabel information = new JLabel(I18n.get("live.none"));
+    private final JPanel live = new JPanel(new FormLayout("fill:0px:grow", "fill:default, 8dlu, fill:default:grow"));
     private final JGlassPanel<JPanel> glass;
     private final HeatTableModel heatTableModel = new HeatTableModel();
     private final JTable heatTable = new JTable(heatTableModel);
@@ -56,8 +57,7 @@ public final class LiveViewPanel extends JPanel {
     private List<LaneRows.Row> displayedPrevious = List.of();
 
     public LiveViewPanel() {
-        super(new FormLayout(COLUMNS, "fill:0px:grow"));
-        JPanel live = new JPanel(new FormLayout("fill:0px:grow", "fill:default, 8dlu, fill:default:grow"));
+        super(new BorderLayout());
 
         title.setFont(LiveFonts.heading());
         clock.setFont(LiveFonts.clock());
@@ -84,7 +84,13 @@ public final class LiveViewPanel extends JPanel {
         top.add(content, BorderLayout.NORTH);
         live.add(top, CC.xy(1, 3));
 
-        glass = new JGlassPanel<>(live);
+        heatTable.getTableHeader().setReorderingAllowed(false);
+        heatTable.setFillsViewportHeight(true);
+        JPanel body = new JPanel(new FormLayout(COLUMNS, "fill:0px:grow"));
+        body.add(live, CC.xy(1, 1));
+        body.add(new JScrollPane(heatTable), CC.xy(3, 1));
+
+        glass = new JGlassPanel<>(body);
         JPanel info = new JPanel();
         info.setBorder(BorderUtils.createLabeledBorder(I18n.get("info.title")));
         information.setBorder(BorderUtils.createSpaceBorder());
@@ -92,11 +98,7 @@ public final class LiveViewPanel extends JPanel {
         glass.getGlassPanel().setLayout(new CenterLayout());
         glass.getGlassPanel().add(info);
         glass.setEnabled(false);
-        add(glass, CC.xy(1, 1));
-
-        heatTable.getTableHeader().setReorderingAllowed(false);
-        heatTable.setFillsViewportHeight(true);
-        add(new JScrollPane(heatTable), CC.xy(3, 1));
+        add(glass, BorderLayout.CENTER);
     }
 
     @Override
@@ -186,8 +188,12 @@ public final class LiveViewPanel extends JPanel {
         return heatTable;
     }
 
+    Component coveredByGlass() {
+        return glass.getComponent();
+    }
+
     Rectangle liveAreaBounds() {
-        return glass.getBounds();
+        return SwingUtilities.convertRectangle(live.getParent(), live.getBounds(), this);
     }
 
     List<Component> rowComponents() {
