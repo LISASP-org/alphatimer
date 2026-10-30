@@ -89,6 +89,33 @@ class HeatRowsTest {
     }
 
     @Test
+    void theRowsAreSortedByTheShownTimesEvenWhenTheArrivalTimesDisagree() {
+        int nine = 9 * 3_600_000;
+        int eight = 8 * 3_600_000;
+        HeatDto shownLater = new HeatDto(1, 1, HeatStatus.Finished, TEN, TEN.plusMinutes(1), 0, List.of(), null, nine);
+        HeatDto shownEarlier = new HeatDto(1, 2, HeatStatus.Finished, TEN.plusMinutes(1), TEN.plusMinutes(2), 0, List.of(), null, eight);
+
+        assertThat(HeatRows.from(List.of(shownEarlier, shownLater), 0)).extracting(HeatRows.Row::start).containsExactly("09:00:00", "08:00:00");
+    }
+
+    @Test
+    void theRowsAreSortedByTheEndAsShown() {
+        int nine = 9 * 3_600_000;
+        HeatDto endsLater = new HeatDto(1, 1, HeatStatus.Finished, TEN, TEN.plusMinutes(3), 0, List.of(), null, nine);
+        HeatDto endsEarlier = new HeatDto(1, 2, HeatStatus.Finished, TEN.plusMinutes(1), TEN.plusMinutes(2), 0, List.of(), null, nine);
+
+        assertThat(HeatRows.from(List.of(endsEarlier, endsLater), 0)).extracting(HeatRows.Row::finish).containsExactly("09:03:00", "09:01:00");
+    }
+
+    @Test
+    void startsInTheSameShownSecondAreSortedByTheirEnd() {
+        HeatDto endsLater = heat(1, 1, TEN.plusNanos(300_000_000), TEN.plusMinutes(2));
+        HeatDto endsEarlier = heat(1, 2, TEN.plusNanos(700_000_000), TEN.plusMinutes(1));
+
+        assertThat(HeatRows.from(List.of(endsEarlier, endsLater), 0)).extracting(HeatRows.Row::finish).containsExactly("10:02:00", "10:01:00");
+    }
+
+    @Test
     void anEventSortsByItsNumberNotByItsText() {
         List<HeatDto> heats = List.of(heat(10, 1, TEN, null), heat(9, 1, TEN, null), heat(1, 10, TEN, null), heat(1, 9, TEN, null));
 

@@ -40,9 +40,13 @@ public final class LiveTexts {
         return heat.status() == HeatStatus.FinishedEstimated ? I18n.get("time.estimated", time) : time;
     }
 
-    /** The time of day of a moment of a started heat, on the clock that {@link #times} describes. */
     static LocalTime timeOfDay(HeatDto heat, LocalDateTime moment, int timekeepingOffsetHours) {
+        return shownMoment(heat, moment, timekeepingOffsetHours).toLocalTime();
+    }
+
+    /** A moment of a started heat on the clock that {@link #times} describes, on the day the heat started here. */
+    static LocalDateTime shownMoment(HeatDto heat, LocalDateTime moment, int timekeepingOffsetHours) {
         LocalTime start = heat.startTimeOfDayMillis() == null ? heat.started().toLocalTime() : DeviceClock.timeOfDay(heat.startTimeOfDayMillis(), timekeepingOffsetHours);
-        return start.plus(Duration.between(heat.started(), moment));
+        return heat.started().toLocalDate().atTime(start).plus(Duration.between(heat.started(), moment));
     }
 }
