@@ -8,7 +8,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
-/** What the Live View lists of every started heat: start, finish and the heat, ordered by these columns, empty cells last. */
+/** What the Live View lists of every started heat: start, finish and the heat, newest first by these columns; an empty finish counts as the newest. */
 public final class HeatRows {
 
     public record Row(String start, String finish, String heat) {
@@ -17,7 +17,8 @@ public final class HeatRows {
     private static final Comparator<HeatDto> ORDER = Comparator.comparing(HeatDto::started)
                                                                .thenComparing(HeatDto::ended, Comparator.nullsLast(Comparator.<LocalDateTime>naturalOrder()))
                                                                .thenComparingInt(HeatDto::event)
-                                                               .thenComparingInt(HeatDto::heat);
+                                                               .thenComparingInt(HeatDto::heat)
+                                                               .reversed();
 
     private HeatRows() {
     }

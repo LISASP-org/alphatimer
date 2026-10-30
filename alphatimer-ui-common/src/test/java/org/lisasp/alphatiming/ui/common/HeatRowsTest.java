@@ -59,7 +59,7 @@ class HeatRowsTest {
     }
 
     @Test
-    void theRowsAreSortedByStartThenFinishThenHeatWithEmptyCellsLast() {
+    void theNewestHeatComesFirstByStartThenFinishThenHeatWithAnEmptyFinishAsTheNewest() {
         List<HeatDto> heats = List.of(heat(2, 1, TEN.plusMinutes(7), null),
                                       heat(1, 3, TEN.plusMinutes(5), TEN.plusMinutes(6)),
                                       heat(1, 1, TEN, null),
@@ -68,12 +68,12 @@ class HeatRowsTest {
                                       heat(1, 5, TEN.plusMinutes(5), TEN.plusMinutes(6)));
 
         assertThat(HeatRows.from(heats, 0)).extracting(HeatRows.Row::heat)
-                                           .containsExactly("01-002",
-                                                            "01-001",
-                                                            "01-003",
-                                                            "01-005",
+                                           .containsExactly("02-001",
                                                             "01-004",
-                                                            "02-001");
+                                                            "01-005",
+                                                            "01-003",
+                                                            "01-001",
+                                                            "01-002");
     }
 
     @Test
@@ -86,6 +86,6 @@ class HeatRowsTest {
         List<HeatDto> heats = List.of(heat(10, 1, TEN, null), heat(9, 1, TEN, null), heat(1, 10, TEN, null), heat(1, 9, TEN, null));
 
         assertThat(HeatRows.from(heats, 0)).extracting(HeatRows.Row::heat)
-                                           .containsExactly("01-009", "01-010", "09-001", "10-001");
+                                           .containsExactly("10-001", "09-001", "01-010", "01-009");
     }
 }
