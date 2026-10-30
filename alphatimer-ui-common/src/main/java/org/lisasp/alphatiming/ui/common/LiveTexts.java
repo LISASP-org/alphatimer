@@ -1,6 +1,7 @@
 package org.lisasp.alphatiming.ui.common;
 
 import org.lisasp.alphatiming.heats.HeatDto;
+import org.lisasp.alphatiming.heats.HeatStatus;
 import org.lisasp.alphatiming.heats.RunningClock;
 
 import java.time.Duration;
@@ -29,9 +30,23 @@ public final class LiveTexts {
         if (heat == null || heat.started() == null) {
             return "";
         }
-        LocalTime start = heat.startTimeOfDayMillis() == null ? heat.started().toLocalTime() : DeviceClock.timeOfDay(heat.startTimeOfDayMillis(), timekeepingOffsetHours);
-        String started = TimeFormat.clock(start) + " \u2192";
+        String started = TimeFormat.clock(timeOfDay(heat, heat.started(), timekeepingOffsetHours)) + " \u2192";
         LocalDateTime end = heat.ended() != null ? heat.ended() : heat.lastMessage();
-        return end == null ? started : started + " " + TimeFormat.clock(start.plus(Duration.between(heat.started(), end)));
+        return end == null ? started : started + " " + endTime(heat, end, timekeepingOffsetHours);
+    }
+
+    static String endTime(HeatDto heat, LocalDateTime end, int timekeepingOffsetHours) {
+        String time = TimeFormat.clock(timeOfDay(heat, end, timekeepingOffsetHours));
+        return heat.status() == HeatStatus.FinishedEstimated ? I18n.get("time.estimated", time) : time;
+    }
+
+    static LocalTime timeOfDay(HeatDto heat, LocalDateTime moment, int timekeepingOffsetHours) {
+        return shownMoment(heat, moment, timekeepingOffsetHours).toLocalTime();
+    }
+
+    /** A moment of a started heat on the clock that {@link #times} describes, on the day the heat started here. */
+    static LocalDateTime shownMoment(HeatDto heat, LocalDateTime moment, int timekeepingOffsetHours) {
+        LocalTime start = heat.startTimeOfDayMillis() == null ? heat.started().toLocalTime() : DeviceClock.timeOfDay(heat.startTimeOfDayMillis(), timekeepingOffsetHours);
+        return heat.started().toLocalDate().atTime(start).plus(Duration.between(heat.started(), moment));
     }
 }

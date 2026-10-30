@@ -477,8 +477,7 @@ public final class AppController implements AutoCloseable {
         scheduleAutoSave(settings);
         serve(next, settings);
         HeatStore heatStore = new HeatStore(doc.database());
-        List<HeatDto> recent = heatStore.findRecent(2);
-        lastHeats = recent.isEmpty() ? LiveHeats.NONE : new LiveHeats(recent.get(0), recent.size() > 1 ? recent.get(1) : null, heatStore.findUsedLanes());
+        lastHeats = LiveHeats.of(heatStore.findAll(), heatStore.findUsedLanes());
         heatListeners.forEach(l -> l.accept(lastHeats));
         fireChange();
     }

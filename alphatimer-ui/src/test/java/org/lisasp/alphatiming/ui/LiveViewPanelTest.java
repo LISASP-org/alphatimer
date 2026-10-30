@@ -62,6 +62,38 @@ class LiveViewPanelTest {
     }
 
     @Test
+    void theKnownHeatsAreListedInATableRightOfTheLiveHeat() {
+        java.time.LocalDateTime start = java.time.LocalDateTime.of(2026, 5, 1, 10, 0, 0);
+        HeatDto running = new HeatDto(3, 2, HeatStatus.Started, start.plusMinutes(3), null, 0, List.of());
+        HeatDto finished = new HeatDto(3, 1, HeatStatus.Finished, start, start.plusSeconds(65), 0, List.of());
+        HeatDto open = new HeatDto(4, 1, HeatStatus.Open, null, null, 0, List.of());
+        LiveViewPanel panel = new LiveViewPanel();
+        panel.setHeats(new LiveHeats(running, finished, new java.util.TreeSet<>(), List.of(open, running, finished)));
+        panel.setSize(1000, 900);
+        layoutAll(panel);
+
+        javax.swing.JTable table = panel.heatTable();
+        assertThat(List.of(table.getColumnName(0), table.getColumnName(1), table.getColumnName(2))).containsExactly("Start", "Finish", "Heat");
+        assertThat(table.getRowCount()).as("the heat without a start is not listed").isEqualTo(2);
+        assertThat(List.of(table.getValueAt(0, 0), table.getValueAt(0, 1), table.getValueAt(0, 2))).containsExactly("10:03:00", "", "03-002");
+        assertThat(List.of(table.getValueAt(1, 0), table.getValueAt(1, 1), table.getValueAt(1, 2))).containsExactly("10:00:00", "10:01:05", "03-001");
+        java.awt.Rectangle tableBounds = javax.swing.SwingUtilities.convertRectangle(table.getParent(), table.getBounds(), panel);
+        assertThat(tableBounds.x).isGreaterThan((int) panel.liveAreaBounds().getMaxX());
+    }
+
+    @Test
+    void theTableFollowsTheTimekeepingOffset() {
+        java.time.LocalDateTime start = java.time.LocalDateTime.of(2026, 5, 1, 10, 0, 0);
+        HeatDto finished = new HeatDto(3, 1, HeatStatus.Finished, start, start.plusSeconds(65), 0, List.of(), null, 7 * 3_600_000);
+        LiveViewPanel panel = new LiveViewPanel();
+        panel.setHeats(new LiveHeats(finished, null));
+
+        panel.setTimekeepingOffset(2);
+
+        assertThat(panel.heatTable().getValueAt(0, 0)).isEqualTo("09:00:00");
+    }
+
+    @Test
     void bothHeatsTellWhenTheyStartedAndTheFinishedOneWhenItFinished() {
         java.time.LocalDateTime start = java.time.LocalDateTime.of(2026, 5, 1, 10, 0, 0);
         HeatDto running = new HeatDto(3, 2, HeatStatus.Started, start.plusMinutes(3), null, 0, List.of());
@@ -85,7 +117,7 @@ class LiveViewPanelTest {
 
         for (javax.swing.JLabel times : List.of(panel.timesLabel(), panel.previousTimesLabel())) {
             java.awt.Rectangle bounds = javax.swing.SwingUtilities.convertRectangle(times.getParent(), times.getBounds(), panel);
-            assertThat((double) bounds.x + bounds.width / 2.0).isCloseTo(panel.getWidth() / 2.0, org.assertj.core.data.Offset.offset(1.0));
+            assertThat((double) bounds.x + bounds.width / 2.0).isCloseTo(panel.liveAreaBounds().getCenterX(), org.assertj.core.data.Offset.offset(1.0));
             assertThat(times.getFont().isPlain()).isTrue();
             assertThat(times.getFont().getSize()).isEqualTo(javax.swing.UIManager.getFont("Label.font").getSize());
         }
@@ -105,7 +137,7 @@ class LiveViewPanelTest {
         java.awt.Rectangle marker = javax.swing.SwingUtilities.convertRectangle(panel.previousMarkerLabel().getParent(), panel.previousMarkerLabel().getBounds(), panel);
         assertThat(title.x).isZero();
         assertThat(marker.x).isGreaterThan(title.x + panel.previousTitleLabel().getPreferredSize().width);
-        assertThat(marker.x + marker.width).isEqualTo(panel.getWidth());
+        assertThat(marker.x + marker.width).isEqualTo((int) panel.liveAreaBounds().getMaxX());
         assertThat(marker.y).isEqualTo(title.y);
     }
 
@@ -181,6 +213,7 @@ class LiveViewPanelTest {
         LiveViewPanel panel = new LiveViewPanel();
         assertThat(panel.isInformationShown()).isTrue();
         assertThat(panel.informationText()).isEqualTo(I18n.get("live.none"));
+        assertThat(javax.swing.SwingUtilities.isDescendingFrom(panel.heatTable(), panel.coveredByGlass())).as("the table of the heats is covered too").isTrue();
 
         panel.setHeats(new LiveHeats(heat(1, HeatStatus.Started, 0, false), null));
         assertThat(panel.isInformationShown()).isFalse();

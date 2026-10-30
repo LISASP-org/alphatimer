@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatimer.api.serial.SerialPortReader;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.heats.HeatDto;
+import org.lisasp.alphatiming.heats.HeatStatus;
 import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.project.db.TimingFileWriter;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
@@ -607,7 +608,7 @@ class AppControllerTest {
         Path file = dir.resolve("two.heat");
         try (TimingDocument a = TimingDocument.create(work, S)) {
             HeatStore store = new HeatStore(a.database());
-            store.create(1, 1, 8);
+            store.create(new HeatDto(1, 1, HeatStatus.Started, LocalDateTime.of(2026, 5, 1, 10, 0), null, 0, List.of()));
             store.create(1, 2, 8);
             a.saveAs(file);
         }
@@ -619,6 +620,38 @@ class AppControllerTest {
         assertThat(seen.get(0).current().heat()).isEqualTo(2);
         assertThat(seen.get(0).previous().heat()).isEqualTo(1);
         assertThat(controller.liveHeats()).isEqualTo(seen.get(0));
+    }
+
+    @Test
+    void openingAProjectMakesAllItsHeatsKnown() throws Exception {
+        Path file = dir.resolve("three.timing");
+        try (TimingDocument a = TimingDocument.create(work, S)) {
+            HeatStore store = new HeatStore(a.database());
+            store.create(1, 1, 8);
+            store.create(1, 2, 8);
+            store.create(1, 3, 8);
+            a.saveAs(file);
+        }
+        controller.init();
+        controller.open(file);
+        assertThat(controller.liveHeats().known()).extracting(HeatDto::heat).containsExactlyInAnyOrder(1, 2, 3);
+    }
+
+    @Test
+    void openingAProjectSkipsAnEmptyHeatForThePreviousHeat() throws Exception {
+        Path file = dir.resolve("skipped.timing");
+        try (TimingDocument a = TimingDocument.create(work, S)) {
+            HeatStore store = new HeatStore(a.database());
+            LocalDateTime start = LocalDateTime.of(2026, 5, 1, 10, 0);
+            store.create(new HeatDto(1, 1, HeatStatus.Started, start, null, 0, List.of()));
+            store.create(1, 2, 8);
+            store.create(new HeatDto(1, 3, HeatStatus.Started, start.plusMinutes(3), null, 0, List.of()));
+            a.saveAs(file);
+        }
+        controller.init();
+        controller.open(file);
+        assertThat(controller.liveHeats().current().heat()).isEqualTo(3);
+        assertThat(controller.liveHeats().previous().heat()).isEqualTo(1);
     }
 
     @Test

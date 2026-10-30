@@ -88,8 +88,8 @@ final class WriteMonitor {
             }
 
             @Override
-            public List<HeatDto> findRecent(int count) {
-                return store.findRecent(count);
+            public List<HeatDto> findAll() {
+                return store.findAll();
             }
 
             @Override

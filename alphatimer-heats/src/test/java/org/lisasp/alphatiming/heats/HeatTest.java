@@ -415,4 +415,49 @@ class HeatTest {
         assertThat(lane(heat, 3)).isEqualTo(new LaneDto(3, 0, 0, LaneStatus.Used, Penalty.DidNotFinish, 0, false));
         assertThat(heat.createDto().ended()).isEqualTo(T0);
     }
+
+    @Test
+    void anEstimatedEndFinishesTheHeatAsEstimated() {
+        Heat heat = prepared();
+
+        heat.estimateEnd(T0.plusSeconds(60));
+
+        assertThat(heat.createDto().status()).isEqualTo(HeatStatus.FinishedEstimated);
+        assertThat(heat.createDto().ended()).isEqualTo(T0.plusSeconds(60));
+    }
+
+    @Test
+    void theOfficialEndReplacesTheEstimatedEnd() {
+        Heat heat = prepared();
+        heat.estimateEnd(T0.plusSeconds(60));
+
+        heat.finish(TestMessageCreator.end(1, 1, T0.plusSeconds(90)));
+
+        assertThat(heat.createDto().status()).isEqualTo(HeatStatus.Finished);
+        assertThat(heat.createDto().ended()).isEqualTo(T0.plusSeconds(90));
+    }
+
+    @Test
+    void aDeletedTimeKeepsTheEstimatedEnd() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 25_000));
+        heat.estimateEnd(T0.plusSeconds(60));
+
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 2, 25_000, T0.plusSeconds(70)));
+
+        assertThat(lane(heat, 1).timeInMillis()).isZero();
+        assertThat(heat.createDto().status()).isEqualTo(HeatStatus.FinishedEstimated);
+        assertThat(heat.createDto().ended()).isEqualTo(T0.plusSeconds(60));
+    }
+
+    @Test
+    void aLiveRestartClearsTheEstimatedEnd() {
+        Heat heat = prepared();
+        heat.estimateEnd(T0.plusSeconds(60));
+
+        heat.start(TestMessageCreator.start(1, 1, T0.plusSeconds(120)));
+
+        assertThat(heat.createDto().status()).isEqualTo(HeatStatus.Started);
+        assertThat(heat.createDto().ended()).isNull();
+    }
 }

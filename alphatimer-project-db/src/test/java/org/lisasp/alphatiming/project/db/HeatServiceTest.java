@@ -8,6 +8,7 @@ import org.lisasp.alphatiming.heats.LaneStatus;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.heats.TestMessageCreator;
 import org.lisasp.alphatiming.heats.Penalty;
+import org.lisasp.alphatiming.heats.RunningClock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -101,7 +102,7 @@ class HeatServiceTest {
         try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
             HeatService first = new HeatService(store);
-            first.accept(TestMessageCreator.used(1, 1, "1100000000"));
+            first.accept(TestMessageCreator.start(1, 1, T0));
             first.accept(TestMessageCreator.used(1, 2, "1100000000"));
 
             HeatService second = new HeatService(store);
@@ -134,6 +135,146 @@ class HeatServiceTest {
             List<LiveHeats> restored = new ArrayList<>();
             new HeatService(store).register(restored::add);
             assertThat(restored.get(0).usedLanes()).containsExactly(1, 2, 3);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void everyHeatOfTheProjectIsKnownWithItsLatestState() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            HeatStore store = new HeatStore(db);
+            HeatService first = new HeatService(store);
+            first.accept(TestMessageCreator.used(1, 1, "1100000000"));
+            first.accept(TestMessageCreator.used(1, 2, "1100000000"));
+
+            HeatService second = new HeatService(store);
+            List<LiveHeats> seen = new ArrayList<>();
+            second.register(seen::add);
+            assertThat(seen.get(0).known()).extracting(HeatDto::heat).containsExactlyInAnyOrder(1, 2);
+
+            second.accept(TestMessageCreator.used(1, 3, "1100000000"));
+            second.accept(TestMessageCreator.start(1, 1, T0));
+            List<HeatDto> known = seen.get(seen.size() - 1).known();
+            assertThat(known).extracting(HeatDto::heat).containsExactlyInAnyOrder(1, 2, 3);
+            assertThat(known).filteredOn(h -> h.heat() == 1).singleElement().extracting(HeatDto::status).isEqualTo(HeatStatus.Started);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void aStartedHeatWithoutEndIsEstimatedFinishedByTheFirstMessageOfAnotherHeat() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            HeatStore store = new HeatStore(db);
+            HeatService service = new HeatService(store);
+            List<LiveHeats> seen = new ArrayList<>();
+            service.register(seen::add);
+            service.accept(TestMessageCreator.used(1, 1, "1100000000"));
+            service.accept(TestMessageCreator.start(1, 1, T0));
+
+            service.accept(TestMessageCreator.start(1, 2, T0.plusMinutes(3)));
+            service.accept(TestMessageCreator.splitAt(1, 2, 1, 1, 1000, T0.plusMinutes(4)));
+
+            HeatDto estimated = store.find(1, 1).orElseThrow();
+            assertThat(estimated.status()).isEqualTo(HeatStatus.FinishedEstimated);
+            assertThat(estimated.ended()).isEqualTo(T0.plusMinutes(3));
+            assertThat(seen.get(seen.size() - 1).previous()).isEqualTo(estimated);
+            assertThat(seen.get(seen.size() - 1).known()).contains(estimated);
+
+            service.accept(TestMessageCreator.end(1, 1, T0.plusMinutes(5)));
+            assertThat(store.find(1, 1).orElseThrow().status()).isEqualTo(HeatStatus.Finished);
+            assertThat(store.find(1, 1).orElseThrow().ended()).isEqualTo(T0.plusMinutes(5));
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void aHeatThatFellSilentLongBeforeTheNextHeatIsEstimatedToEndWhenItsClockStopped() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            HeatStore store = new HeatStore(db);
+            HeatService service = new HeatService(store);
+            service.accept(TestMessageCreator.start(1, 1, T0));
+
+            service.accept(TestMessageCreator.start(1, 2, T0.plusMinutes(30)));
+
+            assertThat(store.find(1, 1).orElseThrow().ended()).isEqualTo(T0.plus(RunningClock.STALE_AFTER));
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void onlyAStartedHeatWithoutEndIsEstimated() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            HeatStore store = new HeatStore(db);
+            HeatService service = new HeatService(store);
+            service.accept(TestMessageCreator.used(1, 1, "1000000000"));
+            service.accept(TestMessageCreator.start(1, 1, T0));
+            service.accept(TestMessageCreator.finAt(1, 1, 1, 50_000, T0.plusSeconds(50)));
+            service.accept(TestMessageCreator.used(1, 2, "1100000000"));
+
+            service.accept(TestMessageCreator.start(1, 3, T0.plusMinutes(5)));
+
+            assertThat(store.find(1, 1).orElseThrow().status()).isEqualTo(HeatStatus.Started);
+            assertThat(store.find(1, 1).orElseThrow().ended()).isEqualTo(T0.plusSeconds(50));
+            assertThat(store.find(1, 2).orElseThrow().status()).isEqualTo(HeatStatus.Open);
+            assertThat(store.find(1, 2).orElseThrow().ended()).isNull();
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void aMessageOfAnotherHeatThatChangesNothingEstimatesNothing() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            HeatStore store = new HeatStore(db);
+            HeatService service = new HeatService(store);
+            service.accept(TestMessageCreator.used(1, 1, "1100000000"));
+            service.accept(TestMessageCreator.start(1, 2, T0));
+
+            service.accept(TestMessageCreator.used(1, 1, "1100000000"));
+
+            assertThat(store.find(1, 2).orElseThrow().status()).isEqualTo(HeatStatus.Started);
+            assertThat(store.find(1, 2).orElseThrow().ended()).isNull();
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void anEmptyHeatDoesNotBecomeThePreviousHeat() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            HeatStore store = new HeatStore(db);
+            HeatService service = new HeatService(store);
+            List<LiveHeats> seen = new ArrayList<>();
+            service.register(seen::add);
+            service.accept(TestMessageCreator.used(1, 1, "1100000000"));
+            service.accept(TestMessageCreator.start(1, 1, T0));
+            service.accept(TestMessageCreator.end(1, 1, T0.plusMinutes(1)));
+            service.accept(TestMessageCreator.used(1, 2, "1100000000"));
+
+            service.accept(TestMessageCreator.start(1, 3, T0.plusMinutes(3)));
+
+            assertThat(seen.get(seen.size() - 1).current().heat()).isEqualTo(3);
+            assertThat(seen.get(seen.size() - 1).previous().heat()).isEqualTo(1);
+
+            List<LiveHeats> restored = new ArrayList<>();
+            new HeatService(store).register(restored::add);
+            assertThat(restored.get(0).current().heat()).isEqualTo(3);
+            assertThat(restored.get(0).previous().heat()).isEqualTo(1);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void anEstimatedEndDoesNotMakeTheEstimatedHeatTheCurrentHeatOfTheProject() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            HeatStore store = new HeatStore(db);
+            HeatService service = new HeatService(store);
+            service.accept(TestMessageCreator.start(1, 1, T0));
+            service.accept(TestMessageCreator.start(1, 2, T0.plusMinutes(3)));
+
+            List<LiveHeats> restored = new ArrayList<>();
+            new HeatService(store).register(restored::add);
+
+            assertThat(restored.get(0).current().heat()).isEqualTo(2);
+            assertThat(restored.get(0).previous().heat()).isEqualTo(1);
             db.closeAndDelete();
         }
     }
