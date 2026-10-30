@@ -164,7 +164,8 @@ untrusted input:
   `alphatimer-ui-common/src/main/resources/org/lisasp/alphatiming/ui/common/messages.properties` (English) and `messages_de.properties`
   and is looked up with `I18n.get(key, args…)` (`MessageFormat` placeholders `{0}`). The language follows the JVM's
   default locale (`-Duser.language=de` to force it); other languages fall back to English. Never hardcode UI text in Java.
-- Write non-ASCII characters in the properties files as `\uXXXX` escapes. Both files must have identical keys and
+- Write non-ASCII characters in the properties files as `\uXXXX` escapes, until `docs/chores/properties-utf-8.md` moves
+  them to plain UTF-8. Both files must have identical keys and
   placeholders; `I18nTest` checks this, that every key used in code exists, and that no key is dead (it scans the sources
   of all front ends; add a new front end to its list). A key built
   dynamically (`"problem." + name`) needs its family enumerated in that test.
@@ -225,7 +226,7 @@ untrusted input:
 
 ## Tests
 
-- JUnit 5 (Jupiter) with AssertJ and Awaitility. Name test classes `*Test`; there are no integration-test conventions —
+- JUnit 6 (Jupiter) with AssertJ and Awaitility. Name test classes `*Test`; there are no integration-test conventions —
   tests that need a database use `TimingDatabase.createNew(@TempDir)`, tests that need a device use a local
   `ServerSocket` or a fake `SerialPortReader`. `HeatServiceTest` and `LegacyServiceTest` run against the real stores and
   therefore live in `alphatimer-project-db`.
@@ -240,11 +241,12 @@ untrusted input:
 - **Comments**: do not write a comment unless it provides benefit on its own — standing alone, with no other context,
   it must tell the reader something they could not already get from the code around it (names, types, structure, a
   nearby signature). A comment that restates what the code does, restates a parameter's name/type/default in prose, or
-  explains something inferable in a few seconds of reading does not clear this bar. The only comments that clear it: a
-  hidden constraint, a subtle invariant, or a workaround for a specific bug that isn't obvious from the code itself.
-  When in doubt, don't add the comment. This is a hard rule, not a default that yields to matching a file's existing
-  style — a comment already present in a file is not evidence it belongs there. Whenever you touch a file or area of
-  code, also remove any existing comment in that area that fails this test.
+  explains something inferable in a few seconds of reading does not clear this bar — do not write it. The only comments
+  that clear it: a hidden constraint, a subtle invariant, or a workaround for a specific bug that isn't obvious from the
+  code itself. When in doubt, don't add the comment. This is a hard rule, not a default that yields to convenience or to
+  matching a file's existing style — a comment already present in a file is not evidence it belongs there. Whenever you
+  touch a file or area of code, also remove any existing comment in that area that fails this test; do not leave it in
+  place because it predates this rule or because removing it feels out of scope.
 - **PTDD (Predictive TDD)**: follow Red-Green-Refactor, but make two predictions explicit. Before writing a test, state
   precisely what the code should do and how you'll observe it (e.g. Given-When-Then). Before running a newly written or
   adjusted test, predict exactly how it will fail; if the actual failure differs, or the test passes unexpectedly, stop
@@ -259,6 +261,16 @@ untrusted input:
 - **Language**: identifiers are English and follow the timing vocabulary already used (`heat`, `lane`, `event`,
   `competitionKey`, `place`, `penalty`, `split`/`finish`); reuse those terms instead of introducing synonyms. The
   `alphatimer-*` copies keep their own names.
+
+## Git Workflow
+
+- While developing a feature, work on a feature branch and stay on it until the feature is finished. Do not merge into
+  `main` in between, not even to hand a library change to another project early; build and install from the branch
+  instead (`mvn install`).
+- Start a branch before the first commit when `main` is checked out. Follow-up work goes on the branch that is checked
+  out; do not create further branches unasked.
+- Merge into `main` only when the feature is finished and the user asks for it, with a real merge commit
+  (`git merge --no-ff`), never a fast-forward.
 - **Commit messages**: write them in German, as in JAuswertung. The body is a brief bullet list of at most 3–4 one-line
   bullets. Focus on intention — why the change was made and what behavior it affects — not mechanics visible in the
   diff. Don't mention tests that accompany a code change; do state it when a commit only adds or changes tests.
