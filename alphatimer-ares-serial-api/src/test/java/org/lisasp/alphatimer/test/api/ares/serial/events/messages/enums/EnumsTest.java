@@ -30,6 +30,7 @@ class EnumsTest {
     @Test
     void timeMarker() {
         Assertions.assertEquals("DNS", TimeMarker.DidNotStart.getValue());
+        Assertions.assertEquals("DSQ", TimeMarker.Disqualified.getValue());
     }
 
     @Test

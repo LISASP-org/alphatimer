@@ -32,6 +32,7 @@ public final class LaneRows {
         String detail = switch (lane.penalty()) {
             case DidNotStart -> I18n.get("lane.dns");
             case DidNotFinish -> I18n.get("lane.dnf");
+            case Disqualified -> I18n.get("lane.dsq");
             case None -> !lane.finished() && lane.lap() > 0 ? I18n.get("lane.lap", String.valueOf(lane.lap())) : "";
         };
         return new Row(lane.number(), TimeFormat.time(lane.timeInMillis()), detail, lane.place(), lane.finished());

@@ -217,6 +217,31 @@ class HeatTest {
     }
 
     @Test
+    void aDisqualifiedLaneKeepsItsTimeButGetsNoPlace() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+        heat.touch(TestMessageCreator.fin(1, 1, 3, 0, 2200));
+
+        heat.disqualified(TestMessageCreator.dsq(1, 1, 1));
+
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 2000, 2, LaneStatus.Used, Penalty.Disqualified, 0, true));
+        assertThat(lane(heat, 2).place()).isEqualTo(1);
+        assertThat(lane(heat, 3).place()).isEqualTo(2);
+    }
+
+    @Test
+    void aDisqualifiedLaneWithoutTimeIsDoneForTheClock() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+
+        heat.disqualified(TestMessageCreator.dsq(1, 1, 3));
+
+        assertThat(heat.createDto().ended()).isEqualTo(T0.plusSeconds(60));
+    }
+
+    @Test
     void heatWithoutFinishTimesGetsNoPlaces() {
         Heat heat = prepared();
         heat.finish(TestMessageCreator.end(1, 1, T0.plusSeconds(30)));

@@ -81,6 +81,17 @@ class LaneRowsTest {
     }
 
     @Test
+    void aDisqualifiedLaneShowsItsTimeWithoutPlace() {
+        HeatDto heat = new HeatDto(1, 1, HeatStatus.Finished, null, null, 2, List.of(
+                new LaneDto(1, 25_000, 2, LaneStatus.Used, Penalty.Disqualified, 0, true)));
+
+        assertThat(LaneRows.from(heat, java.util.Set.of())).containsExactly(new LaneRows.Row(1, "25.00", "DSQ", 0, true));
+
+        Locale.setDefault(Locale.GERMANY);
+        assertThat(LaneRows.from(heat, java.util.Set.of()).getFirst().detail()).isEqualTo("disq.");
+    }
+
+    @Test
     void germanTextsAndDecimalComma() {
         Locale.setDefault(Locale.GERMANY);
         List<LaneRows.Row> rows = LaneRows.from(heat(), java.util.Set.of());

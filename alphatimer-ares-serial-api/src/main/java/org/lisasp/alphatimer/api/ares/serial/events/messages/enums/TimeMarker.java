@@ -10,7 +10,8 @@ public enum TimeMarker {
     Plus("+"),
     Minus("-"),
     DidNotStart("DNS"),
-    DidNotFinish("DNF");
+    DidNotFinish("DNF"),
+    Disqualified("DSQ");
 
     private final String value;
 }

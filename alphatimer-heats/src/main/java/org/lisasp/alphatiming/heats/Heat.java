@@ -3,6 +3,7 @@ package org.lisasp.alphatiming.heats;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.values.UsedLanes;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
@@ -123,6 +124,14 @@ final class Heat {
         assureStarted(message);
         lastMessage = message.getTimestamp();
         lane.didNotFinish();
+        update(message);
+    }
+
+    void disqualified(DisqualifiedMessage message) {
+        Lane lane = lane(message.getLane());
+        assureStarted(message);
+        lastMessage = message.getTimestamp();
+        lane.disqualified();
         update(message);
     }
 

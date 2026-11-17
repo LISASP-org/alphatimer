@@ -66,6 +66,9 @@ class DataHandlingMessage2Parser implements MessageParser {
         if (text.equals("DNF")) {
             return TimeMarker.DidNotFinish;
         }
+        if (text.equals("DSQ")) {
+            return TimeMarker.Disqualified;
+        }
         if (text.equals("-.--")) {
             return TimeMarker.Empty;
         }

@@ -1,6 +1,7 @@
 package org.lisasp.alphatiming.heats;
 
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
@@ -85,6 +86,10 @@ public final class TestMessageCreator {
 
     public static DidNotFinishMessage dnf(int event, int heat, int lane) {
         return new DidNotFinishMessage(T0, "WK", (short) event, (byte) heat, (byte) lane);
+    }
+
+    public static DisqualifiedMessage dsq(int event, int heat, int lane) {
+        return new DisqualifiedMessage(T0.plusSeconds(60), "WK", (short) event, (byte) heat, (byte) lane);
     }
 
     public static OfficialEndMessage end(int event, int heat, LocalDateTime at) {

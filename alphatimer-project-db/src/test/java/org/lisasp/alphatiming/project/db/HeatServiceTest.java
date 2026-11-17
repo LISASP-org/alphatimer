@@ -357,6 +357,23 @@ class HeatServiceTest {
     }
 
     @Test
+    void aDisqualificationIsStoredWithTheTimeOfTheLane() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            HeatStore store = new HeatStore(db);
+            HeatService service = new HeatService(store);
+            service.accept(TestMessageCreator.used(1, 1, "1100000000"));
+            service.accept(TestMessageCreator.start(1, 1, T0));
+            service.accept(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+            service.accept(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+            service.accept(TestMessageCreator.dsq(1, 1, 1));
+            HeatDto heat = store.find(1, 1).orElseThrow();
+            assertThat(heat.lanes().get(0)).isEqualTo(new LaneDto(1, 2000, 2, LaneStatus.Used, Penalty.Disqualified, 0, true));
+            assertThat(heat.lanes().get(1).place()).isEqualTo(1);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
     void aSecondFinishForTheSameLaneReplacesTheTimeAndALaterSplitIsIgnored() throws Exception {
         try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             HeatStore store = new HeatStore(db);
