@@ -12,14 +12,4 @@
     <artifactId>alphatimer-ares-serial-api</artifactId>
     <name>ARES21 Serial Protocol API</name>
 
-    <dependencies>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-    </dependencies>
 </project>
