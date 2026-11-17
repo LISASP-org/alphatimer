@@ -3,6 +3,7 @@ package org.lisasp.alphatimer.test.refinedmessages;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.*;
@@ -172,5 +173,61 @@ class TimeMessageTest {
         assertEquals(List.of(
                 new DroppedTimeMessage(message),
                 new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+    }
+
+    private static final byte LAP_COUNT = 2;
+    private static final byte EVENT = 3;
+    private static final byte HEAT = 4;
+    private static final UsedLanes LANES_1_AND_2 = new UsedLanes(new boolean[]{true, true, false, false, false, false, false, false, false, false});
+
+    private static DataHandlingMessage time(MessageType messageType, TimeType timeType, byte lane, TimeInfo timeInfo) {
+        return new DataHandlingMessage(TIMESTAMP, "TestWK", "1", "2", messageType, KindOfTime.Finish, timeType, LANES_1_AND_2, LAP_COUNT, EVENT,
+                                       HEAT, (byte) 1, RankInfo.Normal, lane, (byte) 2, 65_430, timeInfo, TimeMarker.Empty);
+    }
+
+    private static TimeMessage refined(RefinedMessageType messageType, RefinedTimeType timeType) {
+        return new TimeMessage(TIMESTAMP, "TestWK", EVENT, HEAT, messageType, RefinedKindOfTime.Finish, (byte) 2, (byte) 2, LAP_COUNT, (byte) 1,
+                               65_430, timeType);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"CurrentRaceResults, CurrentRaceResult", "PreviousRaceResults, PreviousRaceResult"})
+    void aResultMessageKeepsItsMessageTypeAndCarriesNoUsedLanes(MessageType messageType, RefinedMessageType refinedMessageType) {
+        refiner.accept(time(messageType, TimeType.Empty, (byte) 2, TimeInfo.Normal));
+
+        assertEquals(List.of(refined(refinedMessageType, RefinedTimeType.Normal)), listener.received);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"CorrectedTime, CorrectedTime", "DeletedTime, DeletedTime"})
+    void aCorrectedOrDeletedTimeIsRefinedWithItsTimeType(TimeType timeType, RefinedTimeType refinedTimeType) {
+        refiner.accept(time(MessageType.CurrentRaceResults, timeType, (byte) 2, TimeInfo.Normal));
+
+        assertEquals(List.of(refined(RefinedMessageType.CurrentRaceResult, refinedTimeType)), listener.received);
+    }
+
+    @Test
+    void aManualTimeMarkedAsManualInBothFieldsIsRefined() {
+        refiner.accept(time(MessageType.CurrentRaceResults, TimeType.ManualTime, (byte) 2, TimeInfo.Manual));
+
+        assertEquals(List.of(refined(RefinedMessageType.CurrentRaceResult, RefinedTimeType.ManualTime)), listener.received);
+    }
+
+    @Test
+    void aManualTimeInfoWithoutManualTimeTypeIsDropped() {
+        DataHandlingMessage message = time(MessageType.CurrentRaceResults, TimeType.Empty, (byte) 2, TimeInfo.Manual);
+
+        refiner.accept(message);
+
+        assertEquals(List.of(new DroppedTimeMessage(message)), listener.received);
+    }
+
+    @Test
+    void aTimeWithoutLaneIsDropped() {
+        DataHandlingMessage message = time(MessageType.CurrentRaceResults, TimeType.Empty, (byte) 0, TimeInfo.Normal);
+
+        refiner.accept(message);
+
+        assertEquals(List.of(new DroppedTimeMessage(message)), listener.received);
     }
 }

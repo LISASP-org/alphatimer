@@ -2,6 +2,8 @@ package org.lisasp.alphatimer.test.refinedmessages;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.*;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.values.UsedLanes;
@@ -227,5 +229,54 @@ class TakeOverTimeMessageTest {
         assertEquals(List.of(
                 new DroppedTakeOverTimeMessage(message),
                 new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+    }
+
+    private static final byte LAP_COUNT = 4;
+    private static final byte EVENT = 3;
+    private static final byte HEAT = 4;
+    private static final UsedLanes LANES_1_AND_2 = new UsedLanes(new boolean[]{true, true, false, false, false, false, false, false, false, false});
+
+    private static DataHandlingMessage takeOver(MessageType messageType, byte lane, byte currentLap, RankInfo rankInfo, TimeMarker marker,
+                                                TimeType timeType) {
+        return new DataHandlingMessage(TIMESTAMP, "TestWK", "1", "2", messageType, KindOfTime.TakeOverTime, timeType, LANES_1_AND_2, LAP_COUNT, EVENT,
+                                       HEAT, (byte) 0, rankInfo, lane, currentLap, 120, TimeInfo.Normal, marker);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"CurrentRaceResults, CurrentRaceResult", "PreviousRaceResults, PreviousRaceResult"})
+    void aResultMessageKeepsItsMessageTypeAndCarriesNoUsedLanes(MessageType messageType, RefinedMessageType refinedMessageType) {
+        refiner.accept(takeOver(messageType, (byte) 2, (byte) 1, RankInfo.Normal, TimeMarker.Minus, TimeType.PlatformTimeBeforeTouchpadTime));
+
+        assertEquals(List.of(new TakeOverTimeMessage(TIMESTAMP, "TestWK", EVENT, HEAT, refinedMessageType, (byte) 2, (byte) 1, TimeMarker.Minus,
+                                                     TimeType.PlatformTimeBeforeTouchpadTime, 120)), listener.received);
+    }
+
+    @Test
+    void aDisqualifiedTakeOverWithoutMarkerAndTimeTypeIsRefined() {
+        refiner.accept(takeOver(MessageType.CurrentRaceResults, (byte) 2, (byte) 1, RankInfo.Disqualified, TimeMarker.Empty, TimeType.Empty));
+
+        assertEquals(List.of(new TakeOverTimeMessage(TIMESTAMP, "TestWK", EVENT, HEAT, RefinedMessageType.CurrentRaceResult, (byte) 2, (byte) 1,
+                                                     TimeMarker.Empty, TimeType.Empty, 120)), listener.received);
+    }
+
+    @Test
+    void aDisqualifiedTakeOverWithMarkerIsDropped() {
+        DataHandlingMessage message = takeOver(MessageType.CurrentRaceResults, (byte) 2, (byte) 1, RankInfo.Disqualified, TimeMarker.Plus,
+                                               TimeType.PlatformTimeAfterTouchpadTime);
+
+        refiner.accept(message);
+
+        assertEquals(List.of(new DroppedTakeOverTimeMessage(message)), listener.received);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"2, 4", "0, 1"})
+    void aTakeOverOnTheLastLapOrWithoutLaneIsDropped(byte lane, byte currentLap) {
+        DataHandlingMessage message = takeOver(MessageType.CurrentRaceResults, lane, currentLap, RankInfo.Normal, TimeMarker.Plus,
+                                               TimeType.PlatformTimeAfterTouchpadTime);
+
+        refiner.accept(message);
+
+        assertEquals(List.of(new DroppedTakeOverTimeMessage(message)), listener.received);
     }
 }
