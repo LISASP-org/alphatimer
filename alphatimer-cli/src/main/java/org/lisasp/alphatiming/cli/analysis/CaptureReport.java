@@ -17,9 +17,9 @@ final class CaptureReport {
     private static final String NOT_REFINED = "-";
 
     /** Shared by both message tables so that their columns line up. */
-    private record Columns(int typeWidth, int countWidth, int processedWidth) {
+    private record Columns(int typeWidth, int countWidth, int processedWidth, int differenceWidth) {
 
-        static Columns of(CaptureStatistics statistics, String countLabel, String processedLabel) {
+        static Columns of(CaptureStatistics statistics, String countLabel, String processedLabel, String differenceLabel) {
             Map<String, Long> received = statistics.protocolMessages();
             Map<String, Long> refined = statistics.refinedMessages();
             int typeWidth = Stream.concat(received.keySet().stream(), refined.keySet().stream()).mapToInt(String::length).max().orElse(0);
@@ -28,11 +28,16 @@ final class CaptureReport {
                                    .mapToInt(String::length).max().orElse(0);
             int processedWidth = Stream.concat(Stream.of(processedLabel), statistics.processedMessages().values().stream().map(Columns::format))
                                        .mapToInt(String::length).max().orElse(0);
-            return new Columns(typeWidth, countWidth, processedWidth);
+            int differenceWidth = Stream.concat(Stream.of(differenceLabel),
+                                                statistics.processedMessages().entrySet().stream()
+                                                          .map(e -> format(received.getOrDefault(e.getKey(), 0L) - e.getValue())))
+                                        .mapToInt(String::length).max().orElse(0);
+            return new Columns(typeWidth, countWidth, processedWidth, differenceWidth);
         }
 
-        String header(String countLabel, String processedLabel) {
-            return ENTRY + " ".repeat(typeWidth) + COLUMN_GAP + right(countLabel, countWidth) + COLUMN_GAP + right(processedLabel, processedWidth);
+        String header(String countLabel, String processedLabel, String differenceLabel) {
+            return ENTRY + " ".repeat(typeWidth) + COLUMN_GAP + right(countLabel, countWidth) + COLUMN_GAP + right(processedLabel, processedWidth)
+                    + COLUMN_GAP + right(differenceLabel, differenceWidth);
         }
 
         String row(String type, long count) {
@@ -40,7 +45,9 @@ final class CaptureReport {
         }
 
         String row(String type, long count, Long processed) {
-            return row(type, count) + COLUMN_GAP + right(processed == null ? NOT_REFINED : format(processed), processedWidth);
+            return row(type, count)
+                    + COLUMN_GAP + right(processed == null ? NOT_REFINED : format(processed), processedWidth)
+                    + COLUMN_GAP + right(processed == null ? NOT_REFINED : format(count - processed), differenceWidth);
         }
 
         private static String right(String text, int width) {
@@ -59,14 +66,15 @@ final class CaptureReport {
         lines.add("");
         String countLabel = I18n.get("cli.analysis.column.count");
         String processedLabel = I18n.get("cli.analysis.column.processed");
-        Columns columns = Columns.of(statistics, countLabel, processedLabel);
+        String differenceLabel = I18n.get("cli.analysis.column.difference");
+        Columns columns = Columns.of(statistics, countLabel, processedLabel, differenceLabel);
         lines.add(I18n.get("cli.analysis.protocolMessages"));
         Map<String, Long> received = statistics.protocolMessages();
         Map<String, Long> processed = statistics.processedMessages();
         if (received.isEmpty()) {
             lines.add(ENTRY + I18n.get("cli.analysis.none"));
         } else {
-            lines.add(columns.header(countLabel, processedLabel));
+            lines.add(columns.header(countLabel, processedLabel, differenceLabel));
             received.forEach((type, count) -> lines.add(columns.row(type, count, processed.get(type))));
         }
         lines.add("");

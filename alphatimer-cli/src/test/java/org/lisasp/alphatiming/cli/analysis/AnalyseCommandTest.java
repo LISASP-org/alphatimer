@@ -85,9 +85,9 @@ class AnalyseCommandTest {
                 "2 files, 90 bytes",
                 "",
                 "Messages (pings, data handling messages by message type):",
-                "                    Count  Processed",
-                "  OnLineTime            2          1",
-                "  Ping                  1          -",
+                "                    Count  Processed  Difference",
+                "  OnLineTime            2          1           1",
+                "  Ping                  1          -           -",
                 "",
                 "Refined messages:",
                 "  TimeMessage           1",
@@ -108,9 +108,9 @@ class AnalyseCommandTest {
 
         command.run(List.of(dir.toString()));
 
-        assertThat(outLines()).containsSubsequence("                    Count  Processed",
-                                                   "  OnLineTime            1          1",
-                                                   "  Ping                 10          -",
+        assertThat(outLines()).containsSubsequence("                    Count  Processed  Difference",
+                                                   "  OnLineTime            1          1           0",
+                                                   "  Ping                 10          -           -",
                                                    "",
                                                    "Refined messages:",
                                                    "  TimeMessage           1",
