@@ -91,6 +91,25 @@ settings, serial port missing), 4 = saving failed, 5 = saved, but the recording 
 lost, 6 = saved, but recorded data could not be stored and is missing from the file (wins over 5). Without a terminal
 (input redirected) only Ctrl+C / SIGTERM end it.
 
+## Raw data analysis
+
+The same jar analyses recorded raw data: every `.dat` and `.serial` file directly in a directory (not in its
+subdirectories) runs through the same parser as a recording:
+
+```bash
+java -cp alphatimer-cli/target/alphatiming-cli.jar org.lisasp.alphatiming.cli.analysis.AnalyseLauncher data
+```
+
+It prints the parsed messages per type (pings and data handling messages by message type, then the refined messages)
+and groups what could not be used, each group with its count and its first occurrence:
+
+- **Defects**: the protocol layer rejects the data — bytes outside a message, an invalid field, a damaged message
+  (starts like a known message or holds only ping bytes), message 1 or 2 of a data handling message without the other.
+- **Well-formed, but not implemented**: messages of an unknown kind, and data handling messages the refiner drops,
+  grouped by their fields (message type, kind of time, time type, time info, rank, time marker).
+
+Exit codes: 0 = analysed, 1 = wrong arguments, 7 = the directory or a file could not be read.
+
 ## Project file
 
 One SQLite file (`*.timing`; files of earlier versions named `*.heat` still open; written through JPA/Hibernate) holds the settings, the raw bytes received, the interpreted
