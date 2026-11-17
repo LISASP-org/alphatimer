@@ -7,3 +7,6 @@ target/
 /distribution/
 *.versionsBackup
 /data/
+
+# Vendor manuals (copyrighted, not redistributable)
+docs/ares/
