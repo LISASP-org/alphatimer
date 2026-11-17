@@ -322,7 +322,8 @@ class StartMessageTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"CurrentRaceResults, CurrentRaceResult", "PreviousRaceResults, PreviousRaceResult"})
+    @CsvSource({"CurrentRaceResults, CurrentRaceResult", "PreviousRaceResults, PreviousRaceResult",
+                "CurrentRaceResultsWithBackupTimes, CurrentRaceResult", "PreviousRaceResultsWithBackupTimes, PreviousRaceResult"})
     void aResultMessageKeepsItsMessageTypeAndCarriesNoUsedLanes(MessageType messageType, RefinedMessageType refinedMessageType) {
         refiner.accept(start(messageType, TimeType.Empty));
 

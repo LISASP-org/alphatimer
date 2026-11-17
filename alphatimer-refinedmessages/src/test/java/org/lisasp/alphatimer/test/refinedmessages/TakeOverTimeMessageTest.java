@@ -243,7 +243,8 @@ class TakeOverTimeMessageTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"CurrentRaceResults, CurrentRaceResult", "PreviousRaceResults, PreviousRaceResult"})
+    @CsvSource({"CurrentRaceResults, CurrentRaceResult", "PreviousRaceResults, PreviousRaceResult",
+                "CurrentRaceResultsWithBackupTimes, CurrentRaceResult", "PreviousRaceResultsWithBackupTimes, PreviousRaceResult"})
     void aResultMessageKeepsItsMessageTypeAndCarriesNoUsedLanes(MessageType messageType, RefinedMessageType refinedMessageType) {
         refiner.accept(takeOver(messageType, (byte) 2, (byte) 1, RankInfo.Normal, TimeMarker.Minus, TimeType.PlatformTimeBeforeTouchpadTime));
 

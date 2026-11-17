@@ -191,7 +191,8 @@ class TimeMessageTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"CurrentRaceResults, CurrentRaceResult", "PreviousRaceResults, PreviousRaceResult"})
+    @CsvSource({"CurrentRaceResults, CurrentRaceResult", "PreviousRaceResults, PreviousRaceResult",
+                "CurrentRaceResultsWithBackupTimes, CurrentRaceResult", "PreviousRaceResultsWithBackupTimes, PreviousRaceResult"})
     void aResultMessageKeepsItsMessageTypeAndCarriesNoUsedLanes(MessageType messageType, RefinedMessageType refinedMessageType) {
         refiner.accept(time(messageType, TimeType.Empty, (byte) 2, TimeInfo.Normal));
 
@@ -206,20 +207,22 @@ class TimeMessageTest {
         assertEquals(List.of(refined(RefinedMessageType.CurrentRaceResult, refinedTimeType)), listener.received);
     }
 
-    @Test
-    void aManualTimeMarkedAsManualInBothFieldsIsRefined() {
-        refiner.accept(time(MessageType.CurrentRaceResults, TimeType.ManualTime, (byte) 2, TimeInfo.Manual));
+    /** ARES manual 5.3.6 and 7: a manually generated time is a valid time ([V]M); the recordings mark it in the time type only. */
+    @ParameterizedTest
+    @CsvSource({"ManualTime, Normal", "ManualTime, Manual", "Empty, Manual"})
+    void aManualTimeIsRefinedAsManualTime(TimeType timeType, TimeInfo timeInfo) {
+        refiner.accept(time(MessageType.CurrentRaceResults, timeType, (byte) 2, timeInfo));
 
         assertEquals(List.of(refined(RefinedMessageType.CurrentRaceResult, RefinedTimeType.ManualTime)), listener.received);
     }
 
-    @Test
-    void aManualTimeInfoWithoutManualTimeTypeIsDropped() {
-        DataHandlingMessage message = time(MessageType.CurrentRaceResults, TimeType.Empty, (byte) 2, TimeInfo.Manual);
+    /** ARES manual 7: a time edited from the keyboard is a valid time ([V]E). */
+    @ParameterizedTest
+    @CsvSource({"Empty", "CorrectedTime"})
+    void anEditedTimeIsRefinedAsCorrectedTime(TimeType timeType) {
+        refiner.accept(time(MessageType.CurrentRaceResults, timeType, (byte) 2, TimeInfo.Edited));
 
-        refiner.accept(message);
-
-        assertEquals(List.of(new DroppedTimeMessage(message)), listener.received);
+        assertEquals(List.of(refined(RefinedMessageType.CurrentRaceResult, RefinedTimeType.CorrectedTime)), listener.received);
     }
 
     @Test
