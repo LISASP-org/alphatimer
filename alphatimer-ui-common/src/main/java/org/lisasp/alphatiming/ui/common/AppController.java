@@ -360,13 +360,25 @@ public final class AppController implements AutoCloseable {
         signOfLifeListeners.add(listener);
     }
 
-    /** True while recording if the timekeeping system sent a ping or a valid message within the last few seconds. */
-    public boolean hasRecentSignOfLife() {
-        return isRecording() && signOfLife.isRecent();
+    /** Not connected without a running, connected recording; silent without a recent ping or message; a new message briefly. */
+    public PingIndicator pingIndicator() {
+        RecordingSession s = session;
+        if (s == null || !s.isConnected()) {
+            return PingIndicator.DISCONNECTED;
+        }
+        if (!signOfLife.isRecent()) {
+            return PingIndicator.SILENT;
+        }
+        return signOfLife.isShowingMessage() ? PingIndicator.MESSAGE : PingIndicator.BRIGHT;
     }
 
-    private void signOfLifeReceived() {
+    private void pingReceived() {
         signOfLife.received();
+        signOfLifeListeners.forEach(Runnable::run);
+    }
+
+    private void messageReceived() {
+        signOfLife.messageReceived();
         signOfLifeListeners.forEach(Runnable::run);
     }
 
@@ -453,10 +465,10 @@ public final class AppController implements AutoCloseable {
             fireChange();
         });
         next.addMessageListener(message -> {
-            signOfLifeReceived();
+            messageReceived();
             announce(MessageText.describe(message, doc.settings().timekeepingOffsetHours()));
         });
-        next.addPingListener(this::signOfLifeReceived);
+        next.addPingListener(this::pingReceived);
         next.addConnectionLostListener(this::onConnectionLost);
         next.addErrorListener(ex -> announce(MessageText.processingError(ex)));
         next.addWriteListener(new WriteListener() {

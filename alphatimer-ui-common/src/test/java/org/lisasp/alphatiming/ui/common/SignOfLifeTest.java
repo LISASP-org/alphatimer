@@ -44,4 +44,34 @@ class SignOfLifeTest {
 
         assertThat(signOfLife.isRecent()).isFalse();
     }
+
+    @Test
+    void aPingIsNoMessage() {
+        signOfLife.received();
+
+        assertThat(signOfLife.isShowingMessage()).isFalse();
+    }
+
+    @Test
+    void aMessageIsShownForOneHundredMillisecondsAndStaysASignOfLife() {
+        signOfLife.messageReceived();
+        assertThat(signOfLife.isShowingMessage()).isTrue();
+        assertThat(signOfLife.isRecent()).isTrue();
+
+        now.set(T0.plusNanos(100_000_000));
+        assertThat(signOfLife.isShowingMessage()).isTrue();
+
+        now.set(T0.plusNanos(101_000_000));
+        assertThat(signOfLife.isShowingMessage()).isFalse();
+        assertThat(signOfLife.isRecent()).isTrue();
+    }
+
+    @Test
+    void aForgottenMessageIsNotShown() {
+        signOfLife.messageReceived();
+
+        signOfLife.forget();
+
+        assertThat(signOfLife.isShowingMessage()).isFalse();
+    }
 }

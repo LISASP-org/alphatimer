@@ -12,9 +12,11 @@ import java.time.LocalDateTime;
 public final class SignOfLife {
 
     static final Duration RECENT = Duration.ofSeconds(5);
+    public static final Duration MESSAGE_SHOWN = Duration.ofMillis(100);
 
     private final DateTimeFacade time;
     private volatile LocalDateTime last;
+    private volatile LocalDateTime lastMessage;
 
     public SignOfLife(DateTimeFacade time) {
         this.time = time;
@@ -26,6 +28,18 @@ public final class SignOfLife {
 
     public void forget() {
         last = null;
+        lastMessage = null;
+    }
+
+    public void messageReceived() {
+        LocalDateTime now = time.now();
+        lastMessage = now;
+        last = now;
+    }
+
+    public boolean isShowingMessage() {
+        LocalDateTime at = lastMessage;
+        return at != null && !time.now().isAfter(at.plus(MESSAGE_SHOWN));
     }
 
     public boolean isRecent() {

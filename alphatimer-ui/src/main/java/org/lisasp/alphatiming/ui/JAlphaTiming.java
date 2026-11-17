@@ -2,6 +2,8 @@ package org.lisasp.alphatiming.ui;
 
 import org.lisasp.alphatiming.ui.common.AppController;
 import org.lisasp.alphatiming.ui.common.I18n;
+import org.lisasp.alphatiming.ui.common.PingIndicator;
+import org.lisasp.alphatiming.ui.common.SignOfLife;
 import org.lisasp.alphatiming.ui.common.TimeFormat;
 import org.lisasp.alphatiming.ui.common.AppStatus;
 import com.jgoodies.forms.factories.CC;
@@ -64,6 +66,8 @@ public final class JAlphaTiming extends JFrame {
     private final JLabel statusLastMessage = new JLabel(" ");
     private final JLabel statusFile = new JLabel();
     private final Timer refreshTimer = new Timer(1000, e -> refresh());
+    /** Ends the white-green of a message; started a little after its time so the controller no longer reports it. */
+    private final Timer messageShownTimer = new Timer((int) SignOfLife.MESSAGE_SHOWN.toMillis() + 20, e -> showSignOfLife());
     private final JMenuItem startItem = new JMenuItem(I18n.get("menu.start"));
     private final JMenuItem stopItem = new JMenuItem(I18n.get("menu.stop"));
     private boolean documentWorkRunning;
@@ -109,6 +113,7 @@ public final class JAlphaTiming extends JFrame {
         }));
         liveViewPanel.setHeats(controller.liveHeats());
 
+        messageShownTimer.setRepeats(false);
         refreshTimer.start();
         refresh();
         WindowUtils.setSize(this, 1200, 700);
@@ -255,7 +260,11 @@ public final class JAlphaTiming extends JFrame {
     }
 
     private void showSignOfLife() {
-        pingMarker.setBright(controller.hasRecentSignOfLife());
+        PingIndicator indicator = controller.pingIndicator();
+        pingMarker.show(indicator);
+        if (indicator == PingIndicator.MESSAGE) {
+            messageShownTimer.restart();
+        }
     }
 
     void refresh() {
@@ -280,6 +289,7 @@ public final class JAlphaTiming extends JFrame {
     @Override
     public void dispose() {
         refreshTimer.stop();
+        messageShownTimer.stop();
         super.dispose();
     }
 

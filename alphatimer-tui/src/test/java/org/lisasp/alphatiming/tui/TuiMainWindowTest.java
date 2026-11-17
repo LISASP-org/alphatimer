@@ -58,7 +58,7 @@ class TuiMainWindowTest {
         screen = new TerminalScreen(terminal);
         screen.startScreen();
         gui = new MultiWindowTextGUI(screen);
-        controller = new AppController(Files.createDirectories(dir.resolve("work")), new DefaultSettingsStore(dir.resolve("defaults.json")), new DiscardingPrompt(), () -> s -> fakeReader(), LocalDateTime::now);
+        controller = new AppController(Files.createDirectories(dir.resolve("work")), new DefaultSettingsStore(dir.resolve("defaults.json")), new DiscardingPrompt(), () -> s -> fakeReader(), this::now);
         controller.init();
         window = new TuiMainWindow(controller, new TuiSavePrompt(gui), gui);
         gui.addWindow(window);
@@ -108,6 +108,18 @@ class TuiMainWindowTest {
     }
 
     private final java.util.List<ByteConsumer> receivers = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final java.util.concurrent.atomic.AtomicReference<LocalDateTime> stoppedClock = new java.util.concurrent.atomic.AtomicReference<>();
+
+    private LocalDateTime now() {
+        LocalDateTime stopped = stoppedClock.get();
+        return stopped != null ? stopped : LocalDateTime.now();
+    }
+
+    private void receive(String data) {
+        for (byte b : data.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1)) {
+            receivers.forEach(r -> r.accept(b));
+        }
+    }
 
     private SerialPortReader fakeReader() {
         return new SerialPortReader() {
@@ -145,20 +157,42 @@ class TuiMainWindowTest {
     }
 
     @Test
-    void thePingMarkerIsBrightGreenAfterAPingWhileRecordingAndDarkGreenOtherwise() throws IOException {
-        assertThat(window.pingMarker().getForegroundColor()).isEqualTo(com.googlecode.lanterna.TextColor.ANSI.GREEN);
+    void thePingMarkerIsGrayWithoutConnectionDarkGreenWhileSilentAndBrightGreenAfterAPing() throws IOException {
+        com.googlecode.lanterna.gui2.Label marker = window.pingMarker();
+        assertThat(marker.getForegroundColor()).isEqualTo(com.googlecode.lanterna.TextColor.ANSI.BLACK_BRIGHT);
+        assertThat(marker.getForegroundColor()).isNotEqualTo(marker.getTheme().getDefinition(com.googlecode.lanterna.gui2.Label.class).getNormal().getBackground());
+
         controller.applySettings(new org.lisasp.alphatiming.ui.core.settings.Settings("localhost", 8585, 60, 0).withCompetitionKey("WK"));
         controller.startRecording();
-
-        for (byte b : new byte[]{0x01, 0x12, 0x39, 0x14, 0x54, 0x50, 0x04}) {
-            receivers.forEach(r -> r.accept(b));
-        }
         render();
-        assertThat(window.pingMarker().getForegroundColor()).isEqualTo(com.googlecode.lanterna.TextColor.ANSI.GREEN_BRIGHT);
+        assertThat(marker.getForegroundColor()).isEqualTo(com.googlecode.lanterna.TextColor.ANSI.GREEN);
+
+        receive("\u0001\u00129\u0014TP\u0004");
+        render();
+        assertThat(marker.getForegroundColor()).isEqualTo(com.googlecode.lanterna.TextColor.ANSI.GREEN_BRIGHT);
 
         controller.stopRecording();
         render();
-        assertThat(window.pingMarker().getForegroundColor()).isEqualTo(com.googlecode.lanterna.TextColor.ANSI.GREEN);
+        assertThat(marker.getForegroundColor()).isEqualTo(com.googlecode.lanterna.TextColor.ANSI.BLACK_BRIGHT);
+    }
+
+    @Test
+    void aMessageIsShownBrightWhiteAndTheMarkerTurnsBrightGreenAfterwards() throws IOException {
+        controller.applySettings(new org.lisasp.alphatiming.ui.core.settings.Settings("localhost", 8585, 60, 0).withCompetitionKey("WK"));
+        controller.startRecording();
+        LocalDateTime t0 = LocalDateTime.of(2026, 11, 19, 10, 0);
+        stoppedClock.set(t0);
+
+        receive("\u0001\u0002\u00082A ?< 400101   1\u0004\u0001\u0002\u0008\n3 4\u0002    1:05.43 \u0004");
+        render();
+        assertThat(window.pingMarker().getForegroundColor()).isEqualTo(com.googlecode.lanterna.TextColor.ANSI.WHITE_BRIGHT);
+
+        stoppedClock.set(t0.plusNanos(101_000_000));
+        org.awaitility.Awaitility.await().pollInSameThread().atMost(java.time.Duration.ofSeconds(2)).untilAsserted(() -> {
+            render();
+            assertThat(window.pingMarker().getForegroundColor()).isEqualTo(com.googlecode.lanterna.TextColor.ANSI.GREEN_BRIGHT);
+        });
+        controller.stopRecording();
     }
 
     @Test

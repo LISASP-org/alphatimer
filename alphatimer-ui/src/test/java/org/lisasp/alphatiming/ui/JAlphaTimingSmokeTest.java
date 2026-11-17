@@ -138,8 +138,8 @@ class JAlphaTimingSmokeTest {
                 assertThat(frame.pingMarker().isShowing()).isTrue();
                 assertThat(frame.pingMarker().getLocationOnScreen().x).isLessThan(frame.statusStateLabel().getLocationOnScreen().x);
                 assertThat(frame.pingMarker().getLocationOnScreen().y).isGreaterThan(frame.settingsPanel().getLocationOnScreen().y);
-                frame.pingMarker().setBright(true);
-                assertThat(frame.pingMarker().isBright()).isTrue();
+                frame.pingMarker().show(org.lisasp.alphatiming.ui.common.PingIndicator.BRIGHT);
+                assertThat(frame.pingMarker().shown()).isEqualTo(org.lisasp.alphatiming.ui.common.PingIndicator.BRIGHT);
             });
 
             onEdt(() -> {
