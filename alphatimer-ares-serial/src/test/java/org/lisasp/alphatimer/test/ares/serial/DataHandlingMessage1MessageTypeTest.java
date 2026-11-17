@@ -243,7 +243,7 @@ class DataHandlingMessage1MessageTypeTest {
                 TIMESTAMP,
                 "TestWK",
                 new String(message1modified),
-                MessageType.UnknownValue7,
+                MessageType.BackupTime,
                 KindOfTime.Start,
                 TimeType.Empty,
                 createUsedLanes(),

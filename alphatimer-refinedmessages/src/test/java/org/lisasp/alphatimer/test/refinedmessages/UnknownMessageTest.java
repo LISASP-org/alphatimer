@@ -38,7 +38,7 @@ class UnknownMessageTest {
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
-                MessageType.UnknownValue7,
+                MessageType.BackupTime,
                 KindOfTime.Empty,
                 TimeType.Empty,
                 new UsedLanes(new boolean[]{true, true, false, false, false, false, false, false, false, false}),
@@ -53,7 +53,7 @@ class UnknownMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new DroppedUnknownMessage(TIMESTAMP, "TestWK", MessageType.UnknownValue7, KindOfTime.Empty, TimeType.Empty,
+        assertEquals(List.of(new DroppedUnknownMessage(TIMESTAMP, "TestWK", MessageType.BackupTime, KindOfTime.Empty, TimeType.Empty,
                                                        "1100000000",
                                                        lapCount,
                                                        event,
