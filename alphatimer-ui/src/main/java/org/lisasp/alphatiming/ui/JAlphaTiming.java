@@ -99,7 +99,7 @@ public final class JAlphaTiming extends JFrame {
         setJMenuBar(createMenuBar());
 
         controller.addChangeListener(() -> SwingUtilities.invokeLater(this::refresh));
-        controller.addPingListener(() -> SwingUtilities.invokeLater(pingMarker::ping));
+        controller.addSignOfLifeListener(() -> SwingUtilities.invokeLater(this::showSignOfLife));
         controller.addHeatListener(h -> SwingUtilities.invokeLater(() -> liveViewPanel.setHeats(h)));
         controller.addStateListener(s -> SwingUtilities.invokeLater(this::refresh));
         controller.addMessageListener(text -> SwingUtilities.invokeLater(() -> {
@@ -254,7 +254,12 @@ public final class JAlphaTiming extends JFrame {
         }
     }
 
+    private void showSignOfLife() {
+        pingMarker.setBright(controller.hasRecentSignOfLife());
+    }
+
     void refresh() {
+        showSignOfLife();
         if (documentWorkRunning) {
             return;
         }

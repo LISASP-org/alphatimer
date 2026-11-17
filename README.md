@@ -57,8 +57,9 @@ installer.
    without a finish counts as newer than a finished one. When the official end of a heat does not arrive, the first
    message of another heat ends it as estimated (at the latest 5 minutes after its last message), shown as `≈10:01:05`;
    an official end that arrives later replaces the estimate. Until data arrives, an information covers both. It keeps updating while recording continues in the
-   background. The marker at the left end of the status bar
-   switches between dark and bright green with every ping of the timekeeping system.
+   background. The marker at the left end of the status bar is bright green while recording as long as the timekeeping
+   system sent a ping (about one per second, if switched on in ARES) or a valid message within the last 5 seconds, and
+   dark green otherwise: without recording, before the first sign of life and when the system has been silent for longer.
 4. To change settings: **Stop recording**, edit, **Start recording** again.
 
 ## Text UI

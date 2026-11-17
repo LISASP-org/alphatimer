@@ -7,16 +7,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PingMarkerTest {
 
     @Test
-    void everyPingSwitchesBetweenDarkAndBrightGreen() {
+    void theMarkerIsDarkUntilItIsSetBrightAndDarkAgainAfterwards() {
         PingMarker marker = new PingMarker();
         assertThat(marker.isBright()).isFalse();
         assertThat(marker.currentColor()).isEqualTo(PingMarker.DARK_GREEN);
 
-        marker.ping();
+        marker.setBright(true);
+        marker.setBright(true);
         assertThat(marker.isBright()).isTrue();
         assertThat(marker.currentColor()).isEqualTo(PingMarker.BRIGHT_GREEN);
 
-        marker.ping();
+        marker.setBright(false);
         assertThat(marker.isBright()).isFalse();
         assertThat(marker.currentColor()).isEqualTo(PingMarker.DARK_GREEN);
     }

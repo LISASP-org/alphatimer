@@ -107,10 +107,13 @@ class TuiMainWindowTest {
         }
     }
 
-    private static SerialPortReader fakeReader() {
+    private final java.util.List<ByteConsumer> receivers = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    private SerialPortReader fakeReader() {
         return new SerialPortReader() {
             @Override
             public SerialPortReader register(ByteConsumer listener) {
+                receivers.add(listener);
                 return this;
             }
 
@@ -139,6 +142,23 @@ class TuiMainWindowTest {
     @Test
     void showsMenuNavigationSettingsAndStatusLikeTheGui() {
         assertThat(screenText()).contains("File", "Recording", "Settings & Recording", "Live View", "Connection type", "Stopped", "unsaved project");
+    }
+
+    @Test
+    void thePingMarkerIsBrightGreenAfterAPingWhileRecordingAndDarkGreenOtherwise() throws IOException {
+        assertThat(window.pingMarker().getForegroundColor()).isEqualTo(com.googlecode.lanterna.TextColor.ANSI.GREEN);
+        controller.applySettings(new org.lisasp.alphatiming.ui.core.settings.Settings("localhost", 8585, 60, 0).withCompetitionKey("WK"));
+        controller.startRecording();
+
+        for (byte b : new byte[]{0x01, 0x12, 0x39, 0x14, 0x54, 0x50, 0x04}) {
+            receivers.forEach(r -> r.accept(b));
+        }
+        render();
+        assertThat(window.pingMarker().getForegroundColor()).isEqualTo(com.googlecode.lanterna.TextColor.ANSI.GREEN_BRIGHT);
+
+        controller.stopRecording();
+        render();
+        assertThat(window.pingMarker().getForegroundColor()).isEqualTo(com.googlecode.lanterna.TextColor.ANSI.GREEN);
     }
 
     @Test

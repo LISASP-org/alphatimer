@@ -10,7 +10,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 
-/** A small round marker that switches between dark and bright green with every ping of the device. */
+/** A small round marker, bright green while the timekeeping system shows signs of life, dark otherwise. */
 public final class PingMarker extends JComponent {
 
     public static final Color DARK_GREEN = new Color(0, 100, 0);
@@ -23,9 +23,11 @@ public final class PingMarker extends JComponent {
         setOpaque(false);
     }
 
-    public void ping() {
-        bright = !bright;
-        repaint();
+    public void setBright(boolean bright) {
+        if (this.bright != bright) {
+            this.bright = bright;
+            repaint();
+        }
     }
 
     public boolean isBright() {

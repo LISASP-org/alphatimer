@@ -56,7 +56,6 @@ final class TuiMainWindow extends BasicWindow {
         return t;
     });
 
-    private boolean pingBright;
 
     TuiMainWindow(AppController controller, TuiSavePrompt prompt, WindowBasedTextGUI gui) {
         this.controller = controller;
@@ -80,7 +79,7 @@ final class TuiMainWindow extends BasicWindow {
 
         controller.addChangeListener(() -> later(this::refresh));
         controller.addStateListener(state -> later(this::refresh));
-        controller.addPingListener(() -> later(this::ping));
+        controller.addSignOfLifeListener(() -> later(this::showSignOfLife));
         controller.addHeatListener(heats -> later(() -> liveViewPanel.setHeats(heats)));
         controller.addMessageListener(text -> later(() -> {
             settingsPanel.appendMessage(text);
@@ -202,12 +201,16 @@ final class TuiMainWindow extends BasicWindow {
         super.close();
     }
 
-    private void ping() {
-        pingBright = !pingBright;
-        pingMarker.setForegroundColor(pingBright ? TextColor.ANSI.GREEN_BRIGHT : TextColor.ANSI.GREEN);
+    private void showSignOfLife() {
+        pingMarker.setForegroundColor(controller.hasRecentSignOfLife() ? TextColor.ANSI.GREEN_BRIGHT : TextColor.ANSI.GREEN);
+    }
+
+    Label pingMarker() {
+        return pingMarker;
     }
 
     private void refresh() {
+        showSignOfLife();
         AppStatus status = AppStatus.of(controller);
         setTitle(status.title());
         statusState.setText(status.state());
