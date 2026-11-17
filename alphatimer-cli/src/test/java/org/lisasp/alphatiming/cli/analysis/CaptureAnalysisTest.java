@@ -16,8 +16,8 @@ class CaptureAnalysisTest {
     private static final String START_2 = "\u0001\u0002\u0008\n1 0\u000210:12:47.03 \u0004";
     private static final String FINISH_1 = "\u0001\u0002\u00082A ?< 400101   1\u0004";
     private static final String FINISH_2 = "\u0001\u0002\u0008\n3 4\u0002    1:05.43 \u0004";
-    private static final String MANUAL_SPLIT_1 = "\u0001\u0002\u00082IM?< 400101   2\u0004";
-    private static final String MANUAL_SPLIT_2 = "\u0001\u0002\u0008\n2 1\u0002      13.66 \u0004";
+    private static final String MINUS_SPLIT_1 = "\u0001\u0002\u00082I ?< 400101   2\u0004";
+    private static final String MINUS_SPLIT_2 = "\u0001\u0002\u0008\n2 1\u0002-     13.66 \u0004";
     private static final String INVALID_MESSAGE_TYPE_1 = "\u0001\u0002\u0008XS ?< 400101   0\u0004";
     private static final String DAMAGED_PING = "\u0001\u00129\u0004";
     private static final String UNKNOWN = "\u0001ABCDEFGH\u0004";
@@ -41,7 +41,7 @@ class CaptureAnalysisTest {
 
     @Test
     void aDataHandlingMessageIsProcessedOnlyIfTheRefinerAcceptsItWithoutDroppingAnyPart() throws IOException {
-        analyse("a.dat", PING, FINISH_1, FINISH_2, MANUAL_SPLIT_1, MANUAL_SPLIT_2);
+        analyse("a.dat", PING, FINISH_1, FINISH_2, MINUS_SPLIT_1, MINUS_SPLIT_2);
 
         assertThat(statistics.protocolMessages()).containsExactly(entry("OnLineTime", 2L), entry("Ping", 1L));
         assertThat(statistics.processedMessages()).containsExactly(entry("OnLineTime", 1L));
@@ -49,22 +49,22 @@ class CaptureAnalysisTest {
 
     @Test
     void aDataHandlingMessageTypeWithoutProcessedMessagesIsCountedAsZero() throws IOException {
-        analyse("a.dat", MANUAL_SPLIT_1, MANUAL_SPLIT_2);
+        analyse("a.dat", MINUS_SPLIT_1, MINUS_SPLIT_2);
 
         assertThat(statistics.processedMessages()).containsExactly(entry("OnLineTime", 0L));
     }
 
     @Test
     void aWellFormedMessageTheRefinerDropsIsNotImplementedAndGroupedByItsFields() throws IOException {
-        analyse("a.dat", MANUAL_SPLIT_1, MANUAL_SPLIT_2, MANUAL_SPLIT_1, MANUAL_SPLIT_2);
-        analyse("b.dat", MANUAL_SPLIT_1, MANUAL_SPLIT_2);
+        analyse("a.dat", MINUS_SPLIT_1, MINUS_SPLIT_2, MINUS_SPLIT_1, MINUS_SPLIT_2);
+        analyse("b.dat", MINUS_SPLIT_1, MINUS_SPLIT_2);
 
         assertThat(statistics.notImplemented()).containsExactly(new Finding(
                 FindingKind.NOT_REFINED,
-                "DroppedTimeMessage (messageType=OnLineTime, kindOfTime=SplitTime, timeType=ManualTime, timeInfo=Normal, rankInfo=Normal, timeMarker=Empty)",
+                "DroppedTimeMessage (messageType=OnLineTime, kindOfTime=SplitTime, timeType=Empty, timeInfo=Normal, rankInfo=Normal, timeMarker=Minus)",
                 3,
                 "a.dat",
-                "<SOH><STX><BS>2IM?< 400101   2<EOT> <SOH><STX><BS><LF>2 1<STX>      13.66 <EOT>"));
+                "<SOH><STX><BS>2I ?< 400101   2<EOT> <SOH><STX><BS><LF>2 1<STX>-     13.66 <EOT>"));
         assertThat(statistics.refinedMessages()).containsExactly(entry("UsedLanesMessage", 3L));
         assertThat(statistics.defects()).isEmpty();
     }

@@ -13,6 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [Backup times are not interpreted](backup-times-not-interpreted.md) | Medium | M | Results sent "With backup" and backup times taken by the operator are dropped by the refiner. |
+| [Backup times are not interpreted](backup-times-not-interpreted.md) | Medium | M | A backup time the operator takes for a lane is dropped by the refiner; the lane keeps no finish time. |
 | [The rank value "D " is read as a disqualification](rank-d-is-not-a-disqualification.md) | Low | M | The parser maps rank `D `, sent with reaction and takeover times, to `RankInfo.Disqualified`; its meaning is unknown. |
 | [A disqualified relay takeover skips the lane and lap checks](disqualified-takeover-skips-checks.md) | Low | S | `TakeOverTimeParser` accepts a disqualified takeover without lane or valid lap, because of missing parentheses. |

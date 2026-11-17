@@ -22,8 +22,8 @@ class AnalyseCommandTest {
     private static final String PING = "\u0001\u00129\u0014TP\u0004";
     private static final String FINISH_1 = "\u0001\u0002\u00082A ?< 400101   1\u0004";
     private static final String FINISH_2 = "\u0001\u0002\u0008\n3 4\u0002    1:05.43 \u0004";
-    private static final String MANUAL_SPLIT_1 = "\u0001\u0002\u00082IM?< 400101   2\u0004";
-    private static final String MANUAL_SPLIT_2 = "\u0001\u0002\u0008\n2 1\u0002      13.66 \u0004";
+    private static final String MINUS_SPLIT_1 = "\u0001\u0002\u00082I ?< 400101   2\u0004";
+    private static final String MINUS_SPLIT_2 = "\u0001\u0002\u0008\n2 1\u0002-     13.66 \u0004";
 
     @TempDir
     Path dir;
@@ -74,7 +74,7 @@ class AnalyseCommandTest {
 
     @Test
     void theReportCoversOnlyTheDatAndSerialFilesDirectlyInTheDirectory() throws IOException {
-        write("b.serial", FINISH_1, FINISH_2, MANUAL_SPLIT_1, MANUAL_SPLIT_2, "\u0000");
+        write("b.serial", FINISH_1, FINISH_2, MINUS_SPLIT_1, MINUS_SPLIT_2, "\u0000");
         write("a.DAT", PING);
         write("c.txt", PING);
         write("sub/d.dat", PING);
@@ -98,8 +98,8 @@ class AnalyseCommandTest {
                 "      first in b.serial: <00>",
                 "",
                 "Well-formed, but not implemented (1):",
-                "  1 x Dropped by the refiner: DroppedTimeMessage (messageType=OnLineTime, kindOfTime=SplitTime, timeType=ManualTime, timeInfo=Normal, rankInfo=Normal, timeMarker=Empty)",
-                "      first in b.serial: <SOH><STX><BS>2IM?< 400101   2<EOT> <SOH><STX><BS><LF>2 1<STX>      13.66 <EOT>");
+                "  1 x Dropped by the refiner: DroppedTimeMessage (messageType=OnLineTime, kindOfTime=SplitTime, timeType=Empty, timeInfo=Normal, rankInfo=Normal, timeMarker=Minus)",
+                "      first in b.serial: <SOH><STX><BS>2I ?< 400101   2<EOT> <SOH><STX><BS><LF>2 1<STX>-     13.66 <EOT>");
     }
 
     @Test

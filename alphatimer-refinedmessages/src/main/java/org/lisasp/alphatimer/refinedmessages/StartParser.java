@@ -14,7 +14,7 @@ public class StartParser implements Parser {
 
     @Override
     public void accept(DataHandlingMessage message, Consumer<RefinedMessage> resultCollector) {
-        if ((message.getMessageType() == MessageType.CurrentRaceResults || message.getMessageType() == MessageType.PreviousRaceResults || message.getMessageType() == MessageType.OnLineTime) && message.getKindOfTime() == KindOfTime.Start) {
+        if (utils.carriesRaceTimes(message.getMessageType()) && message.getKindOfTime() == KindOfTime.Start) {
             if (isValid(message)) {
                 resultCollector.accept(new StartMessage(message.getTimestamp(),
                                                         message.getCompetition(),
