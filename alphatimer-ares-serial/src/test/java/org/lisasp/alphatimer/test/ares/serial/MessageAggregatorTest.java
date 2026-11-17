@@ -10,6 +10,7 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage1;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage2;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.Ping;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.ScoreboardMessage;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.*;
 import org.lisasp.basics.jre.date.DateTimeFacade;
 import org.lisasp.alphatimer.ares.serial.MessageAggregator;
@@ -195,6 +196,53 @@ class MessageAggregatorTest {
                 (byte) 0,
                 RankInfo.Normal));
         aggregator.accept(new Ping(TIMESTAMP, "TestWK", new byte[]{0x12, 0x39}));
+        aggregator.accept(new DataHandlingMessage2(
+                TIMESTAMP,
+                "TestWK",
+                "2",
+                (byte) 1,
+                (byte) 0,
+                112853930,
+                TimeInfo.Normal,
+                TimeMarker.Empty));
+
+        assertEquals(List.of(new DataHandlingMessage(
+                TIMESTAMP,
+                "TestWK",
+                "1",
+                "2",
+                MessageType.OnLineTime,
+                KindOfTime.Start,
+                TimeType.Empty,
+                createUsedLanes(),
+                (byte) 2,
+                (short) 1,
+                (byte) 1,
+                (byte) 0,
+                RankInfo.Normal,
+                (byte) 1,
+                (byte) 0,
+                112853930,
+                TimeInfo.Normal,
+                TimeMarker.Empty)), listener.received);
+    }
+
+    @Test
+    void aScoreboardMessageBetweenMessage1And2NeitherSeparatesThemNorIsPassedOn() {
+        aggregator.accept(new DataHandlingMessage1(
+                TIMESTAMP,
+                "TestWK",
+                "1",
+                MessageType.OnLineTime,
+                KindOfTime.Start,
+                TimeType.Empty,
+                createUsedLanes(),
+                (byte) 2,
+                (short) 1,
+                (byte) 1,
+                (byte) 0,
+                RankInfo.Normal));
+        aggregator.accept(new ScoreboardMessage(TIMESTAMP, "TestWK", ScoreboardCommand.RunningTime, new byte[]{0x01, 0x14, 0x52, 0x04}));
         aggregator.accept(new DataHandlingMessage2(
                 TIMESTAMP,
                 "TestWK",

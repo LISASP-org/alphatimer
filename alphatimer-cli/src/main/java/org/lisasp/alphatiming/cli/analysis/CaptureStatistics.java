@@ -48,7 +48,7 @@ public final class CaptureStatistics {
         return new TreeMap<>(protocolMessages);
     }
 
-    /** Per data handling message type; pings are never refined and have no entry. */
+    /** Per data handling message type and scoreboard command (never processed); pings are never refined and have no entry. */
     public SortedMap<String, Long> processedMessages() {
         return new TreeMap<>(processedMessages);
     }

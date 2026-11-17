@@ -10,6 +10,7 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage1;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage2;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.Ping;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.ScoreboardMessage;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedRefinedMessage;
 import org.lisasp.alphatimer.ares.serial.InputCollector;
@@ -89,6 +90,11 @@ public final class CaptureAnalysis {
                     pending = null;
                 }
                 case Ping p -> statistics.protocolMessage("Ping");
+                case ScoreboardMessage s -> {
+                    String type = "Scoreboard " + s.getCommand().name();
+                    statistics.protocolMessage(type);
+                    statistics.processedMessage(type, false);
+                }
                 case DataHandlingMessage2DroppedEvent d -> {
                     pending = null;
                     finding(FindingKind.INVALID_MESSAGE, invalid(d, d.getMessage()), PrintableBytes.of(d.getData().getDataCopy()));

@@ -84,7 +84,7 @@ class AnalyseCommandTest {
         assertThat(outLines()).containsExactly(
                 "2 files, 90 bytes",
                 "",
-                "Messages (pings, data handling messages by message type):",
+                "Messages (pings, data handling messages by message type, scoreboard messages by command):",
                 "                    Count  Processed  Difference",
                 "  OnLineTime            2          1           1",
                 "  Ping                  1          -           -",

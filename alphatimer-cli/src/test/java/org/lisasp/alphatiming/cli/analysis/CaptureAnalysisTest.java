@@ -20,6 +20,8 @@ class CaptureAnalysisTest {
     private static final String MINUS_SPLIT_2 = "\u0001\u0002\u0008\n2 1\u0002-     13.66 \u0004";
     private static final String INVALID_MESSAGE_TYPE_1 = "\u0001\u0002\u0008XS ?< 400101   0\u0004";
     private static final String DAMAGED_PING = "\u0001\u00129\u0004";
+    private static final String RUNNING_TIME = "\u0001\u0014R02\u0002\u0008  \u0002   13:10.9  \u0004";
+    private static final String RESULT_LINE = "\u0001\u0014S02\u0002\u0008\n2 \u0002 3 13:25.82 \u0004";
     private static final String UNKNOWN = "\u0001ABCDEFGH\u0004";
 
     private final CaptureStatistics statistics = new CaptureStatistics();
@@ -113,8 +115,27 @@ class CaptureAnalysisTest {
     }
 
     @Test
+    void scoreboardMessagesAreCountedPerCommandAndNeverProcessed() throws IOException {
+        analyse("a.dat", RUNNING_TIME, RUNNING_TIME, RESULT_LINE);
+
+        assertThat(statistics.protocolMessages()).containsExactly(entry("Scoreboard ResultLine", 1L), entry("Scoreboard RunningTime", 2L));
+        assertThat(statistics.processedMessages()).containsExactly(entry("Scoreboard ResultLine", 0L), entry("Scoreboard RunningTime", 0L));
+        assertThat(statistics.refinedMessages()).isEmpty();
+        assertThat(statistics.defects()).isEmpty();
+        assertThat(statistics.notImplemented()).isEmpty();
+    }
+
+    @Test
+    void theTwoPartsOfADataHandlingMessageMayBeSeparatedByAScoreboardMessage() throws IOException {
+        analyse("a.dat", FINISH_1, RUNNING_TIME, FINISH_2);
+
+        assertThat(statistics.defects()).isEmpty();
+        assertThat(statistics.refinedMessages()).contains(entry("TimeMessage", 1L));
+    }
+
+    @Test
     void aShortMessageOfAnotherFamilyIsUnknownNotDamaged() throws IOException {
-        analyse("a.dat", "\u0001\u0014L0\u0004");
+        analyse("a.dat", "\u0001\u0014X0\u0004");
 
         assertThat(statistics.notImplemented()).extracting(Finding::kind).containsExactly(FindingKind.UNKNOWN_MESSAGE);
         assertThat(statistics.defects()).isEmpty();

@@ -103,8 +103,11 @@ subdirectories) runs through the same parser as a recording:
 java -cp alphatimer-cli/target/alphatiming-cli.jar org.lisasp.alphatiming.cli.analysis.AnalyseLauncher data
 ```
 
-It prints the parsed messages per type (pings and data handling messages by message type, then the refined messages)
-and groups what could not be used, each group with its count and its first occurrence:
+It prints the parsed messages per type (pings, data handling messages by message type and scoreboard messages by
+command, then the refined messages)
+and groups what could not be used, each group with its count and its first occurrence. Scoreboard messages (running
+time and result lines that ARES sends for a scoreboard) are known, but never processed, as they only repeat the data
+handling messages:
 
 - **Defects**: the protocol layer rejects the data — bytes outside a message, an invalid field, a damaged message
   (starts like a known message or holds only ping bytes), message 1 or 2 of a data handling message without the other.
