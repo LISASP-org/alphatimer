@@ -11,5 +11,6 @@ Every row has a priority and a size; keep the table ordered by priority (High, M
 
 | Feature | Priority | Size | Summary |
 | --- | --- | --- | --- |
+| [REST endpoint for the heat model](timing-rest-endpoint.md) | Medium | M | `GET /timing` serves the heat model (split and backup times, penalty flags) to JAuswertung; replaces the legacy endpoints later |
 | [Open a project file from the command line](open-project-from-command-line.md) | Medium | S | Start the GUI and the TUI with the project file given as argument, so the installer can associate `.timing` files |
 | [Read-only mode](support-readonly-mode.md) | Low | M | Open a project that cannot be locked or written (read-only folder or medium) for viewing only |
