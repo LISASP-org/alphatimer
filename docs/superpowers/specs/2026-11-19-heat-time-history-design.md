@@ -95,6 +95,9 @@ public enum Penalty { DidNotStart, DidNotFinish, Disqualified }
   with a finish; ties share a place.
 - **ReadyToStart:** for a heat that has not started, it creates the heat as `Open` if needed and sets `lapCount` and
   `readyToStart`. For a started heat it changes nothing.
+- **Estimated end:** a ReadyToStart counts as a message of its heat like any other: when it announces another heat,
+  a started heat without end is ended as `FinishedEstimated`, as the first message of another heat always does; the
+  official end replaces the estimate.
 - **Start:** a live start resets the heat as today and clears times, penalties and places of its lanes.
 - **Previous race** results stay ignored. Running clock, estimated ends and `LiveHeats` keep their behavior.
 

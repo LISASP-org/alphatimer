@@ -12,5 +12,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Chore | Severity | Size | Summary |
 | --- | --- | --- | --- |
+| [LegacyServiceTest lives in the wrong module](legacy-service-test-placement.md) | Low | M | The test of `alphatimer-legacy-server` lives in `alphatimer-project-db` because of its test data; move it, possibly with the legacy code into a module of its own |
 | [Associate `.timing` files in the JAuswertung installer](associate-timing-files.md) | Low | S | Register `.timing` files with the AlphaTiming launcher in the install4j project; blocked by opening a project from the command line |
 | [Properties files use \uXXXX escapes](properties-utf-8.md) | Low | S | Convert `messages.properties` and `messages_de.properties` to plain UTF-8 |
