@@ -105,6 +105,28 @@ class BackupTimeMessageTest {
         assertTrue(listener.received.stream().anyMatch(m -> m instanceof TimeMessage));
     }
 
+    @ParameterizedTest
+    @CsvSource({"BackupTime, Normal", "CurrentRaceResultsWithBackupTimes, Backup"})
+    void aDeletedBackupTimeIsDropped(MessageType type, TimeInfo timeInfo) {
+        KindOfTime kind = type == MessageType.BackupTime ? KindOfTime.Backup : KindOfTime.Finish;
+        DataHandlingMessage message = message(type, kind, TimeType.DeletedTime, timeInfo,
+                                              (byte) 2, (byte) 1, 12100, TimeMarker.Empty);
+
+        refiner.accept(message);
+
+        assertEquals(List.of(new DroppedBackupTimeMessage(message)), backupMessages());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"DidNotStart", "DidNotFinish", "Disqualified", "Plus"})
+    void aBackupTimeWithATimeMarkerIsDropped(TimeMarker marker) {
+        DataHandlingMessage message = message(MessageType.BackupTime, KindOfTime.Backup, TimeType.UnknownValue1, TimeInfo.Normal, (byte) 2, (byte) 1, 12100, marker);
+
+        refiner.accept(message);
+
+        assertEquals(List.of(new DroppedBackupTimeMessage(message)), backupMessages());
+    }
+
     private List<RefinedMessage> backupMessages() {
         return listener.received.stream()
                                .filter(m -> m instanceof BackupTimeMessage || m instanceof DroppedBackupTimeMessage)
@@ -112,6 +134,10 @@ class BackupTimeMessageTest {
     }
 
     private static DataHandlingMessage message(MessageType type, KindOfTime kind, TimeType timeType, TimeInfo timeInfo, byte lane, byte lap, int time) {
+        return message(type, kind, timeType, timeInfo, lane, lap, time, TimeMarker.Empty);
+    }
+
+    private static DataHandlingMessage message(MessageType type, KindOfTime kind, TimeType timeType, TimeInfo timeInfo, byte lane, byte lap, int time, TimeMarker marker) {
         return new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
@@ -129,6 +155,6 @@ class BackupTimeMessageTest {
                 lap,
                 time,
                 timeInfo,
-                TimeMarker.Empty);
+                marker);
     }
 }

@@ -4,6 +4,8 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.KindOfTime;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.MessageType;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeInfo;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeMarker;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeType;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedBackupTimeMessage;
@@ -37,12 +39,11 @@ public class BackupTimeParser implements Parser {
         if (message.getMessageType() == MessageType.BackupTime) {
             return message.getKindOfTime() == KindOfTime.Backup;
         }
-        return utils.carriesRaceTimes(message.getMessageType())
-                && (message.getKindOfTime() == KindOfTime.Finish || message.getKindOfTime() == KindOfTime.SplitTime)
-                && message.getTimeInfo() == TimeInfo.Backup;
+        return utils.isRaceTime(message) && message.getTimeInfo() == TimeInfo.Backup;
     }
 
     private boolean isValid(DataHandlingMessage message) {
-        return message.getLane() > 0 && message.getCurrentLap() > 0 && message.getTimeInMillis() > 0;
+        return message.getLane() > 0 && message.getCurrentLap() > 0 && message.getTimeInMillis() > 0
+                && message.getTimeType() != TimeType.DeletedTime && message.getTimeMarker() == TimeMarker.Empty;
     }
 }

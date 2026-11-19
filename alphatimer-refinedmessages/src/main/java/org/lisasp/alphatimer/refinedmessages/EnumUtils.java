@@ -1,5 +1,6 @@
 package org.lisasp.alphatimer.refinedmessages;
 
+import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.KindOfTime;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.MessageType;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeInfo;
@@ -17,6 +18,12 @@ class EnumUtils {
                 return RefinedKindOfTime.SplitTime;
         }
         throw new IllegalArgumentException();
+    }
+
+    /** A finish or split time in a message type that carries race times (a candidate for a time or a backup time). */
+    boolean isRaceTime(DataHandlingMessage message) {
+        return carriesRaceTimes(message.getMessageType())
+                && (message.getKindOfTime() == KindOfTime.Finish || message.getKindOfTime() == KindOfTime.SplitTime);
     }
 
     boolean carriesRaceTimes(MessageType messageType) {

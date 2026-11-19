@@ -14,7 +14,7 @@ public class TimeParser implements Parser {
 
     @Override
     public void accept(DataHandlingMessage message, Consumer<RefinedMessage> resultCollector) {
-        if (utils.carriesRaceTimes(message.getMessageType()) && (message.getKindOfTime() == KindOfTime.Finish || message.getKindOfTime() == KindOfTime.SplitTime)
+        if (utils.isRaceTime(message)
                 && message.getTimeInfo() != TimeInfo.Backup) {
             if (isValid(message)) {
                 resultCollector.accept(new TimeMessage(
