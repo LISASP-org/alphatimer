@@ -4,8 +4,10 @@ import org.lisasp.alphatiming.project.db.ProjectFileIsFolderException;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileSystemException;
+import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.ReadOnlyFileSystemException;
@@ -20,6 +22,8 @@ import java.util.Optional;
 public record FileFailure(Kind kind, Path file, String detail) {
 
     public enum Kind { NOT_FOUND, NO_PERMISSION, DISK_FULL, IS_DIRECTORY, CORRUPT, LOCKED, OTHER }
+
+    private static final String FOLDER_READ_AS_FILE = osTextForReadingAFolder();
 
     private static final int SQLITE_PERM = 3;
     private static final int SQLITE_BUSY = 5;
@@ -72,7 +76,7 @@ public record FileFailure(Kind kind, Path file, String detail) {
         if (text.contains("no space left on device") || text.contains("not enough space on the disk")) {
             return Optional.of(Kind.DISK_FULL);
         }
-        if (text.contains("is a directory")) {
+        if (text.contains("is a directory") || (!FOLDER_READ_AS_FILE.isEmpty() && text.contains(FOLDER_READ_AS_FILE))) {
             return Optional.of(Kind.IS_DIRECTORY);
         }
         if (text.contains("permission denied") || text.contains("access is denied") || text.contains("read-only file system")) {
@@ -82,6 +86,33 @@ public record FileFailure(Kind kind, Path file, String detail) {
             return Optional.of(Kind.LOCKED);
         }
         return Optional.empty();
+    }
+
+    /** The operating system words this failure in its own language (LANG), so its text is learned once by causing it. */
+    private static String osTextForReadingAFolder() {
+        Path folder = null;
+        try {
+            folder = Files.createTempDirectory("alphatiming-folder-probe");
+            try (InputStream in = Files.newInputStream(folder)) {
+                in.read();
+            }
+            return "";
+        } catch (IOException ex) {
+            return ex.getMessage() == null ? "" : ex.getMessage().toLowerCase(Locale.ROOT);
+        } finally {
+            deleteQuietly(folder);
+        }
+    }
+
+    private static void deleteQuietly(Path folder) {
+        if (folder == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(folder);
+        } catch (IOException ex) {
+            folder.toFile().deleteOnExit();
+        }
     }
 
     private static String detailOf(Throwable t) {
