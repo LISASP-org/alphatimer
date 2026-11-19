@@ -19,6 +19,7 @@ public class DataHandlingMessageRefiner implements DataHandlingMessageListener {
             new StartParser(),
             new DidNotStartParser(),
             new DidNotFinishParser(),
+            new DisqualifiedParser(),
             new TakeOverTimeParser(),
             new UsedLanesParser()
     };

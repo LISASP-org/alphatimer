@@ -20,6 +20,8 @@ import com.googlecode.lanterna.gui2.menu.MenuItem;
 import com.googlecode.lanterna.input.KeyStroke;
 import com.googlecode.lanterna.input.KeyType;
 import org.lisasp.alphatiming.ui.common.AppController;
+import org.lisasp.alphatiming.ui.common.PingIndicator;
+import org.lisasp.alphatiming.ui.common.SignOfLife;
 import org.lisasp.alphatiming.ui.common.AppStatus;
 import org.lisasp.alphatiming.ui.common.I18n;
 import org.lisasp.alphatiming.ui.common.TimeFormat;
@@ -43,7 +45,7 @@ final class TuiMainWindow extends BasicWindow {
     private final Panel content = new Panel(new LinearLayout(Direction.VERTICAL));
     private final Component settingsCard;
     private final Component liveCard;
-    private final Label pingMarker = new Label("\u25CF").setForegroundColor(TextColor.ANSI.GREEN);
+    private final Label pingMarker = new Label("\u25CF").setForegroundColor(TextColor.ANSI.BLACK_BRIGHT);
     private final Label statusState = new Label("");
     private final Label statusWarning = new Label("").setForegroundColor(TextColor.ANSI.RED_BRIGHT);
     private final Label statusLastMessage = new Label("");
@@ -56,7 +58,6 @@ final class TuiMainWindow extends BasicWindow {
         return t;
     });
 
-    private boolean pingBright;
 
     TuiMainWindow(AppController controller, TuiSavePrompt prompt, WindowBasedTextGUI gui) {
         this.controller = controller;
@@ -80,7 +81,7 @@ final class TuiMainWindow extends BasicWindow {
 
         controller.addChangeListener(() -> later(this::refresh));
         controller.addStateListener(state -> later(this::refresh));
-        controller.addPingListener(() -> later(this::ping));
+        controller.addSignOfLifeListener(() -> later(this::showSignOfLife));
         controller.addHeatListener(heats -> later(() -> liveViewPanel.setHeats(heats)));
         controller.addMessageListener(text -> later(() -> {
             settingsPanel.appendMessage(text);
@@ -202,12 +203,26 @@ final class TuiMainWindow extends BasicWindow {
         super.close();
     }
 
-    private void ping() {
-        pingBright = !pingBright;
-        pingMarker.setForegroundColor(pingBright ? TextColor.ANSI.GREEN_BRIGHT : TextColor.ANSI.GREEN);
+    private void showSignOfLife() {
+        PingIndicator indicator = controller.pingIndicator();
+        pingMarker.setForegroundColor(switch (indicator) {
+            case DISCONNECTED -> TextColor.ANSI.BLACK_BRIGHT;
+            case SILENT -> TextColor.ANSI.GREEN;
+            case BRIGHT -> TextColor.ANSI.GREEN_BRIGHT;
+            case MESSAGE -> TextColor.ANSI.WHITE_BRIGHT;
+        });
+        if (indicator == PingIndicator.MESSAGE) {
+            // a little after the message time, so the controller no longer reports the message
+            timer.schedule(() -> later(this::showSignOfLife), SignOfLife.MESSAGE_SHOWN.toMillis() + 20, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    Label pingMarker() {
+        return pingMarker;
     }
 
     private void refresh() {
+        showSignOfLife();
         AppStatus status = AppStatus.of(controller);
         setTitle(status.title());
         statusState.setText(status.state());

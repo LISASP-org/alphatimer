@@ -40,8 +40,17 @@ final class EnumNameConverters {
     }
 
     public static final class MessageTypeConverter extends EnumNameConverter<MessageType> {
+
+        /** Project files written before message type 7 was identified as backup time store its former name. */
+        private static final String FORMER_BACKUP_TIME = "UnknownValue7";
+
         public MessageTypeConverter() {
             super(MessageType.class);
+        }
+
+        @Override
+        public MessageType convertToEntityAttribute(String name) {
+            return FORMER_BACKUP_TIME.equals(name) ? MessageType.BackupTime : super.convertToEntityAttribute(name);
         }
     }
 

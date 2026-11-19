@@ -13,7 +13,7 @@ public enum MessageType {
     CurrentRaceResultsWithBackupTimes((byte)4),
     PreviousRaceResults((byte)5),
     PreviousRaceResultsWithBackupTimes((byte)6),
-    UnknownValue7((byte)7);
+    BackupTime((byte)7);
 
     private final byte value;
 }

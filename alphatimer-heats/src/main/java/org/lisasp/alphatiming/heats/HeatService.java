@@ -3,6 +3,7 @@ package org.lisasp.alphatiming.heats;
 import lombok.extern.slf4j.Slf4j;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
@@ -95,6 +96,8 @@ public final class HeatService implements Consumer<RefinedMessage> {
                 heat.didNotStart(m);
             } else if (message instanceof DidNotFinishMessage m) {
                 heat.didNotFinish(m);
+            } else if (message instanceof DisqualifiedMessage m) {
+                heat.disqualified(m);
             } else if (message instanceof OfficialEndMessage m) {
                 heat.finish(m);
             } else {

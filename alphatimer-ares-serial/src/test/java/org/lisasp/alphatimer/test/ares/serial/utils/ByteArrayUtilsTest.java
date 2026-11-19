@@ -114,6 +114,14 @@ class ByteArrayUtilsTest {
     }
 
     @Test
+    void extractEmptyTimeWithDSQTest() {
+        int result = byteArrayUtils.extractTimeInMillis(new byte[]{1, 2, 8, 10, 51, 32, 49, 2, 32, 32, 32, 32, 32, 32, 32, 32, 0x44, 0x53, 0x51, 32, 4},
+                                                        8,
+                                                        11);
+        assertEquals(0, result);
+    }
+
+    @Test
     void extractEmptyTimeWithDNFTest() {
         // placeholder: -.--
         int result = byteArrayUtils.extractTimeInMillis(new byte[]{1, 2, 8, 10, 51, 32, 49, 2, 32, 32, 32, 32, 32, 32, 32, 32, 0x44, 0x4E, 0x46, 32, 4},

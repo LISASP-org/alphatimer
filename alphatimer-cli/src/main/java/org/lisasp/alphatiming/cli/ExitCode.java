@@ -7,7 +7,8 @@ public enum ExitCode {
     RECORDING_NOT_STARTED(3),
     NOT_SAVED(4),
     CONNECTION_LOST(5),
-    DATA_LOST(6);
+    DATA_LOST(6),
+    INPUT_NOT_READ(7);
 
     private final int code;
 

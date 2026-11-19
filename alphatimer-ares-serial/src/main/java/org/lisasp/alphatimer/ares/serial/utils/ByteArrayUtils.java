@@ -151,6 +151,9 @@ public class ByteArrayUtils {
             if (text.equals("DNF")) {
                 return 0;
             }
+            if (text.equals("DSQ")) {
+                return 0;
+            }
             if (text.startsWith("+") || text.startsWith("-")) {
                 text = text.substring(1);
             }

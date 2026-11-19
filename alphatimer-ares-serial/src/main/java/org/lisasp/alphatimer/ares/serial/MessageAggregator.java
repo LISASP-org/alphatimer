@@ -9,6 +9,7 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage1;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage2;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.Ping;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.ScoreboardMessage;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -59,8 +60,7 @@ public class MessageAggregator implements DataHandlingMessageAggregator {
                     message2.getTimeInfo(),
                     message2.getTimeMarker()));
         }
-        if (event instanceof Ping) {
-            // Do not reset message1 on ping
+        if (event instanceof Ping || event instanceof ScoreboardMessage) {
             return;
         }
         message1 = null;

@@ -38,12 +38,13 @@ public final class AppController implements AutoCloseable {
     private final Supplier<RecordingSession.ReaderFactory> readers;
     private final DateTimeFacade time;
     private final AutoSaver autoSaver;
+    private final SignOfLife signOfLife;
 
     private final List<Runnable> changeListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<LiveHeats>> heatListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<RecordingState>> stateListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<String>> messageListeners = new CopyOnWriteArrayList<>();
-    private final List<Runnable> pingListeners = new CopyOnWriteArrayList<>();
+    private final List<Runnable> signOfLifeListeners = new CopyOnWriteArrayList<>();
 
     private volatile TimingDocument document;
     private volatile RecordingSession session;
@@ -58,6 +59,7 @@ public final class AppController implements AutoCloseable {
         this.readers = readers;
         this.time = time;
         this.autoSaver = new AutoSaver(() -> document, this::onAutoSaveError);
+        this.signOfLife = new SignOfLife(time);
     }
 
     public void init() {
@@ -354,8 +356,30 @@ public final class AppController implements AutoCloseable {
         stateListeners.add(listener);
     }
 
-    public void addPingListener(Runnable listener) {
-        pingListeners.add(listener);
+    public void addSignOfLifeListener(Runnable listener) {
+        signOfLifeListeners.add(listener);
+    }
+
+    /** Not connected without a running, connected recording; silent without a recent ping or message; a new message briefly. */
+    public PingIndicator pingIndicator() {
+        RecordingSession s = session;
+        if (s == null || !s.isConnected()) {
+            return PingIndicator.DISCONNECTED;
+        }
+        if (!signOfLife.isRecent()) {
+            return PingIndicator.SILENT;
+        }
+        return signOfLife.isShowingMessage() ? PingIndicator.MESSAGE : PingIndicator.BRIGHT;
+    }
+
+    private void pingReceived() {
+        signOfLife.received();
+        signOfLifeListeners.forEach(Runnable::run);
+    }
+
+    private void messageReceived() {
+        signOfLife.messageReceived();
+        signOfLifeListeners.forEach(Runnable::run);
     }
 
     public void addMessageListener(Consumer<String> listener) {
@@ -434,11 +458,17 @@ public final class AppController implements AutoCloseable {
             heatListeners.forEach(l -> l.accept(h));
         });
         next.addStateListener(st -> {
+            if (st != RecordingState.RUNNING) {
+                signOfLife.forget();
+            }
             stateListeners.forEach(l -> l.accept(st));
             fireChange();
         });
-        next.addMessageListener(message -> announce(MessageText.describe(message, doc.settings().timekeepingOffsetHours())));
-        next.addPingListener(() -> pingListeners.forEach(Runnable::run));
+        next.addMessageListener(message -> {
+            messageReceived();
+            announce(MessageText.describe(message, doc.settings().timekeepingOffsetHours()));
+        });
+        next.addPingListener(this::pingReceived);
         next.addConnectionLostListener(this::onConnectionLost);
         next.addErrorListener(ex -> announce(MessageText.processingError(ex)));
         next.addWriteListener(new WriteListener() {

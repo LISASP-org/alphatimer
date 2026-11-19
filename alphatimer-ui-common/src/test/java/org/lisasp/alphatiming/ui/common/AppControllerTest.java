@@ -221,10 +221,16 @@ class AppControllerTest {
         assertThat(controller.document().settings().tcpHost()).isEqualTo("other");
     }
 
-    @Test
-    void pingsReachThePingListenersButNeverTheMessageLog() {
-        java.util.List<ByteConsumer> consumers = new ArrayList<>();
-        AppController capturing = new AppController(work, defaults, prompt, () -> s -> new SerialPortReader() {
+    private static final byte[] FINISH = "\u0001\u0002\u00082A ?< 400101   1\u0004\u0001\u0002\u0008\n3 4\u0002    1:05.43 \u0004"
+            .getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+
+    private AppController receivingController(List<ByteConsumer> consumers, org.lisasp.basics.jre.date.DateTimeFacade time) {
+        return receivingController(consumers, time, () -> true);
+    }
+
+    private AppController receivingController(List<ByteConsumer> consumers, org.lisasp.basics.jre.date.DateTimeFacade time,
+                                              java.util.function.BooleanSupplier connected) {
+        AppController receiving = new AppController(work, defaults, prompt, () -> s -> new SerialPortReader() {
             @Override
             public SerialPortReader register(ByteConsumer listener) {
                 consumers.add(listener);
@@ -232,28 +238,103 @@ class AppControllerTest {
             }
 
             @Override
+            public boolean isConnected() {
+                return connected.getAsBoolean();
+            }
+
+            @Override
             public void close() {
             }
-        }, LocalDateTime::now);
-        capturing.init();
-        capturing.applySettings(S);
-        java.util.concurrent.atomic.AtomicInteger pings = new java.util.concurrent.atomic.AtomicInteger();
-        List<String> log = new ArrayList<>();
-        capturing.addPingListener(pings::incrementAndGet);
-        capturing.addMessageListener(log::add);
-        capturing.startRecording();
+        }, time);
+        receiving.init();
+        receiving.applySettings(S);
+        return receiving;
+    }
 
-        byte[] ping = {org.lisasp.alphatimer.api.ares.serial.Characters.SOH_StartOfHeader, org.lisasp.alphatimer.api.ares.serial.Characters.DC2_Periphery, 0x39,
-                org.lisasp.alphatimer.api.ares.serial.Characters.DC4_Command, 0x54, 0x50, org.lisasp.alphatimer.api.ares.serial.Characters.EOT_EndOfText};
-        for (byte b : ping) {
+    private static void send(List<ByteConsumer> consumers, byte[] data) {
+        for (byte b : data) {
             consumers.forEach(c -> c.accept(b));
         }
+    }
 
-        assertThat(pings.get()).isEqualTo(1);
-        assertThat(log).isEmpty();
-        capturing.stopRecording();
+    private void closeDiscarding(AppController receiving) {
+        receiving.stopRecording();
         prompt.choices.add(SavePrompt.Choice.DISCARD);
-        capturing.requestClose();
+        receiving.requestClose();
+    }
+
+    @Test
+    void aPingIsASignOfLifeButNeverReachesTheMessageLog() {
+        List<ByteConsumer> consumers = new ArrayList<>();
+        AppController receiving = receivingController(consumers, LocalDateTime::now);
+        java.util.concurrent.atomic.AtomicInteger signs = new java.util.concurrent.atomic.AtomicInteger();
+        List<String> log = new ArrayList<>();
+        receiving.addSignOfLifeListener(signs::incrementAndGet);
+        receiving.addMessageListener(log::add);
+        assertThat(receiving.pingIndicator()).isEqualTo(PingIndicator.DISCONNECTED);
+        receiving.startRecording();
+        assertThat(receiving.pingIndicator()).isEqualTo(PingIndicator.SILENT);
+
+        send(consumers, PING);
+
+        assertThat(signs.get()).isEqualTo(1);
+        assertThat(receiving.pingIndicator()).isEqualTo(PingIndicator.BRIGHT);
+        assertThat(log).isEmpty();
+        closeDiscarding(receiving);
+    }
+
+    @Test
+    void aValidMessageIsShownBrieflyAndRemainsASignOfLife() {
+        List<ByteConsumer> consumers = new ArrayList<>();
+        java.util.concurrent.atomic.AtomicReference<LocalDateTime> now = new java.util.concurrent.atomic.AtomicReference<>(LocalDateTime.of(2026, 11, 19, 10, 0));
+        AppController receiving = receivingController(consumers, now::get);
+        java.util.concurrent.atomic.AtomicInteger signs = new java.util.concurrent.atomic.AtomicInteger();
+        receiving.addSignOfLifeListener(signs::incrementAndGet);
+        receiving.startRecording();
+
+        send(consumers, FINISH);
+
+        assertThat(signs.get()).isEqualTo(1);
+        assertThat(receiving.pingIndicator()).isEqualTo(PingIndicator.MESSAGE);
+        now.set(now.get().plusNanos(101_000_000));
+        assertThat(receiving.pingIndicator()).isEqualTo(PingIndicator.BRIGHT);
+        closeDiscarding(receiving);
+    }
+
+    @Test
+    void theSignOfLifeEndsFiveSecondsAfterTheLastOneAndWithTheRecording() {
+        List<ByteConsumer> consumers = new ArrayList<>();
+        java.util.concurrent.atomic.AtomicReference<LocalDateTime> now = new java.util.concurrent.atomic.AtomicReference<>(LocalDateTime.of(2026, 11, 19, 10, 0));
+        AppController receiving = receivingController(consumers, now::get);
+        receiving.startRecording();
+        send(consumers, PING);
+
+        now.set(now.get().plusSeconds(6));
+        assertThat(receiving.pingIndicator()).isEqualTo(PingIndicator.SILENT);
+
+        send(consumers, PING);
+        assertThat(receiving.pingIndicator()).isEqualTo(PingIndicator.BRIGHT);
+
+        receiving.stopRecording();
+        assertThat(receiving.pingIndicator()).isEqualTo(PingIndicator.DISCONNECTED);
+        receiving.startRecording();
+        assertThat(receiving.pingIndicator()).isEqualTo(PingIndicator.SILENT);
+        closeDiscarding(receiving);
+    }
+
+    @Test
+    void aRecordingWithoutConnectionIsShownAsNotConnected() {
+        List<ByteConsumer> consumers = new ArrayList<>();
+        java.util.concurrent.atomic.AtomicBoolean connected = new java.util.concurrent.atomic.AtomicBoolean(false);
+        AppController receiving = receivingController(consumers, LocalDateTime::now, connected::get);
+        receiving.startRecording();
+
+        send(consumers, PING);
+        assertThat(receiving.pingIndicator()).isEqualTo(PingIndicator.DISCONNECTED);
+
+        connected.set(true);
+        assertThat(receiving.pingIndicator()).isEqualTo(PingIndicator.BRIGHT);
+        closeDiscarding(receiving);
     }
 
     @Test

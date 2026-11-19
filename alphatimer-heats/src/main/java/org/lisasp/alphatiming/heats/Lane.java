@@ -105,6 +105,11 @@ final class Lane {
         finished = false;
     }
 
+    void disqualified() {
+        penalty = Penalty.Disqualified;
+        place = 0;
+    }
+
     private void enforceStatus() {
         if (status == LaneStatus.NotUsed) {
             timeInMillis = 0;

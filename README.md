@@ -57,8 +57,11 @@ installer.
    without a finish counts as newer than a finished one. When the official end of a heat does not arrive, the first
    message of another heat ends it as estimated (at the latest 5 minutes after its last message), shown as `≈10:01:05`;
    an official end that arrives later replaces the estimate. Until data arrives, an information covers both. It keeps updating while recording continues in the
-   background. The marker at the left end of the status bar
-   switches between dark and bright green with every ping of the timekeeping system.
+   background. The marker at the left end of the status bar is gray while not connected (no recording, or the recording
+   still waits for its connection), dark green while connected without a sign of life in the last 5 seconds (before the
+   first one, or when the system has been silent for longer) and bright green while the timekeeping system sent a ping
+   (about one per second, if switched on in ARES) or a valid message within the last 5 seconds. Each message flashes the
+   marker white-green for 100 ms (bright white in the text UI).
 4. To change settings: **Stop recording**, edit, **Start recording** again.
 
 ## Text UI
@@ -90,6 +93,28 @@ saved, 1 = wrong arguments, 2 = the file could not be opened, 3 = the recording 
 settings, serial port missing), 4 = saving failed, 5 = saved, but the recording ended because the connection was
 lost, 6 = saved, but recorded data could not be stored and is missing from the file (wins over 5). Without a terminal
 (input redirected) only Ctrl+C / SIGTERM end it.
+
+## Raw data analysis
+
+The same jar analyses recorded raw data: every `.dat` and `.serial` file directly in a directory (not in its
+subdirectories) runs through the same parser as a recording:
+
+```bash
+java -cp alphatimer-cli/target/alphatiming-cli.jar org.lisasp.alphatiming.cli.analysis.AnalyseLauncher data
+```
+
+It prints the parsed messages per type (pings, data handling messages by message type and scoreboard messages by
+command, then the refined messages)
+and groups what could not be used, each group with its count and its first occurrence. Scoreboard messages (running
+time and result lines that ARES sends for a scoreboard) are known, but never processed, as they only repeat the data
+handling messages:
+
+- **Defects**: the protocol layer rejects the data — bytes outside a message, an invalid field, a damaged message
+  (starts like a known message or holds only ping bytes), message 1 or 2 of a data handling message without the other.
+- **Well-formed, but not implemented**: messages of an unknown kind, and data handling messages the refiner drops,
+  grouped by their fields (message type, kind of time, time type, time info, rank, time marker).
+
+Exit codes: 0 = analysed, 1 = wrong arguments, 7 = the directory or a file could not be read.
 
 ## Project file
 

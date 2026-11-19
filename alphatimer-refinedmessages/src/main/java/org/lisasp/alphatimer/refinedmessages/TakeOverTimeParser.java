@@ -14,7 +14,7 @@ public class TakeOverTimeParser implements Parser {
 
     @Override
     public void accept(DataHandlingMessage message, Consumer<RefinedMessage> resultCollector) {
-        if ((message.getMessageType() == MessageType.CurrentRaceResults || message.getMessageType() == MessageType.PreviousRaceResults || message.getMessageType() == MessageType.OnLineTime) && message.getKindOfTime() == KindOfTime.TakeOverTime) {
+        if (utils.carriesRaceTimes(message.getMessageType()) && message.getKindOfTime() == KindOfTime.TakeOverTime) {
             if (isValid(message)) {
                 resultCollector.accept(new TakeOverTimeMessage(message.getTimestamp(),
                                                                message.getCompetition(),

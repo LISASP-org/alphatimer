@@ -9,7 +9,7 @@ import org.lisasp.alphatimer.ares.serial.exceptions.InvalidDataException;
 public class Parser {
 
     private final MessageParser[] parsers = new MessageParser[]{
-            new DataHandlingMessage1Parser(), new DataHandlingMessage2Parser(), new PingParser()
+            new DataHandlingMessage1Parser(), new DataHandlingMessage2Parser(), new PingParser(), new ScoreboardParser()
     };
 
     public DataInputEvent parse(BytesInputEvent event) {

@@ -47,28 +47,6 @@ class ByteStorage {
         return size == data.length;
     }
 
-    boolean isMessage() {
-        if (!reachesMinimumMessageLength()) {
-            return false;
-        }
-        if (!startsWithStartOfMessage()) {
-            return false;
-        }
-        return endsWithEndOfMessage();
-    }
-
-    private boolean reachesMinimumMessageLength() {
-        return size > 2;
-    }
-
-    private byte firstEntry() {
-        return data[0];
-    }
-
-    private boolean startsWithStartOfMessage() {
-        return firstEntry() == Characters.SOH_StartOfHeader;
-    }
-
     boolean endsWithEndOfMessage() {
         return lastEntry() == Characters.EOT_EndOfText;
     }

@@ -301,4 +301,27 @@ class DataHandlingMessage2TimeTest {
                 TimeInfo.Normal,
                 TimeMarker.DidNotFinish)), listener.received);
     }
+
+    @Test
+    void sendMessage2WithTimeDSQ() {
+        byte[] message2modified = Arrays.copyOf(message2, message2.length);
+        Arrays.fill(message2modified, 8, 16, (byte) 0x20);
+        message2modified[16] = 0x44;
+        message2modified[17] = 0x53;
+        message2modified[18] = 0x51;
+
+        for (byte b : message2modified) {
+            inputCollector.accept(b);
+        }
+
+        assertEquals(List.of(new DataHandlingMessage2(
+                TIMESTAMP,
+                "TestWK",
+                new String(message2modified),
+                (byte) 1,
+                (byte) 0,
+                0,
+                TimeInfo.Normal,
+                TimeMarker.Disqualified)), listener.received);
+    }
 }
