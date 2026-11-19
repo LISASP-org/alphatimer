@@ -7,12 +7,10 @@ import org.lisasp.alphatiming.heats.HeatStatus;
 import org.lisasp.alphatiming.heats.LaneDto;
 import org.lisasp.alphatiming.heats.Penalty;
 import org.lisasp.alphatiming.legacy.api.Heat;
-import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.ui.core.recording.RecordingSession;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -28,9 +26,7 @@ class Version1FixtureTest {
 
     private Path copyOfFixture() throws IOException {
         Path file = dir.resolve("version-1.timing");
-        try (InputStream in = getClass().getResourceAsStream("/fixtures/version-1.timing")) {
-            Files.copy(in, file);
-        }
+        Files.copy(Path.of("src/test/resources/fixtures/version-1.timing"), file);
         return file;
     }
 
@@ -42,7 +38,7 @@ class Version1FixtureTest {
     void theHeatsOfAVersion1FileAreShown() throws Exception {
         try (TimingDocument doc = TimingDocument.open(copyOfFixture(), work());
              RecordingSession session = new RecordingSession(doc.database(), RecordingSession.tcp(), LocalDateTime::now)) {
-            List<HeatDto> heats = new HeatStore(doc.database()).findAll();
+            List<HeatDto> heats = session.liveHeats().known();
 
             assertThat(heats).hasSize(1);
             HeatDto heat = heats.getFirst();

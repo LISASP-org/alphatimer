@@ -63,6 +63,10 @@ public final class HeatService implements Consumer<RefinedMessage> {
         return a.event() == b.event() && a.heat() == b.heat();
     }
 
+    public LiveHeats liveHeats() {
+        return live;
+    }
+
     public synchronized void register(Consumer<LiveHeats> listener) {
         LiveHeats snapshot = live;
         if (snapshot.current() != null) {

@@ -12,6 +12,8 @@ import org.lisasp.alphatimer.api.serial.SerialPortReader;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.heats.HeatDto;
+import org.lisasp.alphatiming.heats.LaneDto;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage;
 import org.lisasp.alphatiming.legacy.api.LegacySerialization;
 import org.lisasp.alphatimer.serial.com.NrSerialReader;
 import org.lisasp.alphatimer.serial.com.SerialPorts;
@@ -135,6 +137,91 @@ class RecordingSessionTest {
         int expected = DataHandlingMessageTestData.message1.length + DataHandlingMessageTestData.message2.length;
         assertThat(RawDataRecorder.readAll(db).stream().mapToInt(c -> c.length).sum()).isEqualTo(expected);
         assertThat(heats).isNotEmpty();
+    }
+
+    private void recordHeatWithLane1Finished() {
+        session.start(settings(0));
+        reader().push(DataHandlingMessageTestData.message1);
+        reader().push(DataHandlingMessageTestData.message2);
+        reader().push(finishTime1());
+        reader().push(finishOfLane(1));
+        reader().push(finishTime1());
+        reader().push(finishOfLane(1));
+        session.stop();
+    }
+
+    private RecordingSession secondSession() {
+        return new RecordingSession(db, s -> {
+            FakeReader r = new FakeReader();
+            created.add(r);
+            return r;
+        }, () -> LocalDateTime.of(2021, 6, 21, 14, 53));
+    }
+
+    @Test
+    void aNewSessionRebuildsTheHeatsOfTheStoredMessages() {
+        recordHeatWithLane1Finished();
+        try (RecordingSession second = secondSession()) {
+            assertThat(second.liveHeats().current()).isEqualTo(session.liveHeats().current());
+            assertThat(second.liveHeats().current().lanes().get(0).timeInMillis()).isEqualTo(112_853_930);
+            assertThat(LegacySerialization.toXML(second.legacyHeats())).isEqualTo(LegacySerialization.toXML(session.legacyHeats()));
+        }
+    }
+
+    @Test
+    void aRecordingContinuesTheRebuiltHeats() {
+        recordHeatWithLane1Finished();
+        int stored = new MessageStore(db).findAll().size();
+        try (RecordingSession second = secondSession()) {
+            second.start(settings(0));
+            reader().push(finishTime1());
+            reader().push(finishOfLane(2));
+            reader().push(finishTime1());
+            reader().push(finishOfLane(2));
+            second.stop();
+
+            List<LaneDto> lanes = second.liveHeats().current().lanes();
+            assertThat(lanes.get(0).timeInMillis()).isEqualTo(112_853_930);
+            assertThat(lanes.get(1).timeInMillis()).isEqualTo(113_453_930);
+            assertThat(new MessageStore(db).findAll()).hasSize(stored + 2);
+        }
+    }
+
+    @Test
+    void aMessageThatCannotBeAppliedDoesNotStopTheRebuild() {
+        session.start(settings(0));
+        reader().push(DataHandlingMessageTestData.message1);
+        reader().push(DataHandlingMessageTestData.message2);
+        reader().push(finishTime1());
+        reader().push(finishOfLane(1));
+        reader().push(finishTime1());
+        reader().push(finishOfLane(1));
+        session.stop();
+        List<DataHandlingMessage> all = new MessageStore(db).findAll();
+        DataHandlingMessage last = all.getLast();
+        db.write(em -> em.createNativeQuery("DELETE FROM aresmessage").executeUpdate());
+        MessageStore store = new MessageStore(db);
+        all.subList(0, all.size() - 1).forEach(store::put);
+        store.put(onLane(last, 11));
+        store.put(last);
+
+        try (RecordingSession second = secondSession()) {
+            assertThat(second.liveHeats().current().lanes().get(0).timeInMillis()).isEqualTo(112_853_930);
+        }
+    }
+
+    private static DataHandlingMessage onLane(DataHandlingMessage m, int lane) {
+        return new DataHandlingMessage(m.getTimestamp(), m.getCompetition(), m.getOriginalText1(), m.getOriginalText2(), m.getMessageType(), m.getKindOfTime(),
+                                       m.getTimeType(), m.getUsedLanes(), m.getLapCount(), m.getEvent(), m.getHeat(), m.getRank(), m.getRankInfo(), (byte) lane,
+                                       m.getCurrentLap(), m.getTimeInMillis(), m.getTimeInfo(), m.getTimeMarker());
+    }
+
+    private static byte[] finishOfLane(int lane) {
+        byte[] message = DataHandlingMessageTestData.message2.clone();
+        message[4] = (byte) ('0' + lane);
+        message[6] = '2';
+        message[11] = (byte) ('1' + lane);
+        return message;
     }
 
     @Test
@@ -268,18 +355,6 @@ class RecordingSessionTest {
         assertThat(new MessageStore(db).findBy("", (short) 1, (byte) 1)).hasSize(1);
     }
 
-    @Test
-    void processingErrorsAreReportedToTheErrorListenersAndTheSessionKeepsRunning() {
-        List<Exception> errors = new CopyOnWriteArrayList<>();
-        session.addErrorListener(errors::add);
-        session.start(settings(0));
-        db.close();
-        reader().push(DataHandlingMessageTestData.message1);
-        reader().push(DataHandlingMessageTestData.message2);
-        assertThat(errors).isNotEmpty();
-        assertThat(session.state()).isEqualTo(RecordingState.RUNNING);
-    }
-
     record WriteEvent(String kind, RecordedData data) {
     }
 
@@ -319,7 +394,7 @@ class RecordingSessionTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"aresmessage, MESSAGES", "heat, HEATS", "lanetime, LANE_TIMES", "rawdata, RAW_DATA"})
+    @CsvSource({"aresmessage, MESSAGES", "rawdata, RAW_DATA"})
     void aWriteErrorNamesWhatCouldNotBeStoredAndIsNoProcessingError(String table, RecordedData data) {
         List<WriteEvent> events = recordWrites();
         List<Exception> errors = new CopyOnWriteArrayList<>();
@@ -334,14 +409,13 @@ class RecordingSessionTest {
     }
 
     @Test
-    void aFailingStoreDoesNotKeepTheOtherStoresFromTheMessage() {
+    void aFailingMessageStoreDoesNotKeepTheHeatsFromTheMessage() {
         List<org.lisasp.alphatiming.heats.LiveHeats> heats = new CopyOnWriteArrayList<>();
         session.addHeatListener(heats::add);
-        blockInserts("lanetime");
+        blockInserts("aresmessage");
         session.start(settings(0));
         reader().push(finishTime1());
         reader().push(DataHandlingMessageTestData.message2);
-        assertThat(new MessageStore(db).findBy("", (short) 1, (byte) 1)).hasSize(1);
         assertThat(heats).isNotEmpty();
     }
 
