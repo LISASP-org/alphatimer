@@ -13,6 +13,7 @@ import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.HeatStatus;
 import org.lisasp.alphatiming.heats.LaneDto;
 import org.lisasp.alphatiming.heats.LaneStatus;
+import org.lisasp.alphatiming.heats.TestLanes;
 import org.lisasp.alphatiming.heats.Penalty;
 import org.lisasp.alphatiming.project.db.CrashLeftover;
 import org.lisasp.alphatiming.ui.core.project.TimingDocument;
@@ -166,8 +167,8 @@ class JAlphaTimingSmokeTest {
             });
 
             HeatDto heat = new HeatDto(3, 2, HeatStatus.Started, LocalDateTime.now().minusSeconds(5), null, 2, List.of(
-                    new LaneDto(1, 12_340, 1, LaneStatus.Used, Set.of(), 0, false),
-                    new LaneDto(2, 25_000, 2, LaneStatus.Used, Set.of(), 1, true)));
+                    TestLanes.lane(1, LaneStatus.Used, Set.of(), 0, TestLanes.split(1, 12_340)),
+                    TestLanes.lane(2, LaneStatus.Used, Set.of(), 1, TestLanes.finish(2, 25_000))));
             onEdt(() -> frame.showHeats(new org.lisasp.alphatiming.heats.LiveHeats(heat, null)));
             onEdt(() -> {
                 ((JToggleButton) frame.buttonBar().getComponent(1)).doClick();

@@ -22,7 +22,7 @@ class RunningTimeModelTest {
 
     private static Heat runningHeat() {
         HeatDto empty = new HeatDto(1, 1, HeatStatus.Open, null, null, 0,
-                                    List.of(1, 2, 3, 4).stream().map(n -> new LaneDto(n, 0, 0, LaneStatus.NotUsed, Set.of(), 0, false)).toList());
+                                    List.of(1, 2, 3, 4).stream().map(n -> TestLanes.lane(n, LaneStatus.NotUsed, Set.of(), 0)).toList());
         Heat heat = new Heat(empty);
         heat.usedLanes(TestMessageCreator.used(1, 1, "1110000000"));
         return heat;

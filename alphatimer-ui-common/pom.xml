@@ -13,5 +13,6 @@
 
     <dependencies>
         <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-ui-core</artifactId></dependency>
+        <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-heats</artifactId><type>test-jar</type><scope>test</scope></dependency>
     </dependencies>
 </project>

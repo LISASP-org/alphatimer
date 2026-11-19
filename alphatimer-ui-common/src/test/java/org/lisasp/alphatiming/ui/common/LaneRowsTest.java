@@ -7,6 +7,7 @@ import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.HeatStatus;
 import org.lisasp.alphatiming.heats.LaneDto;
 import org.lisasp.alphatiming.heats.LaneStatus;
+import org.lisasp.alphatiming.heats.TestLanes;
 import org.lisasp.alphatiming.heats.Penalty;
 
 import java.util.List;
@@ -32,12 +33,12 @@ class LaneRowsTest {
 
     private static HeatDto heat() {
         return new HeatDto(1, 1, HeatStatus.Started, null, null, 2, List.of(
-                new LaneDto(1, 0, 0, LaneStatus.NotUsed, Set.of(), 0, false),
-                new LaneDto(2, 12_340, 1, LaneStatus.Used, Set.of(), 0, false),
-                new LaneDto(3, 25_000, 2, LaneStatus.Used, Set.of(), 1, true),
-                new LaneDto(4, 0, 0, LaneStatus.Used, Set.of(Penalty.DidNotStart), 0, false),
-                new LaneDto(5, 9_000, 1, LaneStatus.Used, Set.of(Penalty.DidNotFinish), 0, false),
-                new LaneDto(6, 0, 0, LaneStatus.Used, Set.of(), 0, false)));
+                TestLanes.lane(1, LaneStatus.NotUsed, Set.of(), 0),
+                TestLanes.lane(2, LaneStatus.Used, Set.of(), 0, TestLanes.split(1, 12_340)),
+                TestLanes.lane(3, LaneStatus.Used, Set.of(), 1, TestLanes.finish(2, 25_000)),
+                TestLanes.lane(4, LaneStatus.Used, Set.of(Penalty.DidNotStart), 0),
+                TestLanes.lane(5, LaneStatus.Used, Set.of(Penalty.DidNotFinish), 0, TestLanes.split(1, 9_000)),
+                TestLanes.lane(6, LaneStatus.Used, Set.of(), 0)));
     }
 
     @Test
@@ -50,10 +51,10 @@ class LaneRowsTest {
     @Test
     void lanesUsedBeforeKeepAnEmptyRowAndNeverUsedLanesStayHidden() {
         HeatDto heat = new HeatDto(1, 2, HeatStatus.Started, null, null, 2, List.of(
-                new LaneDto(1, 0, 0, LaneStatus.NotUsed, Set.of(), 0, false),
-                new LaneDto(2, 12_340, 1, LaneStatus.Used, Set.of(), 0, false),
-                new LaneDto(3, 0, 0, LaneStatus.NotUsed, Set.of(), 0, false),
-                new LaneDto(4, 0, 0, LaneStatus.Used, Set.of(), 0, false)));
+                TestLanes.lane(1, LaneStatus.NotUsed, Set.of(), 0),
+                TestLanes.lane(2, LaneStatus.Used, Set.of(), 0, TestLanes.split(1, 12_340)),
+                TestLanes.lane(3, LaneStatus.NotUsed, Set.of(), 0),
+                TestLanes.lane(4, LaneStatus.Used, Set.of(), 0)));
         List<LaneRows.Row> rows = LaneRows.from(heat, java.util.Set.of(1, 2, 4));
         assertThat(rows).extracting(LaneRows.Row::lane).containsExactly(1, 2, 4);
         assertThat(rows.get(0)).isEqualTo(new LaneRows.Row(1, "", "", 0, false));
@@ -84,7 +85,7 @@ class LaneRowsTest {
     @Test
     void aDisqualifiedLaneShowsItsTimeWithoutPlace() {
         HeatDto heat = new HeatDto(1, 1, HeatStatus.Finished, null, null, 2, List.of(
-                new LaneDto(1, 25_000, 2, LaneStatus.Used, Set.of(Penalty.Disqualified), 0, true)));
+                TestLanes.lane(1, LaneStatus.Used, Set.of(Penalty.Disqualified), 0, TestLanes.finish(2, 25_000))));
 
         assertThat(LaneRows.from(heat, java.util.Set.of())).containsExactly(new LaneRows.Row(1, "25.00", "DSQ", 0, true));
 
@@ -95,7 +96,7 @@ class LaneRowsTest {
     @Test
     void everyPenaltyOfALaneIsShown() {
         HeatDto heat = new HeatDto(1, 1, HeatStatus.Finished, null, null, 2, List.of(
-                new LaneDto(1, 25_000, 2, LaneStatus.Used, Set.of(Penalty.DidNotFinish, Penalty.Disqualified), 0, true)));
+                TestLanes.lane(1, LaneStatus.Used, Set.of(Penalty.DidNotFinish, Penalty.Disqualified), 0, TestLanes.finish(2, 25_000))));
 
         assertThat(LaneRows.from(heat, java.util.Set.of()).getFirst().detail()).isEqualTo("DNF, DSQ");
     }

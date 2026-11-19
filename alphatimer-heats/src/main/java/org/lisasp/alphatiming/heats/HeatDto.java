@@ -29,7 +29,7 @@ public record HeatDto(int event,
 
     public static HeatDto empty(int event, int heat, int laneCount) {
         List<LaneDto> lanes = IntStream.rangeClosed(1, laneCount)
-                                       .mapToObj(number -> new LaneDto(number, 0, 0, LaneStatus.NotUsed, Set.of(), 0, false))
+                                       .mapToObj(number -> new LaneDto(number, LaneStatus.NotUsed, Set.of(), 0, List.of()))
                                        .toList();
         return new HeatDto(event, heat, HeatStatus.Open, null, null, 0, lanes);
     }

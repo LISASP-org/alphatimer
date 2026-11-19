@@ -89,7 +89,7 @@ final class Heat {
 
     /**
      * The device withdraws a time by sending it again as deleted, after the race time has moved on; a deleted final time
-     * comes as a split time of the last lap. Only the lane's current time can be withdrawn, older ones are already gone.
+     * comes as a split time of the last lap. Every time of the lane with that lap and value is marked as deleted.
      */
     private void deleteTime(Lane lane, TimeMessage message) {
         lastMessage = message.getTimestamp();
@@ -169,7 +169,7 @@ final class Heat {
     private void computePlaces() {
         List<Lane> ranking = lanes.stream().filter(Lane::ranks).toList();
         for (Lane lane : lanes) {
-            lane.place(lane.ranks() ? 1 + (int) ranking.stream().filter(o -> o.timeInMillis() < lane.timeInMillis()).count() : 0);
+            lane.place(lane.ranks() ? 1 + (int) ranking.stream().filter(o -> o.finishInMillis() < lane.finishInMillis()).count() : 0);
         }
     }
 

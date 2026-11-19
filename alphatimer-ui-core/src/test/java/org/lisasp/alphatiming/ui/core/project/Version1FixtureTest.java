@@ -47,10 +47,10 @@ class Version1FixtureTest {
             assertThat(heat.heat()).isEqualTo(1);
             assertThat(heat.status()).isEqualTo(HeatStatus.Finished);
             LaneDto first = heat.lanes().get(0);
-            assertThat(first.timeInMillis()).isEqualTo(61_230);
+            assertThat(first.current().orElseThrow().timeInMillis()).isEqualTo(61_230);
             assertThat(first.place()).isEqualTo(1);
             LaneDto second = heat.lanes().get(1);
-            assertThat(second.timeInMillis()).isEqualTo(62_000);
+            assertThat(second.current().orElseThrow().timeInMillis()).isEqualTo(62_000);
             assertThat(second.place()).isEqualTo(2);
             LaneDto third = heat.lanes().get(2);
             assertThat(third.penalties()).containsExactly(Penalty.DidNotStart);

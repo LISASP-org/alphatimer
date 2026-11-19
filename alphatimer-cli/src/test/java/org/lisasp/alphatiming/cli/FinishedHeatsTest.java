@@ -7,6 +7,7 @@ import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.HeatStatus;
 import org.lisasp.alphatiming.heats.LaneDto;
 import org.lisasp.alphatiming.heats.LaneStatus;
+import org.lisasp.alphatiming.heats.TestLanes;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.heats.Penalty;
 
@@ -34,10 +35,10 @@ class FinishedHeatsTest {
 
     private static HeatDto heat(int event, int heat, HeatStatus status) {
         return new HeatDto(event, heat, status, null, null, 0, List.of(
-                new LaneDto(1, 65_430, 0, LaneStatus.Used, Set.of(), 2, true),
-                new LaneDto(2, 61_000, 0, LaneStatus.Used, Set.of(), 1, true),
-                new LaneDto(3, 0, 0, LaneStatus.Used, Set.of(Penalty.DidNotStart), 0, false),
-                new LaneDto(4, 0, 0, LaneStatus.NotUsed, Set.of(), 0, false)));
+                TestLanes.lane(1, LaneStatus.Used, Set.of(), 2, TestLanes.finish(0, 65_430)),
+                TestLanes.lane(2, LaneStatus.Used, Set.of(), 1, TestLanes.finish(0, 61_000)),
+                TestLanes.lane(3, LaneStatus.Used, Set.of(Penalty.DidNotStart), 0),
+                TestLanes.lane(4, LaneStatus.NotUsed, Set.of(), 0)));
     }
 
     @Test

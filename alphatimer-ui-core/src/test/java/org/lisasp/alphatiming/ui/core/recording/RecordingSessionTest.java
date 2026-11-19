@@ -163,7 +163,7 @@ class RecordingSessionTest {
         recordHeatWithLane1Finished();
         try (RecordingSession second = secondSession()) {
             assertThat(second.liveHeats().current()).isEqualTo(session.liveHeats().current());
-            assertThat(second.liveHeats().current().lanes().get(0).timeInMillis()).isEqualTo(112_853_930);
+            assertThat(second.liveHeats().current().lanes().get(0).current().orElseThrow().timeInMillis()).isEqualTo(112_853_930);
             assertThat(LegacySerialization.toXML(second.legacyHeats())).isEqualTo(LegacySerialization.toXML(session.legacyHeats()));
         }
     }
@@ -181,8 +181,8 @@ class RecordingSessionTest {
             second.stop();
 
             List<LaneDto> lanes = second.liveHeats().current().lanes();
-            assertThat(lanes.get(0).timeInMillis()).isEqualTo(112_853_930);
-            assertThat(lanes.get(1).timeInMillis()).isEqualTo(113_453_930);
+            assertThat(lanes.get(0).current().orElseThrow().timeInMillis()).isEqualTo(112_853_930);
+            assertThat(lanes.get(1).current().orElseThrow().timeInMillis()).isEqualTo(113_453_930);
             assertThat(new MessageStore(db).findAll()).hasSize(stored + 2);
         }
     }
@@ -206,7 +206,7 @@ class RecordingSessionTest {
         store.put(last);
 
         try (RecordingSession second = secondSession()) {
-            assertThat(second.liveHeats().current().lanes().get(0).timeInMillis()).isEqualTo(112_853_930);
+            assertThat(second.liveHeats().current().lanes().get(0).current().orElseThrow().timeInMillis()).isEqualTo(112_853_930);
         }
     }
 

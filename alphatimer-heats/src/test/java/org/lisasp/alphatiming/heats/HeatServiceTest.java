@@ -17,7 +17,7 @@ class HeatServiceTest {
         service.accept(TestMessageCreator.used(1, 1, "1100000000"));
         service.accept(TestMessageCreator.used(2, 1, "0011000000"));
         service.accept(TestMessageCreator.split(1, 1, 1, 1, 1000));
-        assertThat(store.find(1, 1).orElseThrow().lanes().get(0).timeInMillis()).isEqualTo(1000);
+        assertThat(store.find(1, 1).orElseThrow().lanes().get(0).current().orElseThrow().timeInMillis()).isEqualTo(1000);
         assertThat(store.find(2, 1).orElseThrow().lanes().get(0).status()).isEqualTo(LaneStatus.NotUsed);
     }
 
@@ -57,7 +57,7 @@ class HeatServiceTest {
         LiveHeats afterSwitch = seen.get(seen.size() - 1);
         assertThat(afterSwitch.current().heat()).isEqualTo(2);
         assertThat(afterSwitch.previous().heat()).isEqualTo(1);
-        assertThat(afterSwitch.previous().lanes().get(0).timeInMillis()).isEqualTo(1900);
+        assertThat(afterSwitch.previous().lanes().get(0).current().orElseThrow().timeInMillis()).isEqualTo(1900);
         assertThat(afterSwitch.previous().lanes().get(0).place()).isEqualTo(1);
 
         service.accept(TestMessageCreator.start(1, 2, T0.plusSeconds(60)));
@@ -249,8 +249,8 @@ class HeatServiceTest {
         service.accept(TestMessageCreator.fin(1, 1, 10, 0, 2000));
         HeatDto heat = store.find(1, 1).orElseThrow();
         assertThat(heat.lanes()).extracting(LaneDto::number).containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
-        assertThat(heat.lanes().get(8)).isEqualTo(new LaneDto(9, 1000, 1, LaneStatus.Used, Set.of(), 0, false));
-        assertThat(heat.lanes().get(9)).isEqualTo(new LaneDto(10, 2000, 2, LaneStatus.Used, Set.of(), 1, true));
+        assertThat(heat.lanes().get(8)).isEqualTo(TestLanes.lane(9, LaneStatus.Used, Set.of(), 0, TestLanes.split(1, 1000)));
+        assertThat(heat.lanes().get(9)).isEqualTo(TestLanes.lane(10, LaneStatus.Used, Set.of(), 1, TestLanes.finish(2, 2000)));
     }
 
     @Test
@@ -263,7 +263,7 @@ class HeatServiceTest {
         service.accept(TestMessageCreator.fin(1, 1, 1, 0, 2000));
         service.accept(TestMessageCreator.fin(1, 1, 2, 0, 2100));
         HeatDto heat = store.find(1, 1).orElseThrow();
-        assertThat(heat.lanes().get(0)).isEqualTo(new LaneDto(1, 2000, 2, LaneStatus.Used, Set.of(Penalty.DidNotStart), 0, true));
+        assertThat(heat.lanes().get(0)).isEqualTo(TestLanes.lane(1, LaneStatus.Used, Set.of(Penalty.DidNotStart), 0, TestLanes.finish(2, 2000)));
         assertThat(heat.lanes().get(1).place()).isEqualTo(1);
     }
 
@@ -277,22 +277,26 @@ class HeatServiceTest {
         service.accept(TestMessageCreator.fin(1, 1, 2, 0, 2100));
         service.accept(TestMessageCreator.dsq(1, 1, 1));
         HeatDto heat = store.find(1, 1).orElseThrow();
-        assertThat(heat.lanes().get(0)).isEqualTo(new LaneDto(1, 2000, 2, LaneStatus.Used, Set.of(Penalty.Disqualified), 0, true));
+        assertThat(heat.lanes().get(0)).isEqualTo(TestLanes.lane(1, LaneStatus.Used, Set.of(Penalty.Disqualified), 0, TestLanes.finish(2, 2000)));
         assertThat(heat.lanes().get(1).place()).isEqualTo(1);
     }
 
     @Test
-    void aSecondFinishForTheSameLaneReplacesTheTimeAndALaterSplitIsIgnored() {
+    void aSecondFinishForTheSameLaneSupersedesTheTimeAndALaterSplitDoesNotReplaceIt() {
         InMemoryHeatRepository store = new InMemoryHeatRepository();
         HeatService service = new HeatService(store);
         service.accept(TestMessageCreator.used(1, 1, "1100000000"));
         service.accept(TestMessageCreator.start(1, 1, T0));
         service.accept(TestMessageCreator.fin(1, 1, 1, 0, 2000));
         service.accept(TestMessageCreator.fin(1, 1, 1, 0, 2050));
-        assertThat(store.find(1, 1).orElseThrow().lanes().get(0)).isEqualTo(new LaneDto(1, 2050, 2, LaneStatus.Used, Set.of(), 1, true));
+        LaneDto lane = store.find(1, 1).orElseThrow().lanes().get(0);
+        assertThat(lane.current().orElseThrow()).isEqualTo(TestLanes.finish(2, 2050));
+        assertThat(lane.place()).isEqualTo(1);
 
         service.accept(TestMessageCreator.split(1, 1, 1, 1, 1000));
-        assertThat(store.find(1, 1).orElseThrow().lanes().get(0)).isEqualTo(new LaneDto(1, 2050, 2, LaneStatus.Used, Set.of(), 1, true));
+        lane = store.find(1, 1).orElseThrow().lanes().get(0);
+        assertThat(lane.current().orElseThrow()).isEqualTo(TestLanes.finish(2, 2050));
+        assertThat(lane.place()).isEqualTo(1);
     }
 
     @Test
@@ -322,6 +326,6 @@ class HeatServiceTest {
 
         assertThat(seen).hasSize(1);
         assertThat(store.findAll().get(0).heat()).isEqualTo(2);
-        assertThat(store.find(1, 1).orElseThrow().lanes().get(0).timeInMillis()).isEqualTo(1900);
+        assertThat(store.find(1, 1).orElseThrow().lanes().get(0).current().orElseThrow().timeInMillis()).isEqualTo(1900);
     }
 }
