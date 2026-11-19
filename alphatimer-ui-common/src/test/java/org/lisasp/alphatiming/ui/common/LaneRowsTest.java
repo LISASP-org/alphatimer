@@ -8,7 +8,12 @@ import org.lisasp.alphatiming.heats.HeatStatus;
 import org.lisasp.alphatiming.heats.LaneDto;
 import org.lisasp.alphatiming.heats.LaneStatus;
 import org.lisasp.alphatiming.heats.TestLanes;
+import org.lisasp.alphatiming.heats.LaneTime;
 import org.lisasp.alphatiming.heats.Penalty;
+import org.lisasp.alphatiming.heats.TestMessageCreator;
+import org.lisasp.alphatiming.heats.TimeKind;
+import org.lisasp.alphatiming.heats.TimeSource;
+import org.lisasp.alphatiming.heats.TimeType;
 
 import java.util.List;
 import java.util.Locale;
@@ -69,6 +74,15 @@ class LaneRowsTest {
         assertThat(rows.get(1).time()).isEqualTo("25.00");
         assertThat(rows.get(1).detail()).isEmpty();
         assertThat(rows.get(1).finished()).isTrue();
+    }
+
+    @Test
+    void aDeletedFinishShowsTheEarlierSplitAsNotFinished() {
+        LaneTime deletedFinish = new LaneTime(2, TimeKind.Finish, 61_230, TimeSource.Live, TimeType.Normal, true, TestMessageCreator.T0);
+        HeatDto heat = new HeatDto(1, 1, HeatStatus.Started, 2, null, null, null, null, null, List.of(
+                new LaneDto(1, LaneStatus.Used, Set.of(), 0, List.of(TestLanes.split(1, 30_000), deletedFinish))));
+
+        assertThat(LaneRows.from(heat, Set.of())).containsExactly(new LaneRows.Row(1, "30.00", "Lap 1", 0, false));
     }
 
     @Test

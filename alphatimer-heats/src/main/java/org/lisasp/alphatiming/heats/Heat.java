@@ -102,8 +102,10 @@ final class Heat {
 
     void backupTime(BackupTimeMessage message) {
         Lane lane = lane(message.getLane());
+        if (status == HeatStatus.Open || !lane.backup(message)) {
+            return;
+        }
         lastMessage = message.getTimestamp();
-        lane.backup(message);
     }
 
     /**

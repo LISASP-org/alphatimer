@@ -612,6 +612,81 @@ class HeatTest {
     }
 
     @Test
+    void aResultRevertingToTheLiveTimeCountsAgain() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 61_230, T0.plusSeconds(61)));
+        heat.touch(TestMessageCreator.resultAt(1, 1, 1, 61_250, T0.plusSeconds(70)));
+        heat.touch(TestMessageCreator.resultAt(1, 1, 1, 61_230, T0.plusSeconds(80)));
+
+        assertThat(lane(heat, 1).times()).hasSize(3);
+        assertThat(lane(heat, 1).finish().orElseThrow().timeInMillis()).isEqualTo(61_230);
+    }
+
+    @Test
+    void aDeletedTimeSentAgainCountsAgain() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 61_230, T0.plusSeconds(61)));
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 2, 61_230, T0.plusSeconds(70)));
+        assertThat(lane(heat, 1).finish()).isEmpty();
+
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 61_230, T0.plusSeconds(80)));
+
+        assertThat(lane(heat, 1).times()).hasSize(2);
+        assertThat(lane(heat, 1).finish().orElseThrow().timeInMillis()).isEqualTo(61_230);
+        assertThat(lane(heat, 1).finish().orElseThrow().arrived()).isEqualTo(T0.plusSeconds(80));
+    }
+
+    @Test
+    void aDeletedFinishFallsBackToTheEarlierSplit() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.split(1, 1, 1, 1, 30_000));
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 61_230, T0.plusSeconds(61)));
+
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 2, 61_230, T0.plusSeconds(70)));
+
+        assertThat(lane(heat, 1).finish()).isEmpty();
+        LaneTime current = lane(heat, 1).current().orElseThrow();
+        assertThat(current.kind()).isEqualTo(TimeKind.Split);
+        assertThat(current.timeInMillis()).isEqualTo(30_000);
+    }
+
+    @Test
+    void aBackupTimeRevertingToAnEarlierValueCountsAgain() {
+        Heat heat = prepared();
+        heat.backupTime(TestMessageCreator.backup(1, 1, 1, 2, 13_710, T0.plusSeconds(20)));
+        heat.backupTime(TestMessageCreator.backup(1, 1, 1, 2, 13_800, T0.plusSeconds(21)));
+        heat.backupTime(TestMessageCreator.backup(1, 1, 1, 2, 13_710, T0.plusSeconds(22)));
+
+        assertThat(lane(heat, 1).backups()).extracting(LaneTime::timeInMillis).containsExactly(13_710, 13_800, 13_710);
+    }
+
+    @Test
+    void aBackupTimeChangesNothingForAHeatThatHasNotStartedOrAnUnusedLane() {
+        Heat notStarted = new Heat(emptyHeat());
+        notStarted.usedLanes(TestMessageCreator.used(1, 1, "1110000000"));
+        HeatDto before = notStarted.createDto();
+        notStarted.backupTime(TestMessageCreator.backup(1, 1, 1, 2, 13_710, T0.plusSeconds(20)));
+        assertThat(notStarted.createDto()).isEqualTo(before);
+
+        Heat heat = prepared();
+        before = heat.createDto();
+        heat.backupTime(TestMessageCreator.backup(1, 1, 5, 2, 13_710, T0.plusSeconds(20)));
+        assertThat(heat.createDto()).isEqualTo(before);
+    }
+
+    @Test
+    void aDuplicateOrNonPositiveBackupTimeLeavesTheHeatUnchanged() {
+        Heat heat = prepared();
+        heat.backupTime(TestMessageCreator.backup(1, 1, 1, 2, 13_710, T0.plusSeconds(20)));
+        HeatDto before = heat.createDto();
+
+        heat.backupTime(TestMessageCreator.backup(1, 1, 1, 2, 13_710, T0.plusSeconds(25)));
+        heat.backupTime(TestMessageCreator.backup(1, 1, 1, 2, 0, T0.plusSeconds(26)));
+
+        assertThat(heat.createDto()).isEqualTo(before);
+    }
+
+    @Test
     void aDeletedSplitIsMarkedNotRemoved() {
         Heat heat = prepared();
         heat.touch(TestMessageCreator.split(1, 1, 1, 1, 30_000));

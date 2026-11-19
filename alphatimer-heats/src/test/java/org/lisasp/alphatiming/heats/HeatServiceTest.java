@@ -329,6 +329,20 @@ class HeatServiceTest {
     }
 
     @Test
+    void aBackupTimeForAnUnknownHeatCreatesNoHeat() {
+        InMemoryHeatRepository store = new InMemoryHeatRepository();
+        HeatService service = new HeatService(store);
+        service.accept(TestMessageCreator.used(1, 1, "1100000000"));
+        service.accept(TestMessageCreator.start(1, 1, T0));
+
+        service.accept(TestMessageCreator.backup(1, 2, 1, 2, 13_710, T0.plusMinutes(5)));
+
+        assertThat(store.find(1, 2)).isEmpty();
+        assertThat(store.findAll()).hasSize(1);
+        assertThat(service.liveHeats().current().heat()).isEqualTo(1);
+    }
+
+    @Test
     void aBackupTimeOfThePreviousRaceIsIgnored() {
         InMemoryHeatRepository store = new InMemoryHeatRepository();
         HeatService service = new HeatService(store);

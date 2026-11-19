@@ -82,22 +82,28 @@ final class Lane {
         }
         TimeKind kind = message.getKindOfTime() == RefinedKindOfTime.Finish ? TimeKind.Finish : TimeKind.Split;
         int lap = message.getCurrentLap();
-        if (times.stream().noneMatch(t -> t.sameTimeAs(lap, kind, message.getTimeInMillis()))) {
+        if (!repeatsNewest(lap, kind, message.getTimeInMillis())) {
             times.add(new LaneTime(lap, kind, message.getTimeInMillis(), sourceOf(message), typeOf(message), false, message.getTimestamp()));
         }
         enforceStatus();
     }
 
-    void backup(BackupTimeMessage message) {
-        if (message.getTimeInMillis() <= 0) {
-            return;
-        }
+    boolean backup(BackupTimeMessage message) {
         int lap = message.getCurrentLap();
-        if (times.stream().noneMatch(t -> t.sameTimeAs(lap, TimeKind.Backup, message.getTimeInMillis()))) {
-            TimeSource source = message.getMessageType() == RefinedMessageType.Live ? TimeSource.Live : TimeSource.Result;
-            times.add(new LaneTime(lap, TimeKind.Backup, message.getTimeInMillis(), source, TimeType.Normal, false, message.getTimestamp()));
+        if (!isUsed() || message.getTimeInMillis() <= 0 || repeatsNewest(lap, TimeKind.Backup, message.getTimeInMillis())) {
+            return false;
         }
-        enforceStatus();
+        TimeSource source = message.getMessageType() == RefinedMessageType.Live ? TimeSource.Live : TimeSource.Result;
+        times.add(new LaneTime(lap, TimeKind.Backup, message.getTimeInMillis(), source, TimeType.Normal, false, message.getTimestamp()));
+        return true;
+    }
+
+    private boolean repeatsNewest(int lap, TimeKind kind, int timeInMillis) {
+        return times.reversed().stream()
+                    .filter(t -> t.lap() == lap && t.kind() == kind && !t.deleted())
+                    .findFirst()
+                    .filter(t -> t.timeInMillis() == timeInMillis)
+                    .isPresent();
     }
 
     boolean deleteTime(TimeMessage message) {

@@ -85,8 +85,10 @@ public enum Penalty { DidNotStart, DidNotFinish, Disqualified }
 
 ### Rules
 
-- **One entry per time:** an entry is identified by lap, kind and time value; a repeat (the result list after a live
-  time) adds no entry. A different time for the same lap and kind adds one; the newest valid entry counts.
+- **One entry per time:** a time message adds nothing only when it equals (same time value) the newest entry of the same
+  lap and kind that is not deleted — a repeat, like the result list after a live time. Otherwise it is appended, so a
+  value that returns after a correction, or a deleted time that is sent again, counts again as the newest entry; the
+  newest valid entry counts. Backup times follow the same rule.
 - **Deleting:** a deleted time marks the entry with the same lap and time value as `deleted` (any kind but backup,
   since a deleted finish arrives as a split of the last lap). Older splits can be withdrawn too.
 - **Penalties:** DNS, DNF and DSQ add their flag and clear no times. A lane gets a place only without penalty flags and

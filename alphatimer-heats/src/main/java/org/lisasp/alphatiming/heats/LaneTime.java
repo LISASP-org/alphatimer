@@ -7,8 +7,4 @@ public record LaneTime(int lap, TimeKind kind, int timeInMillis, TimeSource sour
     LaneTime asDeleted() {
         return new LaneTime(lap, kind, timeInMillis, source, type, true, arrived);
     }
-
-    boolean sameTimeAs(int lap, TimeKind kind, int timeInMillis) {
-        return this.lap == lap && this.kind == kind && this.timeInMillis == timeInMillis;
-    }
 }
