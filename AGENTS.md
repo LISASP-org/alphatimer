@@ -230,8 +230,8 @@ untrusted input:
 
 - JUnit 6 (Jupiter) with AssertJ and Awaitility. Name test classes `*Test`; there are no integration-test conventions —
   tests that need a database use `TimingDatabase.createNew(@TempDir)`, tests that need a device use a local
-  `ServerSocket` or a fake `SerialPortReader`. `HeatServiceTest` and `LegacyServiceTest` run against the real stores and
-  therefore live in `alphatimer-project-db`.
+  `ServerSocket` or a fake `SerialPortReader`. `HeatServiceTest` runs on `InMemoryHeatRepository` in `alphatimer-heats`; `LegacyServiceTest` runs on
+  `InMemoryLaneTimeRepository` but stays in `alphatimer-project-db`, since it uses that module's `DataHandlingMessageTestData`.
 - Shared test helpers are published as test-jars: `TestMessageCreator` from `alphatimer-heats`,
   `DataHandlingMessageTestData` from `alphatimer-project-db`.
 - Prefer tests on the non-Swing modules and `AppController`; keep heat, placing and clock logic and the document workflow
