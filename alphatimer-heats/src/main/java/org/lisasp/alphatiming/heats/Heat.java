@@ -2,6 +2,7 @@ package org.lisasp.alphatiming.heats;
 
 import org.lisasp.alphatimer.api.ares.serial.events.messages.values.UsedLanes;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
@@ -97,6 +98,12 @@ final class Heat {
         lapCount = message.getLapCount();
         lane.touch(message);
         update(message);
+    }
+
+    void backupTime(BackupTimeMessage message) {
+        Lane lane = lane(message.getLane());
+        lastMessage = message.getTimestamp();
+        lane.backup(message);
     }
 
     /**

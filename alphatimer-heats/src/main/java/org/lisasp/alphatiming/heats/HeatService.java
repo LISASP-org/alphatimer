@@ -2,6 +2,7 @@ package org.lisasp.alphatiming.heats;
 
 import lombok.extern.slf4j.Slf4j;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
@@ -50,7 +51,8 @@ public final class HeatService implements Consumer<RefinedMessage> {
 
     private static boolean isRepeatOfAPreviousRace(RefinedMessage message) {
         return (message instanceof StartMessage m && m.getMessageType() == RefinedMessageType.PreviousRaceResult)
-                || (message instanceof TimeMessage t && t.getMessageType() == RefinedMessageType.PreviousRaceResult);
+                || (message instanceof TimeMessage t && t.getMessageType() == RefinedMessageType.PreviousRaceResult)
+                || (message instanceof BackupTimeMessage b && b.getMessageType() == RefinedMessageType.PreviousRaceResult);
     }
 
     private record HeatKey(int event, int heat) {
@@ -99,6 +101,8 @@ public final class HeatService implements Consumer<RefinedMessage> {
                 heat.usedLanes(m);
             } else if (message instanceof TimeMessage m) {
                 heat.touch(m);
+            } else if (message instanceof BackupTimeMessage m) {
+                heat.backupTime(m);
             } else if (message instanceof DidNotStartMessage m) {
                 heat.didNotStart(m);
             } else if (message instanceof DidNotFinishMessage m) {

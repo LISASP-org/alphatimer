@@ -417,6 +417,43 @@ class HeatTest {
     }
 
     @Test
+    void aBackupTimeIsKeptBesideTheFinish() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 13_630));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 14_000));
+
+        heat.backupTime(TestMessageCreator.backup(1, 1, 1, 2, 13_710, T0.plusSeconds(20)));
+
+        assertThat(lane(heat, 1).finish().orElseThrow().timeInMillis()).isEqualTo(13_630);
+        assertThat(lane(heat, 1).backups()).extracting(LaneTime::timeInMillis).containsExactly(13_710);
+        assertThat(lane(heat, 1).place()).isEqualTo(1);
+        assertThat(lane(heat, 2).place()).isEqualTo(2);
+    }
+
+    @Test
+    void aBackupTimeAloneGivesNoFinish() {
+        Heat heat = prepared();
+
+        heat.backupTime(TestMessageCreator.backup(1, 1, 1, 2, 13_710, T0.plusSeconds(20)));
+
+        assertThat(lane(heat, 1).finish()).isEmpty();
+        assertThat(lane(heat, 1).backups()).hasSize(1);
+        assertThat(lane(heat, 1).place()).isZero();
+        assertThat(heat.createDto().ended()).isNull();
+    }
+
+    @Test
+    void aRepeatedBackupTimeAddsNothingAndADeletionNeverMarksIt() {
+        Heat heat = prepared();
+        heat.backupTime(TestMessageCreator.backup(1, 1, 1, 2, 13_710, T0.plusSeconds(20)));
+        heat.backupTime(TestMessageCreator.backup(1, 1, 1, 2, 13_710, T0.plusSeconds(21)));
+
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 2, 13_710, T0.plusSeconds(40)));
+
+        assertThat(lane(heat, 1).backups()).hasSize(1).noneMatch(LaneTime::deleted);
+    }
+
+    @Test
     void aDeletedFinalTimeClearsTheLaneUntilTheNextFinish() {
         Heat heat = prepared();
         heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 25_000));

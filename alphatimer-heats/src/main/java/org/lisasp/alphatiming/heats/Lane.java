@@ -1,5 +1,6 @@
 package org.lisasp.alphatiming.heats;
 
+import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedKindOfTime;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
@@ -83,6 +84,18 @@ final class Lane {
         int lap = message.getCurrentLap();
         if (times.stream().noneMatch(t -> t.sameTimeAs(lap, kind, message.getTimeInMillis()))) {
             times.add(new LaneTime(lap, kind, message.getTimeInMillis(), sourceOf(message), typeOf(message), false, message.getTimestamp()));
+        }
+        enforceStatus();
+    }
+
+    void backup(BackupTimeMessage message) {
+        if (message.getTimeInMillis() <= 0) {
+            return;
+        }
+        int lap = message.getCurrentLap();
+        if (times.stream().noneMatch(t -> t.sameTimeAs(lap, TimeKind.Backup, message.getTimeInMillis()))) {
+            TimeSource source = message.getMessageType() == RefinedMessageType.Live ? TimeSource.Live : TimeSource.Result;
+            times.add(new LaneTime(lap, TimeKind.Backup, message.getTimeInMillis(), source, TimeType.Normal, false, message.getTimestamp()));
         }
         enforceStatus();
     }

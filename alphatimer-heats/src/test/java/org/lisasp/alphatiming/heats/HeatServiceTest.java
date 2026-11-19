@@ -1,6 +1,8 @@
 package org.lisasp.alphatiming.heats;
 
 import org.junit.jupiter.api.Test;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -324,6 +326,19 @@ class HeatServiceTest {
         service.accept(TestMessageCreator.split(1, 2, 11, 1, 1000));
         assertThat(store.find(1, 2)).isEmpty();
         assertThat(store.findAll().get(0).heat()).isEqualTo(1);
+    }
+
+    @Test
+    void aBackupTimeOfThePreviousRaceIsIgnored() {
+        InMemoryHeatRepository store = new InMemoryHeatRepository();
+        HeatService service = new HeatService(store);
+        service.accept(TestMessageCreator.used(1, 1, "1100000000"));
+        service.accept(TestMessageCreator.start(1, 1, T0));
+        HeatDto before = store.find(1, 1).orElseThrow();
+
+        service.accept(new BackupTimeMessage(T0.plusMinutes(5), "WK", (short) 1, (byte) 1, RefinedMessageType.PreviousRaceResult, (byte) 1, (byte) 2, 13_710));
+
+        assertThat(store.find(1, 1).orElseThrow()).isEqualTo(before);
     }
 
     @Test

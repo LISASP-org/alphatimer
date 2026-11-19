@@ -1,5 +1,6 @@
 package org.lisasp.alphatiming.heats;
 
+import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
@@ -75,6 +76,10 @@ public final class TestMessageCreator {
     /** The device marks a deleted final time as a split time of the last lap, with the value it deletes. */
     public static TimeMessage deletedAt(int event, int heat, int lane, int lap, int millis, LocalDateTime at) {
         return new TimeMessage(at, "WK", (short) event, (byte) heat, RefinedMessageType.Live, RefinedKindOfTime.SplitTime, (byte) lane, (byte) lap, (byte) 2, (byte) 0, millis, RefinedTimeType.DeletedTime);
+    }
+
+    public static BackupTimeMessage backup(int event, int heat, int lane, int lap, int millis, LocalDateTime at) {
+        return new BackupTimeMessage(at, "WK", (short) event, (byte) heat, RefinedMessageType.CurrentRaceResult, (byte) lane, (byte) lap, millis);
     }
 
     public static TimeMessage finOfType(int event, int heat, int lane, int millis, RefinedMessageType messageType, RefinedTimeType timeType) {
