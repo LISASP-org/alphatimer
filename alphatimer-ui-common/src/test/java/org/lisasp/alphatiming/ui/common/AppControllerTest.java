@@ -1029,6 +1029,27 @@ class AppControllerTest {
     }
 
     @Test
+    void openingAFileWhoseMessagesCannotBeReadReleasesItsWorkFileAndLock() throws Exception {
+        Path file = savedProject("unreadable.timing");
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + file); var st = connection.createStatement()) {
+            st.execute("insert into aresmessage (originalText1, originalText2, timestamp, messageType, kindOfTime, timeType, usedLanes, lapCount, event, heat, rank,"
+                       + " rankInfo, lane, currentLap, timeInMillis, timeInfo, timeMarker, competitionKey)"
+                       + " values ('a', 'b', '2026-05-01 10:00:00', 'NoSuchType', 'Finish', 'Empty', '1100000000', 1, 1, 1, 0, 'Normal', 1, 1, 1000, 'Normal', 'Empty', 'WK')");
+        }
+        controller.init();
+        TimingDocument before = controller.document();
+
+        controller.open(file);
+
+        assertThat(prompt.errors).hasSize(1);
+        assertThat(controller.document()).isSameAs(before);
+        assertThat(workFiles()).isEqualTo(1);
+        try (TimingDocument reopened = TimingDocument.open(file, otherWork())) {
+            assertThat(reopened.file()).contains(file);
+        }
+    }
+
+    @Test
     void openingAFileThatAnotherProgramHoldsIsRefusedAndKeepsTheCurrentDocument() throws Exception {
         Path file = savedProject("x.timing");
         try (TimingDocument holder = TimingDocument.open(file, otherWork())) {

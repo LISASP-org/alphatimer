@@ -433,10 +433,6 @@ public final class AppController implements AutoCloseable {
 
     private void replaceDocument(TimingDocument next) {
         TimingDocument old = document;
-        RecordingSession oldSession = session;
-        if (oldSession != null) {
-            oldSession.close(); // frees the server port for the next project
-        }
         install(next);
         if (old != null) {
             old.close();
@@ -451,7 +447,17 @@ public final class AppController implements AutoCloseable {
     }
 
     private void install(TimingDocument doc) {
-        RecordingSession next = new RecordingSession(doc.database(), readers.get(), time);
+        RecordingSession next;
+        try {
+            next = new RecordingSession(doc.database(), readers.get(), time);
+        } catch (RuntimeException ex) {
+            doc.close();
+            throw ex;
+        }
+        RecordingSession oldSession = session;
+        if (oldSession != null) {
+            oldSession.close(); // frees the server port for the next project
+        }
         next.addHeatListener(h -> {
             lastHeats = h;
             heatListeners.forEach(l -> l.accept(h));

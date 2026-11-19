@@ -59,7 +59,6 @@ public final class RecordingSession implements AutoCloseable {
     private final DateTimeFacade time;
 
     private final List<Consumer<RecordingState>> stateListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<LiveHeats>> heatListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<DataHandlingMessage>> messageListeners = new CopyOnWriteArrayList<>();
     private final List<Runnable> pingListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<Exception>> errorListeners = new CopyOnWriteArrayList<>();
@@ -351,7 +350,6 @@ public final class RecordingSession implements AutoCloseable {
     }
 
     public void addHeatListener(Consumer<LiveHeats> listener) {
-        heatListeners.add(listener);
         heatService.register(listener);
     }
 
