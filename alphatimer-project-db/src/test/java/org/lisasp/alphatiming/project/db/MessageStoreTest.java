@@ -86,4 +86,17 @@ class MessageStoreTest {
             db.closeAndDelete();
         }
     }
+
+    @Test
+    void theFormerNameOfTheBackupKindOfTimeIsStillRead() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            MessageStore store = new MessageStore(db);
+            store.put(message("TestWK", (short) 1, (byte) 1));
+            db.write(em -> em.createNativeQuery("update aresmessage set kindOfTime = 'UnknownValueB'").executeUpdate());
+
+            assertThat(store.findBy("TestWK", (short) 1, (byte) 1)).extracting(DataHandlingMessage::getKindOfTime)
+                                                                  .containsExactly(KindOfTime.Backup);
+            db.closeAndDelete();
+        }
+    }
 }

@@ -193,7 +193,7 @@ class DataHandlingMessage1KindOfTimeTest {
                 "TestWK",
                 new String(message1modified),
                 MessageType.OnLineTime,
-                KindOfTime.UnknownValueB,
+                KindOfTime.Backup,
                 TimeType.Empty,
                 DataHandlingMessageTestData.createUsedLanes(),
                 (byte) 2,

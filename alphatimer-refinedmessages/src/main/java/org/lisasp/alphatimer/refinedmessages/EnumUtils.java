@@ -58,6 +58,8 @@ class EnumUtils {
             case PreviousRaceResults:
             case PreviousRaceResultsWithBackupTimes:
                 return RefinedMessageType.PreviousRaceResult;
+            case BackupTime:
+                return RefinedMessageType.CurrentRaceResult;
             case OnLineTime:
                 return RefinedMessageType.Live;
         }

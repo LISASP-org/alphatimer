@@ -28,8 +28,17 @@ final class EnumNameConverters {
     }
 
     public static final class KindOfTimeConverter extends EnumNameConverter<KindOfTime> {
+
+        /** Project files written before kind of time B was identified as backup store its former name. */
+        private static final String FORMER_BACKUP = "UnknownValueB";
+
         public KindOfTimeConverter() {
             super(KindOfTime.class);
+        }
+
+        @Override
+        public KindOfTime convertToEntityAttribute(String name) {
+            return FORMER_BACKUP.equals(name) ? KindOfTime.Backup : super.convertToEntityAttribute(name);
         }
     }
 

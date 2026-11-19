@@ -12,7 +12,7 @@ public enum KindOfTime {
     TakeOverTime('D'),
     ReactionTimeAtStart('R'),
     Empty(' '),
-    UnknownValueB('B');
+    Backup('B');
 
     private final char value;
 }
