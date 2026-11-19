@@ -15,7 +15,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 | --- | --- | --- | --- |
 | [Backup times do not become official](backup-times-not-interpreted.md) | Medium | M | Backup times are kept beside the finish but never become official, not even when the operator takes one for a lane. |
 | [How deleted times are handled is not settled](deleted-times-handling.md) | Medium | M | Deletions mark every entry with the same lap and value, and a re-sent time counts again; both rules are inferred, not confirmed by ARES or recordings. |
-| [FileFailure recognises folders only by the English OS text](file-failure-depends-on-os-language.md) | Low | S | The OS error text follows `LANG`; under de_DE reading a folder is not classified as a folder and `FileFailureTest` fails. |
 | [Times with a minus sign are dropped](minus-times-are-dropped.md) | Low | S | Finish and split times with `TimeMarker.Minus` are dropped; seen only before the start of a heat, meaning unknown. |
 | [Documentation still refers to the removed Spring Boot application](references-to-removed-spring-boot-app.md) | Low | M | `AGENTS.md`, `README.md`, a code comment and the first spec and plan describe the protocol and refiner modules as copies of the gone app in `../alphatimer`. |
 | [The rank value "D " is read as a disqualification](rank-d-is-not-a-disqualification.md) | Low | M | The parser maps rank `D `, sent with reaction and takeover times, to `RankInfo.Disqualified`; its meaning is unknown. |
