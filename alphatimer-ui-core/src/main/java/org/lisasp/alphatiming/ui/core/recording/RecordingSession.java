@@ -18,6 +18,7 @@ import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.heats.HeatService;
+import org.lisasp.alphatiming.heats.HeatRepository;
 import org.lisasp.alphatiming.heats.InMemoryHeatRepository;
 import org.lisasp.alphatiming.legacy.server.InMemoryLaneTimeRepository;
 import org.lisasp.alphatiming.legacy.server.LegacyHttpServer;
@@ -73,10 +74,15 @@ public final class RecordingSession implements AutoCloseable {
     private RawDataRecorder rawRecorder;
     private LegacyHttpServer restServer;
     private final LegacyService legacy = new LegacyService(new InMemoryLaneTimeRepository());
-    private final HeatService heatService = new HeatService(new InMemoryHeatRepository(), this::reportError);
+    private final HeatService heatService;
 
     /** Heats and lane times are not stored; they are rebuilt from the stored messages and live as long as the session. */
     public RecordingSession(TimingDatabase db, ReaderFactory readers, DateTimeFacade time) {
+        this(db, readers, time, new InMemoryHeatRepository());
+    }
+
+    RecordingSession(TimingDatabase db, ReaderFactory readers, DateTimeFacade time, HeatRepository heats) {
+        this.heatService = new HeatService(heats, this::reportError);
         this.db = db;
         this.readers = readers;
         this.time = time;

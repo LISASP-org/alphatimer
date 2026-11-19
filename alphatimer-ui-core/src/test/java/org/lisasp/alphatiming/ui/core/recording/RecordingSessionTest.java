@@ -355,6 +355,54 @@ class RecordingSessionTest {
         assertThat(new MessageStore(db).findBy("", (short) 1, (byte) 1)).hasSize(1);
     }
 
+    @Test
+    void aHeatThatCannotBeAppliedIsReportedToTheErrorListenersAndTheSessionKeepsRunning() {
+        RecordingSession failing = new RecordingSession(db, s -> {
+            FakeReader r = new FakeReader();
+            created.add(r);
+            return r;
+        }, () -> LocalDateTime.of(2021, 6, 21, 14, 53), new RejectingHeats());
+        try (failing) {
+            List<Exception> errors = new CopyOnWriteArrayList<>();
+            failing.addErrorListener(errors::add);
+            failing.start(settings(0));
+            reader().push(DataHandlingMessageTestData.message1);
+            reader().push(DataHandlingMessageTestData.message2);
+            reader().push(DataHandlingMessageTestData.message1);
+            assertThat(errors).isNotEmpty().allSatisfy(e -> assertThat(e).isInstanceOf(IllegalStateException.class));
+            assertThat(failing.state()).isEqualTo(RecordingState.RUNNING);
+        }
+    }
+
+    private static final class RejectingHeats implements org.lisasp.alphatiming.heats.HeatRepository {
+        private final org.lisasp.alphatiming.heats.InMemoryHeatRepository delegate = new org.lisasp.alphatiming.heats.InMemoryHeatRepository();
+
+        @Override
+        public java.util.Optional<HeatDto> find(int event, int heat) {
+            return delegate.find(event, heat);
+        }
+
+        @Override
+        public java.util.SortedSet<Integer> findUsedLanes() {
+            return delegate.findUsedLanes();
+        }
+
+        @Override
+        public List<HeatDto> findAll() {
+            return delegate.findAll();
+        }
+
+        @Override
+        public HeatDto create(HeatDto dto) {
+            throw new IllegalStateException("heat rejected");
+        }
+
+        @Override
+        public void save(HeatDto dto) {
+            delegate.save(dto);
+        }
+    }
+
     record WriteEvent(String kind, RecordedData data) {
     }
 

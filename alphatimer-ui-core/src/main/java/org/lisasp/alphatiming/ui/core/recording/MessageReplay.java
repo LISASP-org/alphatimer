@@ -20,12 +20,17 @@ final class MessageReplay {
         DataHandlingMessageRefiner refiner = new DataHandlingMessageRefiner();
         refiner.register(heats::accept);
         for (DataHandlingMessage message : messages) {
-            try {
-                legacy.accept(message);
-                refiner.accept(message);
-            } catch (RuntimeException ex) {
-                log.warn("Could not replay stored message of event {}, heat {}, lane {}.", message.getEvent(), message.getHeat(), message.getLane(), ex);
-            }
+            skippingFailure(message, legacy::accept);
+            skippingFailure(message, refiner::accept);
+        }
+    }
+
+    /** The live pipeline gives each consumer its own failure handling; a replay must treat a message the same way. */
+    private static void skippingFailure(DataHandlingMessage message, DataHandlingMessageListener consumer) {
+        try {
+            consumer.accept(message);
+        } catch (RuntimeException ex) {
+            log.warn("Could not replay stored message of event {}, heat {}, lane {}.", message.getEvent(), message.getHeat(), message.getLane(), ex);
         }
     }
 }
