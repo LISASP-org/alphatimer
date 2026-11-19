@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -52,7 +53,7 @@ class Version1FixtureTest {
             assertThat(second.timeInMillis()).isEqualTo(62_000);
             assertThat(second.place()).isEqualTo(2);
             LaneDto third = heat.lanes().get(2);
-            assertThat(third.penalty()).isEqualTo(Penalty.DidNotStart);
+            assertThat(third.penalties()).containsExactly(Penalty.DidNotStart);
             assertThat(third.place()).isZero();
         }
     }

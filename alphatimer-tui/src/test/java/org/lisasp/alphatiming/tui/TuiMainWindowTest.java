@@ -34,6 +34,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -262,10 +263,10 @@ class TuiMainWindowTest {
         assertThat(screenText()).contains("No data to display yet");
 
         HeatDto heat = new HeatDto(3, 2, HeatStatus.Finished, null, null, 0, List.of(
-                new LaneDto(1, 65_430, 0, LaneStatus.Used, Penalty.None, 2, true),
-                new LaneDto(2, 0, 0, LaneStatus.Used, Penalty.DidNotStart, 0, false)));
+                new LaneDto(1, 65_430, 0, LaneStatus.Used, Set.of(), 2, true),
+                new LaneDto(2, 0, 0, LaneStatus.Used, Set.of(Penalty.DidNotStart), 0, false)));
         HeatDto before = new HeatDto(3, 1, HeatStatus.Finished, null, null, 0, List.of(
-                new LaneDto(1, 61_000, 0, LaneStatus.Used, Penalty.None, 1, true)));
+                new LaneDto(1, 61_000, 0, LaneStatus.Used, Set.of(), 1, true)));
         window.liveViewPanel().setHeats(new LiveHeats(heat, before));
         render();
 

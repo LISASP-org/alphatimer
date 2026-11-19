@@ -3,13 +3,16 @@ package org.lisasp.alphatiming.heats;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedKindOfTime;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 final class Lane {
 
     private final int number;
     private int timeInMillis;
     private int lap;
     private LaneStatus status;
-    private Penalty penalty;
+    private final Set<Penalty> penalties = EnumSet.noneOf(Penalty.class);
     private int place;
     private boolean finished;
 
@@ -18,14 +21,14 @@ final class Lane {
         this.timeInMillis = dto.timeInMillis();
         this.lap = dto.lap();
         this.status = dto.status();
-        this.penalty = dto.penalty();
+        this.penalties.addAll(dto.penalties());
         this.place = dto.place();
         this.finished = dto.finished();
         enforceStatus();
     }
 
     LaneDto createDto() {
-        return new LaneDto(number, timeInMillis, lap, status, penalty, place, finished);
+        return new LaneDto(number, timeInMillis, lap, status, penalties, place, finished);
     }
 
     int number() {
@@ -33,7 +36,7 @@ final class Lane {
     }
 
     boolean isDone() {
-        return status == LaneStatus.Used && (finished || penalty != Penalty.None);
+        return status == LaneStatus.Used && (finished || !penalties.isEmpty());
     }
 
     boolean isUsed() {
@@ -41,7 +44,7 @@ final class Lane {
     }
 
     boolean ranks() {
-        return status == LaneStatus.Used && finished && penalty == Penalty.None && timeInMillis > 0;
+        return status == LaneStatus.Used && finished && penalties.isEmpty() && timeInMillis > 0;
     }
 
     int timeInMillis() {
@@ -61,7 +64,7 @@ final class Lane {
         lap = 0;
         place = 0;
         finished = false;
-        penalty = Penalty.None;
+        penalties.clear();
     }
 
     void used(boolean used) {
@@ -92,21 +95,19 @@ final class Lane {
     }
 
     void didNotStart() {
-        penalty = Penalty.DidNotStart;
-        timeInMillis = 0;
-        lap = 0;
-        place = 0;
-        finished = false;
+        penalize(Penalty.DidNotStart);
     }
 
     void didNotFinish() {
-        penalty = Penalty.DidNotFinish;
-        place = 0;
-        finished = false;
+        penalize(Penalty.DidNotFinish);
     }
 
     void disqualified() {
-        penalty = Penalty.Disqualified;
+        penalize(Penalty.Disqualified);
+    }
+
+    private void penalize(Penalty penalty) {
+        penalties.add(penalty);
         place = 0;
     }
 
@@ -116,7 +117,7 @@ final class Lane {
             lap = 0;
             place = 0;
             finished = false;
-            penalty = Penalty.None;
+            penalties.clear();
         }
         if (timeInMillis <= 0) {
             timeInMillis = 0;

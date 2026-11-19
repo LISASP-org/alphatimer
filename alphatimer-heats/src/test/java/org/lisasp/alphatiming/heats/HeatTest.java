@@ -6,6 +6,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -15,7 +16,7 @@ class HeatTest {
 
     private static HeatDto emptyHeat() {
         return new HeatDto(1, 1, HeatStatus.Open, null, null, 0,
-                           List.of(1, 2, 3, 4, 5, 6, 7, 8).stream().map(n -> new LaneDto(n, 0, 0, LaneStatus.NotUsed, Penalty.None, 0, false)).toList());
+                           List.of(1, 2, 3, 4, 5, 6, 7, 8).stream().map(n -> new LaneDto(n, 0, 0, LaneStatus.NotUsed, Set.of(), 0, false)).toList());
     }
 
     private static Heat prepared() {
@@ -64,7 +65,7 @@ class HeatTest {
     void splitSetsLatestTimeAndLapWithoutFinishing() {
         Heat heat = prepared();
         heat.touch(TestMessageCreator.split(1, 1, 2, 1, 1234));
-        assertThat(lane(heat, 2)).isEqualTo(new LaneDto(2, 1234, 1, LaneStatus.Used, Penalty.None, 0, false));
+        assertThat(lane(heat, 2)).isEqualTo(new LaneDto(2, 1234, 1, LaneStatus.Used, Set.of(), 0, false));
         heat.touch(TestMessageCreator.split(1, 1, 2, 2, 2500));
         assertThat(lane(heat, 2).timeInMillis()).isEqualTo(2500);
     }
@@ -74,7 +75,7 @@ class HeatTest {
         Heat heat = prepared();
         heat.touch(TestMessageCreator.split(1, 1, 1, 1, 1000));
         heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
-        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 2000, 2, LaneStatus.Used, Penalty.None, 1, true));
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 2000, 2, LaneStatus.Used, Set.of(), 1, true));
     }
 
     @Test
@@ -179,7 +180,7 @@ class HeatTest {
         assertThat(dto.started()).isEqualTo(T0.plusSeconds(120));
         assertThat(dto.ended()).isNull();
         assertThat(lane(heat, 1).timeInMillis()).isZero();
-        assertThat(lane(heat, 2).penalty()).isEqualTo(Penalty.None);
+        assertThat(lane(heat, 2).penalties()).isEmpty();
     }
 
     @Test
@@ -212,8 +213,8 @@ class HeatTest {
         heat.didNotFinish(TestMessageCreator.dnf(1, 1, 3));
         heat.finish(TestMessageCreator.end(1, 1, T0.plusSeconds(30)));
         assertThat(lane(heat, 1).place()).isEqualTo(1);
-        assertThat(lane(heat, 2)).isEqualTo(new LaneDto(2, 0, 0, LaneStatus.Used, Penalty.DidNotStart, 0, false));
-        assertThat(lane(heat, 3)).isEqualTo(new LaneDto(3, 900, 1, LaneStatus.Used, Penalty.DidNotFinish, 0, false));
+        assertThat(lane(heat, 2)).isEqualTo(new LaneDto(2, 0, 0, LaneStatus.Used, Set.of(Penalty.DidNotStart), 0, false));
+        assertThat(lane(heat, 3)).isEqualTo(new LaneDto(3, 900, 1, LaneStatus.Used, Set.of(Penalty.DidNotFinish), 0, false));
     }
 
     @Test
@@ -225,9 +226,55 @@ class HeatTest {
 
         heat.disqualified(TestMessageCreator.dsq(1, 1, 1));
 
-        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 2000, 2, LaneStatus.Used, Penalty.Disqualified, 0, true));
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 2000, 2, LaneStatus.Used, Set.of(Penalty.Disqualified), 0, true));
         assertThat(lane(heat, 2).place()).isEqualTo(1);
         assertThat(lane(heat, 3).place()).isEqualTo(2);
+    }
+
+    @Test
+    void aLaneCanCarrySeveralPenalties() {
+        Heat heat = prepared();
+
+        heat.didNotFinish(TestMessageCreator.dnf(1, 1, 1));
+        heat.disqualified(TestMessageCreator.dsq(1, 1, 1));
+
+        assertThat(lane(heat, 1).penalties()).containsExactlyInAnyOrder(Penalty.DidNotFinish, Penalty.Disqualified);
+    }
+
+    @Test
+    void aPenaltyKeepsTheTimesOfTheLane() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 61_230));
+
+        heat.didNotStart(TestMessageCreator.dns(1, 1, 1));
+
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 61_230, 2, LaneStatus.Used, Set.of(Penalty.DidNotStart), 0, true));
+    }
+
+    @Test
+    void onlyALaneWithoutPenaltyGetsAPlace() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+        heat.touch(TestMessageCreator.fin(1, 1, 3, 0, 2200));
+
+        heat.didNotFinish(TestMessageCreator.dnf(1, 1, 1));
+        heat.disqualified(TestMessageCreator.dsq(1, 1, 2));
+
+        assertThat(lane(heat, 1).place()).isZero();
+        assertThat(lane(heat, 2).place()).isZero();
+        assertThat(lane(heat, 3).place()).isEqualTo(1);
+    }
+
+    @Test
+    void aLiveStartClearsThePenalties() {
+        Heat heat = prepared();
+        heat.didNotStart(TestMessageCreator.dns(1, 1, 1));
+        heat.disqualified(TestMessageCreator.dsq(1, 1, 1));
+
+        heat.start(TestMessageCreator.start(1, 1, T0.plusSeconds(120)));
+
+        assertThat(lane(heat, 1).penalties()).isEmpty();
     }
 
     @Test
@@ -266,7 +313,7 @@ class HeatTest {
         heat.touch(TestMessageCreator.split(1, 1, 1, 1, 0));
         assertThat(lane(heat, 1).timeInMillis()).isZero();
         heat.touch(TestMessageCreator.split(1, 1, 5, 1, 1000));
-        assertThat(lane(heat, 5)).isEqualTo(new LaneDto(5, 0, 0, LaneStatus.NotUsed, Penalty.None, 0, false));
+        assertThat(lane(heat, 5)).isEqualTo(new LaneDto(5, 0, 0, LaneStatus.NotUsed, Set.of(), 0, false));
     }
 
     @Test
@@ -274,7 +321,7 @@ class HeatTest {
         Heat heat = prepared();
         heat.touch(TestMessageCreator.fin(1, 1, 1, 1, 2000));
         heat.start(TestMessageCreator.start(1, 1, T0.plusSeconds(60)));
-        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 0, 0, LaneStatus.Used, Penalty.None, 0, false));
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 0, 0, LaneStatus.Used, Set.of(), 0, false));
     }
 
     @Test
@@ -321,7 +368,7 @@ class HeatTest {
 
         heat.touch(TestMessageCreator.split(1, 1, 1, 1, 12_000));
 
-        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 25_000, 2, LaneStatus.Used, Penalty.None, 1, true));
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 25_000, 2, LaneStatus.Used, Set.of(), 1, true));
         assertThat(lane(heat, 2).place()).isEqualTo(2);
     }
 
@@ -333,7 +380,7 @@ class HeatTest {
 
         heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 24_900));
 
-        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 24_900, 2, LaneStatus.Used, Penalty.None, 1, true));
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 24_900, 2, LaneStatus.Used, Set.of(), 1, true));
         assertThat(lane(heat, 2).place()).isEqualTo(2);
     }
 
@@ -373,11 +420,11 @@ class HeatTest {
 
         heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 2, 25_000, T0.plusSeconds(40)));
 
-        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 0, 0, LaneStatus.Used, Penalty.None, 0, false));
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 0, 0, LaneStatus.Used, Set.of(), 0, false));
         assertThat(lane(heat, 2).place()).isEqualTo(1);
 
         heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 27_000));
-        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 27_000, 2, LaneStatus.Used, Penalty.None, 2, true));
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 27_000, 2, LaneStatus.Used, Set.of(), 2, true));
     }
 
     @Test
@@ -387,7 +434,7 @@ class HeatTest {
 
         heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 1, 12_000, T0.plusSeconds(40)));
 
-        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 0, 0, LaneStatus.Used, Penalty.None, 0, false));
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 0, 0, LaneStatus.Used, Set.of(), 0, false));
     }
 
     @Test
@@ -399,8 +446,8 @@ class HeatTest {
         heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 1, 12_000, T0.plusSeconds(40)));
         heat.touch(TestMessageCreator.deletedAt(1, 1, 2, 2, 25_000, T0.plusSeconds(41)));
 
-        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 25_000, 2, LaneStatus.Used, Penalty.None, 0, false));
-        assertThat(lane(heat, 2)).isEqualTo(new LaneDto(2, 26_000, 2, LaneStatus.Used, Penalty.None, 1, true));
+        assertThat(lane(heat, 1)).isEqualTo(new LaneDto(1, 25_000, 2, LaneStatus.Used, Set.of(), 0, false));
+        assertThat(lane(heat, 2)).isEqualTo(new LaneDto(2, 26_000, 2, LaneStatus.Used, Set.of(), 1, true));
     }
 
     @Test
@@ -437,7 +484,7 @@ class HeatTest {
 
         heat.touch(TestMessageCreator.deletedAt(1, 1, 3, 1, 900, T0.plusSeconds(40)));
 
-        assertThat(lane(heat, 3)).isEqualTo(new LaneDto(3, 0, 0, LaneStatus.Used, Penalty.DidNotFinish, 0, false));
+        assertThat(lane(heat, 3)).isEqualTo(new LaneDto(3, 0, 0, LaneStatus.Used, Set.of(Penalty.DidNotFinish), 0, false));
         assertThat(heat.createDto().ended()).isEqualTo(T0);
     }
 

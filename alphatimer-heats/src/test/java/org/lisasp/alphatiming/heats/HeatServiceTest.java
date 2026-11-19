@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.lisasp.alphatiming.heats.TestMessageCreator.T0;
 
@@ -248,8 +249,8 @@ class HeatServiceTest {
         service.accept(TestMessageCreator.fin(1, 1, 10, 0, 2000));
         HeatDto heat = store.find(1, 1).orElseThrow();
         assertThat(heat.lanes()).extracting(LaneDto::number).containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
-        assertThat(heat.lanes().get(8)).isEqualTo(new LaneDto(9, 1000, 1, LaneStatus.Used, Penalty.None, 0, false));
-        assertThat(heat.lanes().get(9)).isEqualTo(new LaneDto(10, 2000, 2, LaneStatus.Used, Penalty.None, 1, true));
+        assertThat(heat.lanes().get(8)).isEqualTo(new LaneDto(9, 1000, 1, LaneStatus.Used, Set.of(), 0, false));
+        assertThat(heat.lanes().get(9)).isEqualTo(new LaneDto(10, 2000, 2, LaneStatus.Used, Set.of(), 1, true));
     }
 
     @Test
@@ -262,7 +263,7 @@ class HeatServiceTest {
         service.accept(TestMessageCreator.fin(1, 1, 1, 0, 2000));
         service.accept(TestMessageCreator.fin(1, 1, 2, 0, 2100));
         HeatDto heat = store.find(1, 1).orElseThrow();
-        assertThat(heat.lanes().get(0)).isEqualTo(new LaneDto(1, 2000, 2, LaneStatus.Used, Penalty.DidNotStart, 0, true));
+        assertThat(heat.lanes().get(0)).isEqualTo(new LaneDto(1, 2000, 2, LaneStatus.Used, Set.of(Penalty.DidNotStart), 0, true));
         assertThat(heat.lanes().get(1).place()).isEqualTo(1);
     }
 
@@ -276,7 +277,7 @@ class HeatServiceTest {
         service.accept(TestMessageCreator.fin(1, 1, 2, 0, 2100));
         service.accept(TestMessageCreator.dsq(1, 1, 1));
         HeatDto heat = store.find(1, 1).orElseThrow();
-        assertThat(heat.lanes().get(0)).isEqualTo(new LaneDto(1, 2000, 2, LaneStatus.Used, Penalty.Disqualified, 0, true));
+        assertThat(heat.lanes().get(0)).isEqualTo(new LaneDto(1, 2000, 2, LaneStatus.Used, Set.of(Penalty.Disqualified), 0, true));
         assertThat(heat.lanes().get(1).place()).isEqualTo(1);
     }
 
@@ -288,10 +289,10 @@ class HeatServiceTest {
         service.accept(TestMessageCreator.start(1, 1, T0));
         service.accept(TestMessageCreator.fin(1, 1, 1, 0, 2000));
         service.accept(TestMessageCreator.fin(1, 1, 1, 0, 2050));
-        assertThat(store.find(1, 1).orElseThrow().lanes().get(0)).isEqualTo(new LaneDto(1, 2050, 2, LaneStatus.Used, Penalty.None, 1, true));
+        assertThat(store.find(1, 1).orElseThrow().lanes().get(0)).isEqualTo(new LaneDto(1, 2050, 2, LaneStatus.Used, Set.of(), 1, true));
 
         service.accept(TestMessageCreator.split(1, 1, 1, 1, 1000));
-        assertThat(store.find(1, 1).orElseThrow().lanes().get(0)).isEqualTo(new LaneDto(1, 2050, 2, LaneStatus.Used, Penalty.None, 1, true));
+        assertThat(store.find(1, 1).orElseThrow().lanes().get(0)).isEqualTo(new LaneDto(1, 2050, 2, LaneStatus.Used, Set.of(), 1, true));
     }
 
     @Test

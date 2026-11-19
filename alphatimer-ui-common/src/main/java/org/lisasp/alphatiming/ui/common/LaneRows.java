@@ -3,9 +3,12 @@ package org.lisasp.alphatiming.ui.common;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.LaneDto;
 import org.lisasp.alphatiming.heats.LaneStatus;
+import org.lisasp.alphatiming.heats.Penalty;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /** What the Live View shows per used lane: one time (latest intermediate or the final one), lap or penalty, place. */
 public final class LaneRows {
@@ -29,12 +32,23 @@ public final class LaneRows {
     }
 
     private static Row toRow(LaneDto lane) {
-        String detail = switch (lane.penalty()) {
+        String detail = lane.penalties().isEmpty() ? lapText(lane) : penaltyText(lane);
+        return new Row(lane.number(), TimeFormat.time(lane.timeInMillis()), detail, lane.place(), lane.finished());
+    }
+
+    private static String lapText(LaneDto lane) {
+        return !lane.finished() && lane.lap() > 0 ? I18n.get("lane.lap", String.valueOf(lane.lap())) : "";
+    }
+
+    private static String penaltyText(LaneDto lane) {
+        return EnumSet.copyOf(lane.penalties()).stream().map(LaneRows::text).collect(Collectors.joining(", "));
+    }
+
+    private static String text(Penalty penalty) {
+        return switch (penalty) {
             case DidNotStart -> I18n.get("lane.dns");
             case DidNotFinish -> I18n.get("lane.dnf");
             case Disqualified -> I18n.get("lane.dsq");
-            case None -> !lane.finished() && lane.lap() > 0 ? I18n.get("lane.lap", String.valueOf(lane.lap())) : "";
         };
-        return new Row(lane.number(), TimeFormat.time(lane.timeInMillis()), detail, lane.place(), lane.finished());
     }
 }

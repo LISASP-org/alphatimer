@@ -14,6 +14,7 @@ import org.lisasp.alphatiming.heats.Penalty;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -43,8 +44,8 @@ class LiveViewPanelTest {
 
     private static HeatDto heat(int heatNumber, HeatStatus status, int timeInMillis, boolean finished) {
         return new HeatDto(3, heatNumber, status, null, null, 2, List.of(
-                new LaneDto(1, timeInMillis, 2, LaneStatus.Used, Penalty.None, finished ? 1 : 0, finished),
-                new LaneDto(2, 0, 0, LaneStatus.Used, Penalty.None, 0, false)));
+                new LaneDto(1, timeInMillis, 2, LaneStatus.Used, Set.of(), finished ? 1 : 0, finished),
+                new LaneDto(2, 0, 0, LaneStatus.Used, Set.of(), 0, false)));
     }
 
     @Test
@@ -145,11 +146,11 @@ class LiveViewPanelTest {
     void aLaneUsedBeforeKeepsItsRowWithoutATimeInBothHeats() {
         LiveViewPanel panel = new LiveViewPanel();
         HeatDto live = new HeatDto(3, 2, HeatStatus.Started, null, null, 2, List.of(
-                new LaneDto(1, 0, 0, LaneStatus.NotUsed, Penalty.None, 0, false),
-                new LaneDto(2, 12_340, 1, LaneStatus.Used, Penalty.None, 0, false)));
+                new LaneDto(1, 0, 0, LaneStatus.NotUsed, Set.of(), 0, false),
+                new LaneDto(2, 12_340, 1, LaneStatus.Used, Set.of(), 0, false)));
         HeatDto previous = new HeatDto(3, 1, HeatStatus.Finished, null, null, 2, List.of(
-                new LaneDto(1, 25_010, 2, LaneStatus.Used, Penalty.None, 1, true),
-                new LaneDto(2, 25_980, 2, LaneStatus.Used, Penalty.None, 2, true)));
+                new LaneDto(1, 25_010, 2, LaneStatus.Used, Set.of(), 1, true),
+                new LaneDto(2, 25_980, 2, LaneStatus.Used, Set.of(), 2, true)));
         panel.setHeats(new LiveHeats(live, previous, java.util.Set.of(1, 2)));
 
         assertThat(panel.displayedRows()).extracting(LaneRows.Row::lane).containsExactly(1, 2);

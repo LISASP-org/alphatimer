@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.lisasp.alphatiming.heats.TestMessageCreator.T0;
@@ -21,7 +22,7 @@ class RunningTimeModelTest {
 
     private static Heat runningHeat() {
         HeatDto empty = new HeatDto(1, 1, HeatStatus.Open, null, null, 0,
-                                    List.of(1, 2, 3, 4).stream().map(n -> new LaneDto(n, 0, 0, LaneStatus.NotUsed, Penalty.None, 0, false)).toList());
+                                    List.of(1, 2, 3, 4).stream().map(n -> new LaneDto(n, 0, 0, LaneStatus.NotUsed, Set.of(), 0, false)).toList());
         Heat heat = new Heat(empty);
         heat.usedLanes(TestMessageCreator.used(1, 1, "1110000000"));
         return heat;
