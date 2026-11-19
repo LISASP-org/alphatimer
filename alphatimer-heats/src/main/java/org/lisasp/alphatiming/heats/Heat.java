@@ -2,10 +2,12 @@ package org.lisasp.alphatiming.heats;
 
 import org.lisasp.alphatimer.api.ares.serial.events.messages.values.UsedLanes;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
@@ -22,6 +24,7 @@ final class Heat {
     private final int event;
     private final int heat;
     private HeatStatus status;
+    private LocalDateTime readyToStart;
     private LocalDateTime started;
     private LocalDateTime ended;
     private LocalDateTime lastMessage;
@@ -33,6 +36,7 @@ final class Heat {
         this.event = dto.event();
         this.heat = dto.heat();
         this.status = dto.status();
+        this.readyToStart = dto.readyToStart();
         this.started = dto.started();
         this.ended = dto.ended();
         this.lastMessage = dto.lastMessage();
@@ -42,7 +46,16 @@ final class Heat {
     }
 
     HeatDto createDto() {
-        return new HeatDto(event, heat, status, started, ended, lapCount, lanes.stream().map(Lane::createDto).toList(), lastMessage, startTimeOfDayMillis);
+        return new HeatDto(event, heat, status, lapCount, readyToStart, started, ended, lastMessage, startTimeOfDayMillis, lanes.stream().map(Lane::createDto).toList());
+    }
+
+    void readyToStart(ReadyToStartMessage message) {
+        if (status != HeatStatus.Open || started != null) {
+            return;
+        }
+        readyToStart = message.getTimestamp();
+        lastMessage = message.getTimestamp();
+        lapCount = message.getLapCount();
     }
 
     /**
@@ -87,9 +100,17 @@ final class Heat {
         update(message);
     }
 
+    void backupTime(BackupTimeMessage message) {
+        Lane lane = lane(message.getLane());
+        if (status == HeatStatus.Open || !lane.backup(message)) {
+            return;
+        }
+        lastMessage = message.getTimestamp();
+    }
+
     /**
      * The device withdraws a time by sending it again as deleted, after the race time has moved on; a deleted final time
-     * comes as a split time of the last lap. Only the lane's current time can be withdrawn, older ones are already gone.
+     * comes as a split time of the last lap. Every time of the lane with that lap and value is marked as deleted.
      */
     private void deleteTime(Lane lane, TimeMessage message) {
         lastMessage = message.getTimestamp();
@@ -169,7 +190,7 @@ final class Heat {
     private void computePlaces() {
         List<Lane> ranking = lanes.stream().filter(Lane::ranks).toList();
         for (Lane lane : lanes) {
-            lane.place(lane.ranks() ? 1 + (int) ranking.stream().filter(o -> o.timeInMillis() < lane.timeInMillis()).count() : 0);
+            lane.place(lane.ranks() ? 1 + (int) ranking.stream().filter(o -> o.finishInMillis() < lane.finishInMillis()).count() : 0);
         }
     }
 

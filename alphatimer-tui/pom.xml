@@ -15,6 +15,7 @@
         <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-ui-common</artifactId></dependency>
         <dependency><groupId>com.googlecode.lanterna</groupId><artifactId>lanterna</artifactId></dependency>
         <dependency><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId><scope>runtime</scope></dependency>
+        <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-heats</artifactId><type>test-jar</type><scope>test</scope></dependency>
     </dependencies>
 
     <build>

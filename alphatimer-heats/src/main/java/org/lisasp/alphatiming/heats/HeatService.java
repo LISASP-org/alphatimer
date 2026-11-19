@@ -2,10 +2,12 @@ package org.lisasp.alphatiming.heats;
 
 import lombok.extern.slf4j.Slf4j;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
@@ -49,7 +51,8 @@ public final class HeatService implements Consumer<RefinedMessage> {
 
     private static boolean isRepeatOfAPreviousRace(RefinedMessage message) {
         return (message instanceof StartMessage m && m.getMessageType() == RefinedMessageType.PreviousRaceResult)
-                || (message instanceof TimeMessage t && t.getMessageType() == RefinedMessageType.PreviousRaceResult);
+                || (message instanceof TimeMessage t && t.getMessageType() == RefinedMessageType.PreviousRaceResult)
+                || (message instanceof BackupTimeMessage b && b.getMessageType() == RefinedMessageType.PreviousRaceResult);
     }
 
     private record HeatKey(int event, int heat) {
@@ -61,6 +64,10 @@ public final class HeatService implements Consumer<RefinedMessage> {
 
     private static boolean sameHeat(HeatDto a, HeatDto b) {
         return a.event() == b.event() && a.heat() == b.heat();
+    }
+
+    public LiveHeats liveHeats() {
+        return live;
     }
 
     public synchronized void register(Consumer<LiveHeats> listener) {
@@ -86,12 +93,16 @@ public final class HeatService implements Consumer<RefinedMessage> {
             Optional<HeatDto> stored = store.find(message.getEvent(), message.getHeat());
             HeatDto before = stored.orElseGet(() -> HeatDto.empty(message.getEvent(), message.getHeat(), LANE_COUNT));
             Heat heat = new Heat(before);
-            if (message instanceof StartMessage m) {
+            if (message instanceof ReadyToStartMessage m) {
+                heat.readyToStart(m);
+            } else if (message instanceof StartMessage m) {
                 heat.start(m);
             } else if (message instanceof UsedLanesMessage m) {
                 heat.usedLanes(m);
             } else if (message instanceof TimeMessage m) {
                 heat.touch(m);
+            } else if (message instanceof BackupTimeMessage m) {
+                heat.backupTime(m);
             } else if (message instanceof DidNotStartMessage m) {
                 heat.didNotStart(m);
             } else if (message instanceof DidNotFinishMessage m) {

@@ -7,7 +7,15 @@ import org.lisasp.alphatimer.api.serial.SerialPortReader;
 import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.HeatStatus;
-import org.lisasp.alphatiming.project.db.HeatStore;
+import org.lisasp.alphatiming.project.db.MessageStore;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.KindOfTime;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.MessageType;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.RankInfo;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeInfo;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeMarker;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeType;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.values.UsedLanes;
 import org.lisasp.alphatiming.project.db.TimingFileWriter;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.heats.LiveHeats;
@@ -565,17 +573,19 @@ class AppControllerTest {
     @Test
     void latestHeatIsRestoredWhenOpeningAFile() throws Exception {
         Path file = dir.resolve("heat.heat");
-        HeatDto created;
         try (TimingDocument other = TimingDocument.create(work, S)) {
-            created = new HeatStore(other.database()).create(4, 2, 8);
+            new MessageStore(other.database()).put(announcementOf(4, 2, LocalDateTime.of(2026, 5, 1, 10, 0)));
             other.saveAs(file);
         }
         controller.init();
         List<LiveHeats> seen = new ArrayList<>();
         controller.addHeatListener(seen::add);
         controller.open(file);
-        assertThat(controller.currentHeat()).contains(created);
-        assertThat(seen).containsExactly(new LiveHeats(created, null));
+        assertThat(controller.currentHeat()).hasValueSatisfying(heat -> {
+            assertThat(heat.event()).isEqualTo(4);
+            assertThat(heat.heat()).isEqualTo(2);
+        });
+        assertThat(seen).containsExactly(controller.liveHeats());
     }
 
     @Test
@@ -684,13 +694,28 @@ class AppControllerTest {
         assertThat(workFiles()).isEqualTo(2); // the leftover and the new project
     }
 
+    private static DataHandlingMessage messageOf(MessageType type, KindOfTime kind, int event, int heat, LocalDateTime at) {
+        boolean[] lanes = new boolean[10];
+        java.util.Arrays.fill(lanes, 0, 8, true);
+        return new DataHandlingMessage(at, "", "a", "b", type, kind, TimeType.Empty, new UsedLanes(lanes), (byte) 2, (short) event, (byte) heat, (byte) 0,
+                                       RankInfo.Normal, (byte) 0, (byte) 0, 0, TimeInfo.Normal, TimeMarker.Empty);
+    }
+
+    private static DataHandlingMessage announcementOf(int event, int heat, LocalDateTime at) {
+        return messageOf(MessageType.ReadyToStart, KindOfTime.Empty, event, heat, at);
+    }
+
+    private static DataHandlingMessage startOf(int event, int heat, LocalDateTime at) {
+        return messageOf(MessageType.OnLineTime, KindOfTime.Start, event, heat, at);
+    }
+
     @Test
     void openingAProjectRestoresTheCurrentAndThePreviousHeat() throws Exception {
         Path file = dir.resolve("two.heat");
         try (TimingDocument a = TimingDocument.create(work, S)) {
-            HeatStore store = new HeatStore(a.database());
-            store.create(new HeatDto(1, 1, HeatStatus.Started, LocalDateTime.of(2026, 5, 1, 10, 0), null, 0, List.of()));
-            store.create(1, 2, 8);
+            MessageStore store = new MessageStore(a.database());
+            store.put(startOf(1, 1, LocalDateTime.of(2026, 5, 1, 10, 0)));
+            store.put(startOf(1, 2, LocalDateTime.of(2026, 5, 1, 10, 3)));
             a.saveAs(file);
         }
         controller.init();
@@ -707,10 +732,10 @@ class AppControllerTest {
     void openingAProjectMakesAllItsHeatsKnown() throws Exception {
         Path file = dir.resolve("three.timing");
         try (TimingDocument a = TimingDocument.create(work, S)) {
-            HeatStore store = new HeatStore(a.database());
-            store.create(1, 1, 8);
-            store.create(1, 2, 8);
-            store.create(1, 3, 8);
+            MessageStore store = new MessageStore(a.database());
+            store.put(announcementOf(1, 1, LocalDateTime.of(2026, 5, 1, 10, 0)));
+            store.put(announcementOf(1, 2, LocalDateTime.of(2026, 5, 1, 10, 3)));
+            store.put(announcementOf(1, 3, LocalDateTime.of(2026, 5, 1, 10, 6)));
             a.saveAs(file);
         }
         controller.init();
@@ -722,11 +747,11 @@ class AppControllerTest {
     void openingAProjectSkipsAnEmptyHeatForThePreviousHeat() throws Exception {
         Path file = dir.resolve("skipped.timing");
         try (TimingDocument a = TimingDocument.create(work, S)) {
-            HeatStore store = new HeatStore(a.database());
+            MessageStore store = new MessageStore(a.database());
             LocalDateTime start = LocalDateTime.of(2026, 5, 1, 10, 0);
-            store.create(new HeatDto(1, 1, HeatStatus.Started, start, null, 0, List.of()));
-            store.create(1, 2, 8);
-            store.create(new HeatDto(1, 3, HeatStatus.Started, start.plusMinutes(3), null, 0, List.of()));
+            store.put(startOf(1, 1, start));
+            store.put(announcementOf(1, 2, start.plusMinutes(1)));
+            store.put(startOf(1, 3, start.plusMinutes(3)));
             a.saveAs(file);
         }
         controller.init();
@@ -740,7 +765,7 @@ class AppControllerTest {
         Path withHeat = dir.resolve("with.heat");
         Path without = dir.resolve("without.heat");
         try (TimingDocument a = TimingDocument.create(work, S)) {
-            new HeatStore(a.database()).create(4, 2, 8);
+            new MessageStore(a.database()).put(announcementOf(4, 2, LocalDateTime.of(2026, 5, 1, 10, 0)));
             a.saveAs(withHeat);
         }
         try (TimingDocument b = TimingDocument.create(work, S)) {
@@ -1001,6 +1026,27 @@ class AppControllerTest {
 
     private Path otherWork() throws IOException {
         return Files.createDirectories(dir.resolve("other-work"));
+    }
+
+    @Test
+    void openingAFileWhoseMessagesCannotBeReadReleasesItsWorkFileAndLock() throws Exception {
+        Path file = savedProject("unreadable.timing");
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + file); var st = connection.createStatement()) {
+            st.execute("insert into aresmessage (originalText1, originalText2, timestamp, messageType, kindOfTime, timeType, usedLanes, lapCount, event, heat, rank,"
+                       + " rankInfo, lane, currentLap, timeInMillis, timeInfo, timeMarker, competitionKey)"
+                       + " values ('a', 'b', '2026-05-01 10:00:00', 'NoSuchType', 'Finish', 'Empty', '1100000000', 1, 1, 1, 0, 'Normal', 1, 1, 1000, 'Normal', 'Empty', 'WK')");
+        }
+        controller.init();
+        TimingDocument before = controller.document();
+
+        controller.open(file);
+
+        assertThat(prompt.errors).hasSize(1);
+        assertThat(controller.document()).isSameAs(before);
+        assertThat(workFiles()).isEqualTo(1);
+        try (TimingDocument reopened = TimingDocument.open(file, otherWork())) {
+            assertThat(reopened.file()).contains(file);
+        }
     }
 
     @Test

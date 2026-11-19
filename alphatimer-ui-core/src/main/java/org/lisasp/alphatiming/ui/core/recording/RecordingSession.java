@@ -18,8 +18,9 @@ import org.lisasp.basics.notification.primitive.ByteConsumer;
 import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.heats.HeatService;
-import org.lisasp.alphatiming.project.db.HeatStore;
-import org.lisasp.alphatiming.project.db.LaneTimeStore;
+import org.lisasp.alphatiming.heats.HeatRepository;
+import org.lisasp.alphatiming.heats.InMemoryHeatRepository;
+import org.lisasp.alphatiming.legacy.server.InMemoryLaneTimeRepository;
 import org.lisasp.alphatiming.legacy.server.LegacyHttpServer;
 import org.lisasp.alphatiming.legacy.server.LegacyService;
 import org.lisasp.alphatiming.legacy.api.Heat;
@@ -58,7 +59,6 @@ public final class RecordingSession implements AutoCloseable {
     private final DateTimeFacade time;
 
     private final List<Consumer<RecordingState>> stateListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<LiveHeats>> heatListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<DataHandlingMessage>> messageListeners = new CopyOnWriteArrayList<>();
     private final List<Runnable> pingListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<Exception>> errorListeners = new CopyOnWriteArrayList<>();
@@ -72,13 +72,20 @@ public final class RecordingSession implements AutoCloseable {
     private volatile SerialPortReader reader;
     private RawDataRecorder rawRecorder;
     private LegacyHttpServer restServer;
-    private final LegacyService legacy;
+    private final LegacyService legacy = new LegacyService(new InMemoryLaneTimeRepository());
+    private final HeatService heatService;
 
+    /** Heats and lane times are not stored; they are rebuilt from the stored messages and live as long as the session. */
     public RecordingSession(TimingDatabase db, ReaderFactory readers, DateTimeFacade time) {
+        this(db, readers, time, new InMemoryHeatRepository());
+    }
+
+    RecordingSession(TimingDatabase db, ReaderFactory readers, DateTimeFacade time, HeatRepository heats) {
+        this.heatService = new HeatService(heats, this::reportError);
         this.db = db;
         this.readers = readers;
         this.time = time;
-        this.legacy = new LegacyService(writes.laneTimes(new LaneTimeStore(db)));
+        MessageReplay.replay(new MessageStore(db).findAll(), legacy, heatService);
     }
 
     /** TCP or serial reader, depending on the connection type of the settings. */
@@ -161,8 +168,6 @@ public final class RecordingSession implements AutoCloseable {
 
     private void build(Settings s) {
         MessageStore messageStore = new MessageStore(db);
-        HeatService heatService = new HeatService(writes.heats(new HeatStore(db)), this::reportError);
-        heatListeners.forEach(heatService::register);
         rawRecorder = new RawDataRecorder(db, time, 512, 250, ex -> writes.failed(RecordedData.RAW_DATA, ex), () -> writes.stored(RecordedData.RAW_DATA),
                                           bytes -> writes.dropped(RecordedData.RAW_DATA, bytes));
 
@@ -345,7 +350,7 @@ public final class RecordingSession implements AutoCloseable {
     }
 
     public void addHeatListener(Consumer<LiveHeats> listener) {
-        heatListeners.add(listener);
+        heatService.register(listener);
     }
 
     /** Called with every interpreted message (the two raw lines of the device combined); pings are not messages. */
@@ -360,6 +365,10 @@ public final class RecordingSession implements AutoCloseable {
     /** Called after a lost connection has stopped the recording. */
     public void addConnectionLostListener(Consumer<LostConnection> listener) {
         connectionLostListeners.add(listener);
+    }
+
+    public LiveHeats liveHeats() {
+        return heatService.liveHeats();
     }
 
     public Heat[] legacyHeats() {

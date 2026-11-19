@@ -1,7 +1,7 @@
 # AlphaTiming
 
 Desktop application that reads the data of a Quantum/Ares timekeeping system over TCP or a serial port, stores the raw data and the
-interpreted results in one project file and shows the current heat live (lanes, one time per lane, penalties, placing,
+messages in one project file, rebuilds the heats from them and shows the current heat live (lanes with their current time, penalties, placing,
 running time).
 
 It reuses the core logic of the Spring Boot application *alphatimer* (protocol parsing, message refining, heat logic;

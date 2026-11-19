@@ -52,6 +52,14 @@ public class MessageStore implements DataHandlingMessageRepository {
                                .toList());
     }
 
+    public List<DataHandlingMessage> findAll() {
+        return db.read(em -> em.createQuery("select a from AresMessageEntity a order by a.id", AresMessageEntity.class)
+                               .getResultList()
+                               .stream()
+                               .map(MessageStore::toMessage)
+                               .toList());
+    }
+
     private static DataHandlingMessage toMessage(AresMessageEntity e) {
         return new DataHandlingMessage(e.getTimestamp(),
                                        e.getCompetitionKey(),

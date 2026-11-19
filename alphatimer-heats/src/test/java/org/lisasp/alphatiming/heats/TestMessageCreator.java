@@ -1,9 +1,11 @@
 package org.lisasp.alphatiming.heats;
 
+import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
@@ -23,6 +25,10 @@ public final class TestMessageCreator {
 
     public static UsedLanesMessage used(int event, int heat, String lanes) {
         return new UsedLanesMessage(T0, "WK", (short) event, (byte) heat, lanes);
+    }
+
+    public static ReadyToStartMessage readyToStart(int event, int heat, int lapCount, LocalDateTime at) {
+        return new ReadyToStartMessage(at, "WK", (short) event, (byte) heat, (byte) lapCount);
     }
 
     public static StartMessage start(int event, int heat, LocalDateTime at) {
@@ -70,6 +76,14 @@ public final class TestMessageCreator {
     /** The device marks a deleted final time as a split time of the last lap, with the value it deletes. */
     public static TimeMessage deletedAt(int event, int heat, int lane, int lap, int millis, LocalDateTime at) {
         return new TimeMessage(at, "WK", (short) event, (byte) heat, RefinedMessageType.Live, RefinedKindOfTime.SplitTime, (byte) lane, (byte) lap, (byte) 2, (byte) 0, millis, RefinedTimeType.DeletedTime);
+    }
+
+    public static BackupTimeMessage backup(int event, int heat, int lane, int lap, int millis, LocalDateTime at) {
+        return new BackupTimeMessage(at, "WK", (short) event, (byte) heat, RefinedMessageType.CurrentRaceResult, (byte) lane, (byte) lap, millis);
+    }
+
+    public static TimeMessage finOfType(int event, int heat, int lane, int millis, RefinedMessageType messageType, RefinedTimeType timeType) {
+        return new TimeMessage(T0.plusSeconds(1), "WK", (short) event, (byte) heat, messageType, RefinedKindOfTime.Finish, (byte) lane, (byte) 2, (byte) 2, (byte) 0, millis, timeType);
     }
 
     private static TimeMessage timeAt(int event, int heat, int lane, int lap, int rank, int millis, RefinedKindOfTime kind, LocalDateTime at, RefinedMessageType type) {

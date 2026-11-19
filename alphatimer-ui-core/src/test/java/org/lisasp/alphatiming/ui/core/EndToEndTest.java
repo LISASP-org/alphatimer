@@ -3,7 +3,6 @@ package org.lisasp.alphatiming.ui.core;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatiming.heats.LiveHeats;
-import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.project.db.MessageStore;
 import org.lisasp.alphatiming.project.db.RawDataRecorder;
@@ -82,7 +81,7 @@ class EndToEndTest {
             RawDataRecorder.readAll(doc.database()).forEach(raw::writeBytes);
             assertThat(raw.toByteArray()).isEqualTo(data);
             assertThat(new MessageStore(doc.database()).findBy("", (short) 1, (byte) 1)).hasSize(1);
-            assertThat(new HeatStore(doc.database()).findLatest()).isPresent();
+            assertThat(session.liveHeats().current()).isNotNull();
             assertThat(doc.isDirty()).isFalse();
 
             // change the settings without restarting the program, record again

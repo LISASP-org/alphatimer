@@ -30,7 +30,7 @@ class HeatRowsTest {
     }
 
     private static HeatDto heat(int event, int heat, LocalDateTime started, LocalDateTime ended) {
-        return new HeatDto(event, heat, HeatStatus.Started, started, ended, 0, List.of(), started);
+        return new HeatDto(event, heat, HeatStatus.Started, 0, null, started, ended, started, null, List.of());
     }
 
     @Test
@@ -47,7 +47,7 @@ class HeatRowsTest {
 
     @Test
     void anEstimatedFinishIsMarked() {
-        HeatDto estimated = new HeatDto(3, 2, HeatStatus.FinishedEstimated, TEN, TEN.plusSeconds(65), 0, List.of());
+        HeatDto estimated = new HeatDto(3, 2, HeatStatus.FinishedEstimated, 0, null, TEN, TEN.plusSeconds(65), null, null, List.of());
 
         assertThat(HeatRows.from(List.of(estimated), 0)).containsExactly(new HeatRows.Row("10:00:00", "\u224810:01:05", "03-002"));
     }
@@ -60,7 +60,7 @@ class HeatRowsTest {
     @Test
     void theTimesFollowTheClockOfTheDeviceWithTheOffset() {
         int halfPastSeven = 7 * 3_600_000 + 30 * 60_000;
-        HeatDto heat = new HeatDto(3, 2, HeatStatus.Finished, TEN, TEN.plusSeconds(65), 0, List.of(), null, halfPastSeven);
+        HeatDto heat = new HeatDto(3, 2, HeatStatus.Finished, 0, null, TEN, TEN.plusSeconds(65), null, halfPastSeven, List.of());
 
         assertThat(HeatRows.from(List.of(heat), 1)).containsExactly(new HeatRows.Row("08:30:00", "08:31:05", "03-002"));
     }
@@ -92,8 +92,8 @@ class HeatRowsTest {
     void theRowsAreSortedByTheShownTimesEvenWhenTheArrivalTimesDisagree() {
         int nine = 9 * 3_600_000;
         int eight = 8 * 3_600_000;
-        HeatDto shownLater = new HeatDto(1, 1, HeatStatus.Finished, TEN, TEN.plusMinutes(1), 0, List.of(), null, nine);
-        HeatDto shownEarlier = new HeatDto(1, 2, HeatStatus.Finished, TEN.plusMinutes(1), TEN.plusMinutes(2), 0, List.of(), null, eight);
+        HeatDto shownLater = new HeatDto(1, 1, HeatStatus.Finished, 0, null, TEN, TEN.plusMinutes(1), null, nine, List.of());
+        HeatDto shownEarlier = new HeatDto(1, 2, HeatStatus.Finished, 0, null, TEN.plusMinutes(1), TEN.plusMinutes(2), null, eight, List.of());
 
         assertThat(HeatRows.from(List.of(shownEarlier, shownLater), 0)).extracting(HeatRows.Row::start).containsExactly("09:00:00", "08:00:00");
     }
@@ -101,8 +101,8 @@ class HeatRowsTest {
     @Test
     void theRowsAreSortedByTheEndAsShown() {
         int nine = 9 * 3_600_000;
-        HeatDto endsLater = new HeatDto(1, 1, HeatStatus.Finished, TEN, TEN.plusMinutes(3), 0, List.of(), null, nine);
-        HeatDto endsEarlier = new HeatDto(1, 2, HeatStatus.Finished, TEN.plusMinutes(1), TEN.plusMinutes(2), 0, List.of(), null, nine);
+        HeatDto endsLater = new HeatDto(1, 1, HeatStatus.Finished, 0, null, TEN, TEN.plusMinutes(3), null, nine, List.of());
+        HeatDto endsEarlier = new HeatDto(1, 2, HeatStatus.Finished, 0, null, TEN.plusMinutes(1), TEN.plusMinutes(2), null, nine, List.of());
 
         assertThat(HeatRows.from(List.of(endsEarlier, endsLater), 0)).extracting(HeatRows.Row::finish).containsExactly("09:03:00", "09:01:00");
     }

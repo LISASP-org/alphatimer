@@ -13,12 +13,12 @@ import java.util.List;
 
 /**
  * Brings the schema of a project file to the current version before Hibernate opens it. The version is SQLite's
- * {@code user_version}: the number of steps applied. There are no steps yet: the files of version 1 are the baseline.
+ * {@code user_version}: the number of steps applied.
  */
 @Slf4j
 final class SchemaMigrations {
 
-    private static final List<MigrationStep> STEPS = List.of();
+    private static final List<MigrationStep> STEPS = List.of(new DropDerivedTables());
 
     static final int CURRENT_VERSION = STEPS.size();
 

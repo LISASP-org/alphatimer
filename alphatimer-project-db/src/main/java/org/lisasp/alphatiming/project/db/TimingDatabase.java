@@ -25,7 +25,7 @@ public final class TimingDatabase implements AutoCloseable {
 
     private static final byte[] SQLITE_HEADER = "SQLite format 3\0".getBytes(StandardCharsets.US_ASCII);
 
-    private static final Class<?>[] ENTITIES = {SettingsEntity.class, RawDataChunkEntity.class, AresMessageEntity.class, LaneTimeEntity.class, HeatEntity.class, LaneEntity.class};
+    private static final Class<?>[] ENTITIES = {SettingsEntity.class, RawDataChunkEntity.class, AresMessageEntity.class};
 
     private final ReentrantLock lock = new ReentrantLock();
     private final AtomicLong writeCount = new AtomicLong();
@@ -46,11 +46,7 @@ public final class TimingDatabase implements AutoCloseable {
             } else {
                 SchemaMigrations.migrate(workFile);
             }
-            SessionFactory built = buildFactory(workFile);
-            if (isNew) {
-                createKeys(built);
-            }
-            this.factory = built;
+            this.factory = buildFactory(workFile);
         } catch (IOException | RuntimeException ex) {
             releaseLock();
             throw ex;
@@ -115,25 +111,12 @@ public final class TimingDatabase implements AutoCloseable {
     private static void checkIsTimingDatabase(Path file, Path shownName) throws IOException {
         try (java.sql.Connection c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + file.toAbsolutePath());
              Statement st = c.createStatement();
-             java.sql.ResultSet rs = st.executeQuery("select count(*) from sqlite_master where type = 'table' and name in ('settings', 'heat', 'rawdata', 'aresmessage')")) {
-            if (!rs.next() || rs.getInt(1) < 4) {
+             java.sql.ResultSet rs = st.executeQuery("select count(*) from sqlite_master where type = 'table' and name in ('settings', 'rawdata', 'aresmessage')")) {
+            if (!rs.next() || rs.getInt(1) < 3) {
                 throw new InvalidProjectFileException(shownName);
             }
         } catch (java.sql.SQLException ex) {
             throw new InvalidProjectFileException(shownName, ex);
-        }
-    }
-
-    private static void createKeys(SessionFactory built) {
-        try {
-            built.inTransaction(session -> {
-                session.createNativeMutationQuery(HeatEntity.UNIQUE_KEY).executeUpdate();
-                // TableRebuild needs foreign keys off only for a referenced table; no table references lane.
-                session.doWork(LaneKeys::addTo);
-            });
-        } catch (RuntimeException ex) {
-            built.close();
-            throw ex;
         }
     }
 

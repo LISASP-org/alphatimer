@@ -13,6 +13,7 @@ import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.HeatStatus;
 import org.lisasp.alphatiming.heats.LaneDto;
 import org.lisasp.alphatiming.heats.LaneStatus;
+import org.lisasp.alphatiming.heats.TestLanes;
 import org.lisasp.alphatiming.heats.Penalty;
 import org.lisasp.alphatiming.project.db.CrashLeftover;
 import org.lisasp.alphatiming.ui.core.project.TimingDocument;
@@ -37,6 +38,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -164,9 +166,9 @@ class JAlphaTimingSmokeTest {
                 assertThat(frame.settingsPanel().lockableInputs()).isNotEmpty().allSatisfy(c -> assertThat(c.isEnabled()).as(c.getClass().getSimpleName()).isFalse());
             });
 
-            HeatDto heat = new HeatDto(3, 2, HeatStatus.Started, LocalDateTime.now().minusSeconds(5), null, 2, List.of(
-                    new LaneDto(1, 12_340, 1, LaneStatus.Used, Penalty.None, 0, false),
-                    new LaneDto(2, 25_000, 2, LaneStatus.Used, Penalty.None, 1, true)));
+            HeatDto heat = new HeatDto(3, 2, HeatStatus.Started, 2, null, LocalDateTime.now().minusSeconds(5), null, null, null, List.of(
+                    TestLanes.lane(1, LaneStatus.Used, Set.of(), 0, TestLanes.split(1, 12_340)),
+                    TestLanes.lane(2, LaneStatus.Used, Set.of(), 1, TestLanes.finish(2, 25_000))));
             onEdt(() -> frame.showHeats(new org.lisasp.alphatiming.heats.LiveHeats(heat, null)));
             onEdt(() -> {
                 ((JToggleButton) frame.buttonBar().getComponent(1)).doClick();

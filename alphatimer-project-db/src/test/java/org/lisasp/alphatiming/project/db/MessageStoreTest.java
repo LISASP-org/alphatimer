@@ -59,6 +59,22 @@ class MessageStoreTest {
     }
 
     @Test
+    void findAllReturnsEveryMessageInTheOrderItWasStored() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            MessageStore store = new MessageStore(db);
+            DataHandlingMessage first = message("TestWK", (short) 1, (byte) 2);
+            DataHandlingMessage second = message("Other", (short) 1, (byte) 1);
+            DataHandlingMessage third = message("TestWK", (short) 1, (byte) 1);
+            store.put(first);
+            store.put(second);
+            store.put(third);
+
+            assertThat(store.findAll()).containsExactly(first, second, third);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
     void theFormerNameOfTheBackupTimeTypeIsStillRead() throws Exception {
         try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             MessageStore store = new MessageStore(db);
@@ -67,6 +83,19 @@ class MessageStoreTest {
 
             assertThat(store.findBy("TestWK", (short) 1, (byte) 1)).extracting(DataHandlingMessage::getMessageType)
                                                                   .containsExactly(MessageType.BackupTime);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void theFormerNameOfTheBackupKindOfTimeIsStillRead() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            MessageStore store = new MessageStore(db);
+            store.put(message("TestWK", (short) 1, (byte) 1));
+            db.write(em -> em.createNativeQuery("update aresmessage set kindOfTime = 'UnknownValueB'").executeUpdate());
+
+            assertThat(store.findBy("TestWK", (short) 1, (byte) 1)).extracting(DataHandlingMessage::getKindOfTime)
+                                                                  .containsExactly(KindOfTime.Backup);
             db.closeAndDelete();
         }
     }

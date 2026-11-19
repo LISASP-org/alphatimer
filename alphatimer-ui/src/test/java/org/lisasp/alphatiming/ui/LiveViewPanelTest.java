@@ -9,11 +9,13 @@ import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.HeatStatus;
 import org.lisasp.alphatiming.heats.LaneDto;
 import org.lisasp.alphatiming.heats.LaneStatus;
+import org.lisasp.alphatiming.heats.TestLanes;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.heats.Penalty;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,9 +44,10 @@ class LiveViewPanelTest {
     }
 
     private static HeatDto heat(int heatNumber, HeatStatus status, int timeInMillis, boolean finished) {
-        return new HeatDto(3, heatNumber, status, null, null, 2, List.of(
-                new LaneDto(1, timeInMillis, 2, LaneStatus.Used, Penalty.None, finished ? 1 : 0, finished),
-                new LaneDto(2, 0, 0, LaneStatus.Used, Penalty.None, 0, false)));
+        return new HeatDto(3, heatNumber, status, 2, null, null, null, null, null, List.of(
+                finished ? TestLanes.lane(1, LaneStatus.Used, Set.of(), 1, TestLanes.finish(2, timeInMillis))
+                         : TestLanes.lane(1, LaneStatus.Used, Set.of(), 0, TestLanes.split(2, timeInMillis)),
+                TestLanes.lane(2, LaneStatus.Used, Set.of(), 0)));
     }
 
     @Test
@@ -64,9 +67,9 @@ class LiveViewPanelTest {
     @Test
     void theKnownHeatsAreListedInATableRightOfTheLiveHeat() {
         java.time.LocalDateTime start = java.time.LocalDateTime.of(2026, 5, 1, 10, 0, 0);
-        HeatDto running = new HeatDto(3, 2, HeatStatus.Started, start.plusMinutes(3), null, 0, List.of());
-        HeatDto finished = new HeatDto(3, 1, HeatStatus.Finished, start, start.plusSeconds(65), 0, List.of());
-        HeatDto open = new HeatDto(4, 1, HeatStatus.Open, null, null, 0, List.of());
+        HeatDto running = new HeatDto(3, 2, HeatStatus.Started, 0, null, start.plusMinutes(3), null, null, null, List.of());
+        HeatDto finished = new HeatDto(3, 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, null, List.of());
+        HeatDto open = new HeatDto(4, 1, HeatStatus.Open, 0, null, null, null, null, null, List.of());
         LiveViewPanel panel = new LiveViewPanel();
         panel.setHeats(new LiveHeats(running, finished, new java.util.TreeSet<>(), List.of(open, running, finished)));
         panel.setSize(1000, 900);
@@ -84,7 +87,7 @@ class LiveViewPanelTest {
     @Test
     void theTableFollowsTheTimekeepingOffset() {
         java.time.LocalDateTime start = java.time.LocalDateTime.of(2026, 5, 1, 10, 0, 0);
-        HeatDto finished = new HeatDto(3, 1, HeatStatus.Finished, start, start.plusSeconds(65), 0, List.of(), null, 7 * 3_600_000);
+        HeatDto finished = new HeatDto(3, 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, 7 * 3_600_000, List.of());
         LiveViewPanel panel = new LiveViewPanel();
         panel.setHeats(new LiveHeats(finished, null));
 
@@ -96,8 +99,8 @@ class LiveViewPanelTest {
     @Test
     void bothHeatsTellWhenTheyStartedAndTheFinishedOneWhenItFinished() {
         java.time.LocalDateTime start = java.time.LocalDateTime.of(2026, 5, 1, 10, 0, 0);
-        HeatDto running = new HeatDto(3, 2, HeatStatus.Started, start.plusMinutes(3), null, 0, List.of());
-        HeatDto finished = new HeatDto(3, 1, HeatStatus.Finished, start, start.plusSeconds(65), 0, List.of());
+        HeatDto running = new HeatDto(3, 2, HeatStatus.Started, 0, null, start.plusMinutes(3), null, null, null, List.of());
+        HeatDto finished = new HeatDto(3, 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, null, List.of());
         LiveViewPanel panel = new LiveViewPanel();
 
         panel.setHeats(new LiveHeats(running, finished));
@@ -110,8 +113,8 @@ class LiveViewPanelTest {
     void theTimesStandInTheMiddleOfTheHeadingInThePlainNormalFont() {
         java.time.LocalDateTime start = java.time.LocalDateTime.of(2026, 5, 1, 10, 0, 0);
         LiveViewPanel panel = new LiveViewPanel();
-        panel.setHeats(new LiveHeats(new HeatDto(3, 2, HeatStatus.Started, start.plusMinutes(3), null, 0, List.of()),
-                                     new HeatDto(3, 1, HeatStatus.Finished, start, start.plusSeconds(65), 0, List.of())));
+        panel.setHeats(new LiveHeats(new HeatDto(3, 2, HeatStatus.Started, 0, null, start.plusMinutes(3), null, null, null, List.of()),
+                                     new HeatDto(3, 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, null, List.of())));
         panel.setSize(1000, 900);
         layoutAll(panel);
 
@@ -144,12 +147,12 @@ class LiveViewPanelTest {
     @Test
     void aLaneUsedBeforeKeepsItsRowWithoutATimeInBothHeats() {
         LiveViewPanel panel = new LiveViewPanel();
-        HeatDto live = new HeatDto(3, 2, HeatStatus.Started, null, null, 2, List.of(
-                new LaneDto(1, 0, 0, LaneStatus.NotUsed, Penalty.None, 0, false),
-                new LaneDto(2, 12_340, 1, LaneStatus.Used, Penalty.None, 0, false)));
-        HeatDto previous = new HeatDto(3, 1, HeatStatus.Finished, null, null, 2, List.of(
-                new LaneDto(1, 25_010, 2, LaneStatus.Used, Penalty.None, 1, true),
-                new LaneDto(2, 25_980, 2, LaneStatus.Used, Penalty.None, 2, true)));
+        HeatDto live = new HeatDto(3, 2, HeatStatus.Started, 2, null, null, null, null, null, List.of(
+                TestLanes.lane(1, LaneStatus.NotUsed, Set.of(), 0),
+                TestLanes.lane(2, LaneStatus.Used, Set.of(), 0, TestLanes.split(1, 12_340))));
+        HeatDto previous = new HeatDto(3, 1, HeatStatus.Finished, 2, null, null, null, null, null, List.of(
+                TestLanes.lane(1, LaneStatus.Used, Set.of(), 1, TestLanes.finish(2, 25_010)),
+                TestLanes.lane(2, LaneStatus.Used, Set.of(), 2, TestLanes.finish(2, 25_980))));
         panel.setHeats(new LiveHeats(live, previous, java.util.Set.of(1, 2)));
 
         assertThat(panel.displayedRows()).extracting(LaneRows.Row::lane).containsExactly(1, 2);
@@ -225,7 +228,7 @@ class LiveViewPanelTest {
     @Test
     void theClockDoesNotRunOnFromAStaleReference() {
         java.time.LocalDateTime longAgo = java.time.LocalDateTime.now().minusHours(2);
-        HeatDto stale = new HeatDto(3, 1, HeatStatus.Started, longAgo, null, 2, List.of(), longAgo.plusSeconds(25));
+        HeatDto stale = new HeatDto(3, 1, HeatStatus.Started, 2, null, longAgo, null, longAgo.plusSeconds(25), null, List.of());
 
         LiveViewPanel panel = new LiveViewPanel();
         panel.setHeats(new LiveHeats(stale, null));
@@ -239,7 +242,7 @@ class LiveViewPanelTest {
     @Test
     void theClockRunsWhileRecordingAHeatWithRecentMessages() {
         java.time.LocalDateTime start = java.time.LocalDateTime.now().minusSeconds(20);
-        HeatDto running = new HeatDto(3, 1, HeatStatus.Started, start, null, 2, List.of(), java.time.LocalDateTime.now().minusSeconds(2));
+        HeatDto running = new HeatDto(3, 1, HeatStatus.Started, 2, null, start, null, java.time.LocalDateTime.now().minusSeconds(2), null, List.of());
         LiveViewPanel panel = new LiveViewPanel();
         panel.setRecording(true);
         panel.setHeats(new LiveHeats(running, null));

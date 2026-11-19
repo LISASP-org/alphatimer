@@ -5,7 +5,6 @@ import org.lisasp.basics.jre.date.DateTimeFacade;
 import org.lisasp.alphatiming.project.db.InvalidProjectFileException;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.heats.HeatDto;
-import org.lisasp.alphatiming.project.db.HeatStore;
 import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.ui.core.project.AutoSaver;
 import org.lisasp.alphatiming.project.db.CrashLeftover;
@@ -434,10 +433,6 @@ public final class AppController implements AutoCloseable {
 
     private void replaceDocument(TimingDocument next) {
         TimingDocument old = document;
-        RecordingSession oldSession = session;
-        if (oldSession != null) {
-            oldSession.close(); // frees the server port for the next project
-        }
         install(next);
         if (old != null) {
             old.close();
@@ -452,7 +447,17 @@ public final class AppController implements AutoCloseable {
     }
 
     private void install(TimingDocument doc) {
-        RecordingSession next = new RecordingSession(doc.database(), readers.get(), time);
+        RecordingSession next;
+        try {
+            next = new RecordingSession(doc.database(), readers.get(), time);
+        } catch (RuntimeException ex) {
+            doc.close();
+            throw ex;
+        }
+        RecordingSession oldSession = session;
+        if (oldSession != null) {
+            oldSession.close(); // frees the server port for the next project
+        }
         next.addHeatListener(h -> {
             lastHeats = h;
             heatListeners.forEach(l -> l.accept(h));
@@ -506,9 +511,10 @@ public final class AppController implements AutoCloseable {
         Settings settings = doc.settings();
         scheduleAutoSave(settings);
         serve(next, settings);
-        HeatStore heatStore = new HeatStore(doc.database());
-        lastHeats = LiveHeats.of(heatStore.findAll(), heatStore.findUsedLanes());
-        heatListeners.forEach(l -> l.accept(lastHeats));
+        lastHeats = next.liveHeats();
+        if (lastHeats.current() == null) {
+            heatListeners.forEach(l -> l.accept(lastHeats));
+        }
         fireChange();
     }
 

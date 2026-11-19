@@ -26,37 +26,13 @@ class TimingDatabaseTest {
     }
 
     @Test
-    void aNewProjectIdentifiesAHeatByEventAndHeatNumberOnly() throws Exception {
+    void aNewProjectHasNoDerivedTables() throws Exception {
         try (TimingDatabase db = TimingDatabase.createNew(dir)) {
-            List<Object> heatColumns = db.read(em -> em.createNativeQuery("select name from pragma_table_info('heat')").getResultList());
-            List<Object> uniqueKeys = db.read(em -> em.createNativeQuery(
-                    "select group_concat(ii.name, ',') from pragma_index_list('heat') il, pragma_index_info(il.name) ii where il.\"unique\" = 1 group by il.name")
-                                                 .getResultList());
+            List<Object> tables = db.read(em -> em.createNativeQuery("select name from sqlite_master where type = 'table'").getResultList());
 
-            assertThat(heatColumns).doesNotContain("competition");
-            assertThat(uniqueKeys).containsExactly("event,heatNumber");
-            db.closeAndDelete();
-        }
-    }
-
-    @Test
-    void aNewProjectKeepsEveryLaneWithItsHeatAndOneRowPerLaneNumber() throws Exception {
-        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
-            db.write(em -> em.createNativeQuery("insert into heat (id, event, heatNumber, lapCount, changeSeq) values (7, 1, 2, 1, 1)").executeUpdate());
-
-            assertThatThrownBy(() -> db.write(em -> em.createNativeQuery(
-                    "insert into lane (heat_id, number, timeInMillis, lap, place, finished) values (99, 1, 0, 0, 0, false)").executeUpdate()))
-                    .hasStackTraceContaining("FOREIGN KEY");
-            assertThatThrownBy(() -> db.write(em -> em.createNativeQuery(
-                    "insert into lane (heat_id, number, timeInMillis, lap, place, finished) values (null, 1, 0, 0, 0, false)").executeUpdate()))
-                    .hasStackTraceContaining("NOT NULL");
-            db.write(em -> em.createNativeQuery("insert into lane (heat_id, number, timeInMillis, lap, place, finished) values (7, 1, 0, 0, 0, false)").executeUpdate());
-            assertThatThrownBy(() -> db.write(em -> em.createNativeQuery(
-                    "insert into lane (heat_id, number, timeInMillis, lap, place, finished) values (7, 1, 0, 0, 0, false)").executeUpdate()))
-                    .hasStackTraceContaining("UNIQUE");
-            List<Object> foreignKeys = db.read(em -> em.createNativeQuery(
-                    "select \"table\" || '|' || \"from\" || '|' || \"to\" from pragma_foreign_key_list('lane')").getResultList());
-            assertThat(foreignKeys).containsExactly("heat|heat_id|id");
+            assertThat(tables).contains("settings", "rawdata", "aresmessage").doesNotContain("heat", "lane", "lanetime");
+            Object version = db.read(em -> em.createNativeQuery("pragma user_version").getSingleResult());
+            assertThat(version).isEqualTo(1);
             db.closeAndDelete();
         }
     }
