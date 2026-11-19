@@ -2,6 +2,7 @@ package org.lisasp.alphatiming.heats;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -19,6 +20,22 @@ class HeatServiceTest {
         service.accept(TestMessageCreator.split(1, 1, 1, 1, 1000));
         assertThat(store.find(1, 1).orElseThrow().lanes().get(0).current().orElseThrow().timeInMillis()).isEqualTo(1000);
         assertThat(store.find(2, 1).orElseThrow().lanes().get(0).status()).isEqualTo(LaneStatus.NotUsed);
+    }
+
+    @Test
+    void aReadyToStartAnnouncesTheHeat() {
+        InMemoryHeatRepository store = new InMemoryHeatRepository();
+        HeatService service = new HeatService(store);
+        LocalDateTime at = T0.plusSeconds(5);
+
+        service.accept(TestMessageCreator.readyToStart(1, 1, 4, at));
+
+        HeatDto heat = store.find(1, 1).orElseThrow();
+        assertThat(heat.status()).isEqualTo(HeatStatus.Open);
+        assertThat(heat.lapCount()).isEqualTo(4);
+        assertThat(heat.readyToStart()).isEqualTo(at);
+        assertThat(heat.lastMessage()).isEqualTo(at);
+        assertThat(service.liveHeats().current()).isEqualTo(heat);
     }
 
     @Test

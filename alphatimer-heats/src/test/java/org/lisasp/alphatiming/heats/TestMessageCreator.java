@@ -4,6 +4,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
@@ -23,6 +24,10 @@ public final class TestMessageCreator {
 
     public static UsedLanesMessage used(int event, int heat, String lanes) {
         return new UsedLanesMessage(T0, "WK", (short) event, (byte) heat, lanes);
+    }
+
+    public static ReadyToStartMessage readyToStart(int event, int heat, int lapCount, LocalDateTime at) {
+        return new ReadyToStartMessage(at, "WK", (short) event, (byte) heat, (byte) lapCount);
     }
 
     public static StartMessage start(int event, int heat, LocalDateTime at) {

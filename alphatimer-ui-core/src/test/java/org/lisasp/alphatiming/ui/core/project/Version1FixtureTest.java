@@ -46,6 +46,7 @@ class Version1FixtureTest {
             assertThat(heat.event()).isEqualTo(1);
             assertThat(heat.heat()).isEqualTo(1);
             assertThat(heat.status()).isEqualTo(HeatStatus.Finished);
+            assertThat(heat.readyToStart()).isEqualTo(LocalDateTime.of(2026, 5, 1, 10, 0, 0));
             LaneDto first = heat.lanes().get(0);
             assertThat(first.current().orElseThrow().timeInMillis()).isEqualTo(61_230);
             assertThat(first.place()).isEqualTo(1);

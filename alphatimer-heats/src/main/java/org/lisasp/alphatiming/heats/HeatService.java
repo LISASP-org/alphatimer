@@ -6,6 +6,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
@@ -90,7 +91,9 @@ public final class HeatService implements Consumer<RefinedMessage> {
             Optional<HeatDto> stored = store.find(message.getEvent(), message.getHeat());
             HeatDto before = stored.orElseGet(() -> HeatDto.empty(message.getEvent(), message.getHeat(), LANE_COUNT));
             Heat heat = new Heat(before);
-            if (message instanceof StartMessage m) {
+            if (message instanceof ReadyToStartMessage m) {
+                heat.readyToStart(m);
+            } else if (message instanceof StartMessage m) {
                 heat.start(m);
             } else if (message instanceof UsedLanesMessage m) {
                 heat.usedLanes(m);

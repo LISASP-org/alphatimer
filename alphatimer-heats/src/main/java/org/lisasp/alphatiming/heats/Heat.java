@@ -6,6 +6,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
@@ -22,6 +23,7 @@ final class Heat {
     private final int event;
     private final int heat;
     private HeatStatus status;
+    private LocalDateTime readyToStart;
     private LocalDateTime started;
     private LocalDateTime ended;
     private LocalDateTime lastMessage;
@@ -33,6 +35,7 @@ final class Heat {
         this.event = dto.event();
         this.heat = dto.heat();
         this.status = dto.status();
+        this.readyToStart = dto.readyToStart();
         this.started = dto.started();
         this.ended = dto.ended();
         this.lastMessage = dto.lastMessage();
@@ -42,7 +45,16 @@ final class Heat {
     }
 
     HeatDto createDto() {
-        return new HeatDto(event, heat, status, started, ended, lapCount, lanes.stream().map(Lane::createDto).toList(), lastMessage, startTimeOfDayMillis);
+        return new HeatDto(event, heat, status, lapCount, readyToStart, started, ended, lastMessage, startTimeOfDayMillis, lanes.stream().map(Lane::createDto).toList());
+    }
+
+    void readyToStart(ReadyToStartMessage message) {
+        if (status != HeatStatus.Open || started != null) {
+            return;
+        }
+        readyToStart = message.getTimestamp();
+        lastMessage = message.getTimestamp();
+        lapCount = message.getLapCount();
     }
 
     /**

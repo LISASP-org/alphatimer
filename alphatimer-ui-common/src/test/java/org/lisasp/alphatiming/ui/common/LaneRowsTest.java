@@ -32,7 +32,7 @@ class LaneRowsTest {
     }
 
     private static HeatDto heat() {
-        return new HeatDto(1, 1, HeatStatus.Started, null, null, 2, List.of(
+        return new HeatDto(1, 1, HeatStatus.Started, 2, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.NotUsed, Set.of(), 0),
                 TestLanes.lane(2, LaneStatus.Used, Set.of(), 0, TestLanes.split(1, 12_340)),
                 TestLanes.lane(3, LaneStatus.Used, Set.of(), 1, TestLanes.finish(2, 25_000)),
@@ -50,7 +50,7 @@ class LaneRowsTest {
 
     @Test
     void lanesUsedBeforeKeepAnEmptyRowAndNeverUsedLanesStayHidden() {
-        HeatDto heat = new HeatDto(1, 2, HeatStatus.Started, null, null, 2, List.of(
+        HeatDto heat = new HeatDto(1, 2, HeatStatus.Started, 2, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.NotUsed, Set.of(), 0),
                 TestLanes.lane(2, LaneStatus.Used, Set.of(), 0, TestLanes.split(1, 12_340)),
                 TestLanes.lane(3, LaneStatus.NotUsed, Set.of(), 0),
@@ -84,7 +84,7 @@ class LaneRowsTest {
 
     @Test
     void aDisqualifiedLaneShowsItsTimeWithoutPlace() {
-        HeatDto heat = new HeatDto(1, 1, HeatStatus.Finished, null, null, 2, List.of(
+        HeatDto heat = new HeatDto(1, 1, HeatStatus.Finished, 2, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.Used, Set.of(Penalty.Disqualified), 0, TestLanes.finish(2, 25_000))));
 
         assertThat(LaneRows.from(heat, java.util.Set.of())).containsExactly(new LaneRows.Row(1, "25.00", "DSQ", 0, true));
@@ -95,7 +95,7 @@ class LaneRowsTest {
 
     @Test
     void everyPenaltyOfALaneIsShown() {
-        HeatDto heat = new HeatDto(1, 1, HeatStatus.Finished, null, null, 2, List.of(
+        HeatDto heat = new HeatDto(1, 1, HeatStatus.Finished, 2, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.Used, Set.of(Penalty.DidNotFinish, Penalty.Disqualified), 0, TestLanes.finish(2, 25_000))));
 
         assertThat(LaneRows.from(heat, java.util.Set.of()).getFirst().detail()).isEqualTo("DNF, DSQ");
