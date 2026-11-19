@@ -6,37 +6,10 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.RankInfo;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeInfo;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeMarker;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeType;
-import org.lisasp.alphatiming.heats.HeatStatus;
-import org.lisasp.alphatiming.heats.LaneStatus;
-import org.lisasp.alphatiming.heats.Penalty;
 
 final class EnumNameConverters {
 
     private EnumNameConverters() {
-    }
-
-    public static final class HeatStatusConverter extends EnumNameConverter<HeatStatus> {
-        public HeatStatusConverter() {
-            super(HeatStatus.class);
-        }
-    }
-
-    public static final class LaneStatusConverter extends EnumNameConverter<LaneStatus> {
-        public LaneStatusConverter() {
-            super(LaneStatus.class);
-        }
-    }
-
-    public static final class PenaltyConverter extends EnumNameConverter<Penalty> {
-        public PenaltyConverter() {
-            super(Penalty.class);
-        }
-    }
-
-    public static final class LegacyLaneStatusConverter extends EnumNameConverter<org.lisasp.alphatiming.legacy.api.LaneStatus> {
-        public LegacyLaneStatusConverter() {
-            super(org.lisasp.alphatiming.legacy.api.LaneStatus.class);
-        }
     }
 
     public static final class MessageTypeConverter extends EnumNameConverter<MessageType> {

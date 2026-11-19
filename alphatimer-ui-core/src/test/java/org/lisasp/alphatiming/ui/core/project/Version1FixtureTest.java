@@ -68,4 +68,17 @@ class Version1FixtureTest {
             assertThat(heats[0].getLanes().get(1).getTimes()).contains(62_000);
         }
     }
+
+    @Test
+    void openingAVersion1FileDropsItsDerivedTables() throws Exception {
+        try (TimingDocument doc = TimingDocument.open(copyOfFixture(), work());
+             RecordingSession session = new RecordingSession(doc.database(), RecordingSession.tcp(), LocalDateTime::now)) {
+            List<Object> tables = doc.database().read(em -> em.createNativeQuery("select name from sqlite_master where type = 'table'").getResultList());
+
+            assertThat(tables).contains("settings", "rawdata", "aresmessage").doesNotContain("heat", "lane", "lanetime");
+            Object version = doc.database().read(em -> em.createNativeQuery("pragma user_version").getSingleResult());
+            assertThat(version).isEqualTo(1);
+            assertThat(session.liveHeats().known()).hasSize(1);
+        }
+    }
 }
