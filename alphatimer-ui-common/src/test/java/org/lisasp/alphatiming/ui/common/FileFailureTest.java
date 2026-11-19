@@ -75,6 +75,11 @@ class FileFailureTest {
     }
 
     @Test
+    void anUnrecognisedFailureOnAFolderIsNotTakenForReadingTheFolder() {
+        assertThat(FileFailure.of(new IOException("disk full"), dir).kind()).isEqualTo(FileFailure.Kind.OTHER);
+    }
+
+    @Test
     void savingOntoAFolderIsIsDirectory() {
         Path folder = dir.resolve("wk.timing");
 
