@@ -69,7 +69,7 @@ public record LaneDto(int number, LaneStatus status,
                       int place,                        // 0 = no place
                       List<LaneTime> times) {           // in order of arrival
     Optional<LaneTime> finish();                        // newest finish that is not deleted
-    Optional<LaneTime> current();                       // newest split or finish that is not deleted
+    Optional<LaneTime> current();                       // finish(), else the newest split that is not deleted
     List<LaneTime> backups();
 }
 
