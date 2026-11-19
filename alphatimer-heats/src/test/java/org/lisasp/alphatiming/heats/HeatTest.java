@@ -623,4 +623,17 @@ class HeatTest {
 
         assertThat(lane(heat, 1).times()).isEmpty();
     }
+
+    @Test
+    void sourceAndTypeOfATimeFollowTheMessage() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.finOfType(1, 1, 1, 61_000, RefinedMessageType.Live, RefinedTimeType.Normal));
+        heat.touch(TestMessageCreator.finOfType(1, 1, 1, 61_100, RefinedMessageType.Live, RefinedTimeType.ManualTime));
+        heat.touch(TestMessageCreator.finOfType(1, 1, 1, 61_200, RefinedMessageType.CurrentRaceResult, RefinedTimeType.CorrectedTime));
+
+        assertThat(lane(heat, 1).times()).extracting(LaneTime::timeInMillis, LaneTime::source, LaneTime::type)
+                                         .containsExactly(tuple(61_000, TimeSource.Live, TimeType.Normal),
+                                                          tuple(61_100, TimeSource.Live, TimeType.Manual),
+                                                          tuple(61_200, TimeSource.Result, TimeType.Corrected));
+    }
 }

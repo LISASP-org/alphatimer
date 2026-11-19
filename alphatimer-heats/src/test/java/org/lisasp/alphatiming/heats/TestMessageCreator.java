@@ -72,6 +72,10 @@ public final class TestMessageCreator {
         return new TimeMessage(at, "WK", (short) event, (byte) heat, RefinedMessageType.Live, RefinedKindOfTime.SplitTime, (byte) lane, (byte) lap, (byte) 2, (byte) 0, millis, RefinedTimeType.DeletedTime);
     }
 
+    public static TimeMessage finOfType(int event, int heat, int lane, int millis, RefinedMessageType messageType, RefinedTimeType timeType) {
+        return new TimeMessage(T0.plusSeconds(1), "WK", (short) event, (byte) heat, messageType, RefinedKindOfTime.Finish, (byte) lane, (byte) 2, (byte) 2, (byte) 0, millis, timeType);
+    }
+
     private static TimeMessage timeAt(int event, int heat, int lane, int lap, int rank, int millis, RefinedKindOfTime kind, LocalDateTime at, RefinedMessageType type) {
         return new TimeMessage(at, "WK", (short) event, (byte) heat, type, kind, (byte) lane, (byte) lap, (byte) 2, (byte) rank, millis, RefinedTimeType.Normal);
     }
