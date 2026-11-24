@@ -155,7 +155,7 @@ class TuiMainWindowTest {
 
     @Test
     void showsMenuNavigationSettingsAndStatusLikeTheGui() {
-        assertThat(screenText()).contains("File", "Recording", "Settings & Recording", "Live View", "Connection type", "Stopped", "unsaved project");
+        assertThat(screenText()).contains("File", "Recording", "Settings & Recording", "Live View", "Timing system", "Source", "Stopped", "unsaved project");
     }
 
     @Test
@@ -260,7 +260,9 @@ class TuiMainWindowTest {
     @Test
     void theLenexFieldsFollowTheConnectionTypeAndKeepFileAndInterval() throws IOException {
         TuiSettingsPanel settings = window.settingsPanel();
-        settings.connectionTypeCombo().setSelectedIndex(ConnectionType.LENEX.ordinal());
+        settings.systemCombo().setSelectedIndex(1);
+        render();
+        assertThat(settings.connectionTypeCombo().getItemCount()).isEqualTo(1);
         settings.lenexFileField().setText("/data/meet.lef");
         settings.lenexIntervalCombo().setSelectedIndex(3);
         settings.commit();
@@ -270,12 +272,13 @@ class TuiMainWindowTest {
         assertThat(settings.tcpFields().isVisible()).isFalse();
         assertThat(controller.document().settings().lenexFile()).isEqualTo("/data/meet.lef");
         assertThat(controller.document().settings().lenexIntervalSeconds()).isEqualTo(30);
-        assertThat(screenText()).contains("LENEX file", "30 s");
+        assertThat(controller.document().settings().connectionType()).isEqualTo(ConnectionType.LENEX);
+        assertThat(screenText()).contains("Timing system", "LENEX", "Source", "File", "30 s");
     }
 
     @Test
-    void onceAresDataIsRecordedLenexIsNoLongerOffered() throws IOException {
-        assertThat(window.settingsPanel().connectionTypeCombo().getItemCount()).isEqualTo(4);
+    void onceAresDataIsRecordedOnlyOmegaIsOfferedWithItsSources() throws IOException {
+        assertThat(window.settingsPanel().systemCombo().getItemCount()).isEqualTo(2);
         controller.applySettings(new org.lisasp.alphatiming.ui.core.settings.Settings("localhost", 8585, 60, 0).withCompetitionKey("WK"));
         controller.startRecording();
 
@@ -283,6 +286,7 @@ class TuiMainWindowTest {
         controller.stopRecording();
         window.settingsPanel().refresh();
 
+        assertThat(window.settingsPanel().systemCombo().getItemCount()).isEqualTo(1);
         assertThat(window.settingsPanel().connectionTypeCombo().getItemCount()).isEqualTo(3);
     }
 
@@ -361,7 +365,7 @@ class TuiMainWindowTest {
 
         window.handleInput(new KeyStroke(KeyType.F5));
         render();
-        assertThat(screenText()).contains("Connection type");
+        assertThat(screenText()).contains("Source");
     }
 
     @Test

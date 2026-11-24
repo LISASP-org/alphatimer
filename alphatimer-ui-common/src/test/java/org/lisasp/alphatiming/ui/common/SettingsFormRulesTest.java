@@ -51,13 +51,24 @@ class SettingsFormRulesTest {
     }
 
     @Test
-    void onceDataIsRecordedOnlyTheInputOfTheDataIsOffered() {
-        assertThat(SettingsFormRules.of(TCP, false, true, Optional.empty()).connectionTypes())
-                .containsExactly(ConnectionType.TCP, ConnectionType.SERIAL, ConnectionType.FILE, ConnectionType.LENEX);
-        assertThat(SettingsFormRules.of(TCP, false, true, Optional.of(Input.ARES)).connectionTypes())
-                .containsExactly(ConnectionType.TCP, ConnectionType.SERIAL, ConnectionType.FILE);
-        assertThat(SettingsFormRules.of(TCP.withConnectionType(ConnectionType.LENEX), false, true, Optional.of(Input.LENEX)).connectionTypes())
-                .containsExactly(ConnectionType.LENEX);
+    void bothSystemsAreOfferedUntilTheProjectHoldsData() {
+        assertThat(SettingsFormRules.of(TCP, false, true, Optional.empty()).systems()).containsExactly(Input.ARES, Input.LENEX);
+        assertThat(SettingsFormRules.of(TCP, false, true, Optional.of(Input.ARES)).systems()).containsExactly(Input.ARES);
+        assertThat(SettingsFormRules.of(TCP.withConnectionType(ConnectionType.LENEX), false, true, Optional.of(Input.LENEX)).systems())
+                .containsExactly(Input.LENEX);
+    }
+
+    @Test
+    void theSourcesAreThoseOfTheSelectedSystem() {
+        assertThat(SettingsFormRules.of(TCP, false, true).sources()).containsExactly(ConnectionType.TCP, ConnectionType.SERIAL, ConnectionType.FILE);
+        assertThat(SettingsFormRules.of(TCP.withConnectionType(ConnectionType.LENEX), false, true).sources()).containsExactly(ConnectionType.LENEX);
+    }
+
+    @Test
+    void anotherSystemStartsWithItsFirstSourceAndTheSameSystemKeepsTheSource() {
+        assertThat(SettingsFormRules.sourceFor(Input.LENEX, ConnectionType.SERIAL)).isEqualTo(ConnectionType.LENEX);
+        assertThat(SettingsFormRules.sourceFor(Input.ARES, ConnectionType.LENEX)).isEqualTo(ConnectionType.TCP);
+        assertThat(SettingsFormRules.sourceFor(Input.ARES, ConnectionType.SERIAL)).isEqualTo(ConnectionType.SERIAL);
     }
 
     @Test

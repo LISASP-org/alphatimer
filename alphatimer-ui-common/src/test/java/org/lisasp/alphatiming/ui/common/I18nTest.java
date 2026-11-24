@@ -124,6 +124,9 @@ class I18nTest {
         for (org.lisasp.alphatimer.api.refinedmessages.accepted.enums.Round round : org.lisasp.alphatimer.api.refinedmessages.accepted.enums.Round.values()) {
             used.add("round." + round.name());
         }
+        for (org.lisasp.alphatiming.ui.core.settings.Input system : org.lisasp.alphatiming.ui.core.settings.Input.values()) {
+            used.add("input.system." + system.name());
+        }
         for (FileFailure.Kind kind : FileFailure.Kind.values()) {
             used.add("failure." + kind.name());
         }

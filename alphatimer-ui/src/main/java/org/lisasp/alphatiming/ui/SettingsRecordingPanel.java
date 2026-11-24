@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatimer.serial.com.SerialPorts;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
+import org.lisasp.alphatiming.ui.core.settings.Input;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
@@ -53,6 +54,7 @@ public final class SettingsRecordingPanel extends JPanel {
 
     private final AppController controller;
 
+    private final JComboBox<Input> system = new JComboBox<>(Input.values());
     private final JComboBox<ConnectionType> connectionType = new JComboBox<>(ConnectionType.values());
     private final JWarningTextField replayFile = new JWarningTextField(true, false);
     private final JButton chooseFile = new JButton(I18n.get("input.chooseFile"));
@@ -115,6 +117,13 @@ public final class SettingsRecordingPanel extends JPanel {
             }
         });
         connectionType.addActionListener(e -> connectionChanged());
+        system.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focus) {
+                return super.getListCellRendererComponent(list, value == null ? "" : I18n.label((Input) value), index, selected, focus);
+            }
+        });
+        system.addActionListener(e -> systemChanged());
         chooseFile.addActionListener(e -> chooseReplayFile());
         replayFile.addActionListener(e -> commit());
         chooseLenexFile.addActionListener(e -> chooseLenexFile());
@@ -199,6 +208,7 @@ public final class SettingsRecordingPanel extends JPanel {
         portAccess.setVisible(false);
 
         SimpleFormBuilder typeForm = newBuilder();
+        typeForm.add(I18n.get("input.system"), system);
         typeForm.add(I18n.get("input.type"), connectionType);
         SimpleFormBuilder tcpForm = newBuilder();
         tcpForm.add(I18n.get("input.tcpHost"), host);
@@ -298,6 +308,22 @@ public final class SettingsRecordingPanel extends JPanel {
         }
     }
 
+    /** Another system starts with its first source; the form then offers the sources of that system. */
+    private void systemChanged() {
+        if (updating || system.getSelectedItem() == null) {
+            return;
+        }
+        ConnectionType source = SettingsFormRules.sourceFor((Input) system.getSelectedItem(), selectedType());
+        updating = true;
+        try {
+            connectionType.setModel(new DefaultComboBoxModel<>(new ConnectionType[]{source}));
+            connectionType.setSelectedItem(source);
+        } finally {
+            updating = false;
+        }
+        connectionChanged();
+    }
+
     private void connectionChanged() {
         if (updating) {
             return;
@@ -371,6 +397,7 @@ public final class SettingsRecordingPanel extends JPanel {
         try {
             if (doc != null) {
                 Settings s = doc.settings();
+                system.setSelectedItem(s.connectionType().input());
                 connectionType.setSelectedItem(s.connectionType());
                 if (replaced || !replayFile.hasFocus()) {
                     replayFile.setText(s.replayFile());
@@ -412,7 +439,8 @@ public final class SettingsRecordingPanel extends JPanel {
         boolean running = controller.isRecording();
         Settings fields = readFields();
         SettingsFormRules rules = SettingsFormRules.of(fields, running, controller.document() != null, controller.recordedInput());
-        offerOnly(rules.connectionTypes());
+        offer(system, rules.systems());
+        offer(connectionType, rules.sources());
         host.setRequired(rules.hostRequired());
         replayFile.setRequired(rules.replayFileRequired());
         lenexFile.setRequired(rules.lenexFileRequired());
@@ -422,7 +450,7 @@ public final class SettingsRecordingPanel extends JPanel {
             case FILE -> FILE_CARD;
             case LENEX -> LENEX_CARD;
         });
-        for (Component field : new Component[]{connectionType, host, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, lenexFile, chooseLenexFile, lenexInterval, competitionKey, timekeepingOffset, autoSave, serverToggle}) {
+        for (Component field : new Component[]{system, connectionType, host, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, lenexFile, chooseLenexFile, lenexInterval, competitionKey, timekeepingOffset, autoSave, serverToggle}) {
             field.setEnabled(rules.editable());
         }
         restPort.setEnabled(rules.restPortEditable());
@@ -433,21 +461,23 @@ public final class SettingsRecordingPanel extends JPanel {
         recordToggle.setToolTipText(rules.recordHint().orElse(null));
     }
 
-    /** Once the project holds data, the input of its data is the only one offered. */
-    private void offerOnly(List<ConnectionType> types) {
-        List<ConnectionType> offered = new ArrayList<>();
-        for (int i = 0; i < connectionType.getItemCount(); i++) {
-            offered.add(connectionType.getItemAt(i));
+    /** Offers exactly the given choices, keeping the selected one. */
+    private <T> void offer(JComboBox<T> combo, List<T> choices) {
+        List<T> offered = new ArrayList<>();
+        for (int i = 0; i < combo.getItemCount(); i++) {
+            offered.add(combo.getItemAt(i));
         }
-        if (offered.equals(types)) {
+        if (offered.equals(choices)) {
             return;
         }
         boolean wasUpdating = updating;
         updating = true;
         try {
-            Object selected = connectionType.getSelectedItem();
-            connectionType.setModel(new DefaultComboBoxModel<>(types.toArray(ConnectionType[]::new)));
-            connectionType.setSelectedItem(selected);
+            Object selected = combo.getSelectedItem();
+            DefaultComboBoxModel<T> model = new DefaultComboBoxModel<>();
+            choices.forEach(model::addElement);
+            combo.setModel(model);
+            combo.setSelectedItem(selected);
         } finally {
             updating = wasUpdating;
         }
@@ -483,7 +513,11 @@ public final class SettingsRecordingPanel extends JPanel {
     }
 
     List<Component> lockableInputs() {
-        return List.of(connectionType, host, competitionKey, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, lenexFile, chooseLenexFile, lenexInterval, timekeepingOffset, autoSave, restPort, serverToggle);
+        return List.of(system, connectionType, host, competitionKey, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, lenexFile, chooseLenexFile, lenexInterval, timekeepingOffset, autoSave, restPort, serverToggle);
+    }
+
+    JComboBox<Input> systemCombo() {
+        return system;
     }
 
     JComboBox<ConnectionType> connectionTypeCombo() {

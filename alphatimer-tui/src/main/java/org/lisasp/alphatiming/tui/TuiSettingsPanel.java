@@ -25,6 +25,7 @@ import org.lisasp.alphatiming.ui.common.ShownDocument;
 import org.lisasp.alphatiming.ui.common.TimeFormat;
 import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
+import org.lisasp.alphatiming.ui.core.settings.Input;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
@@ -46,6 +47,8 @@ final class TuiSettingsPanel extends Panel {
     private final AppController controller;
     private final WindowBasedTextGUI gui;
 
+    private final ComboBox<String> system = new ComboBox<>(Arrays.stream(Input.values()).map(I18n::label).toList());
+    private List<Input> offeredSystems = List.of(Input.values());
     private final ComboBox<String> connectionType = new ComboBox<>(Arrays.stream(ConnectionType.values()).map(I18n::label).toList());
     private final CommitTextBox host = new CommitTextBox(30, this::commit);
     private final CommitTextBox port = new CommitTextBox(6, this::commit);
@@ -107,6 +110,7 @@ final class TuiSettingsPanel extends Panel {
                      GridLayout.createLayoutData(GridLayout.Alignment.FILL, GridLayout.Alignment.FILL, true, true, 2, 1));
 
         connectionType.addListener((selected, previous, byUser) -> connectionChanged());
+        system.addListener((selected, previous, byUser) -> systemChanged());
         serialPort.addListener((selected, previous, byUser) -> commit());
         serialMode.addListener((selected, previous, byUser) -> commit());
         server.addListener(checked -> commit());
@@ -117,6 +121,8 @@ final class TuiSettingsPanel extends Panel {
 
     private Panel createSource() {
         Panel type = new Panel(new GridLayout(2));
+        type.addComponent(new Label(I18n.get("input.system")));
+        type.addComponent(system);
         type.addComponent(new Label(I18n.get("input.type")));
         type.addComponent(connectionType);
 
@@ -173,6 +179,20 @@ final class TuiSettingsPanel extends Panel {
             row.addComponent(component);
         }
         return row;
+    }
+
+    /** Another system starts with its first source; the form then offers the sources of that system. */
+    private void systemChanged() {
+        if (updating) {
+            return;
+        }
+        Input chosen = offeredSystems.get(Math.max(0, system.getSelectedIndex()));
+        if (chosen == selectedType().input()) {
+            return;
+        }
+        ConnectionType source = SettingsFormRules.sourceFor(chosen, selectedType());
+        offerSources(List.of(source), source);
+        connectionChanged();
     }
 
     private ConnectionType selectedType() {
@@ -309,7 +329,8 @@ final class TuiSettingsPanel extends Panel {
         try {
             if (doc != null) {
                 Settings s = doc.settings();
-                connectionType.setSelectedIndex(Math.max(0, offered.indexOf(s.connectionType())));
+                offerSystems(offeredSystems, s.connectionType().input());
+                offerSources(SettingsFormRules.of(s, false, true).sources(), s.connectionType());
                 setUnlessEdited(lenexFile, s.lenexFile(), replaced);
                 lenexInterval.setSelectedIndex(Math.max(0, Settings.LENEX_INTERVALS_SECONDS.indexOf(s.lenexIntervalSeconds())));
                 setUnlessEdited(competitionKey, s.competitionKey(), replaced);
@@ -334,9 +355,37 @@ final class TuiSettingsPanel extends Panel {
         refreshButtons();
     }
 
-    /** Once the project holds data, the input of its data is the only one offered. */
-    private void offerOnly(List<ConnectionType> types, ConnectionType selected) {
+    private void offerSystems(List<Input> systems, Input selected) {
+        boolean wasUpdating = updating;
+        updating = true;
+        try {
+            if (!offeredSystems.equals(systems)) {
+                offeredSystems = List.copyOf(systems);
+                system.clearItems();
+                offeredSystems.forEach(s -> system.addItem(I18n.label(s)));
+            }
+            select(system, Math.max(0, offeredSystems.indexOf(selected)));
+        } finally {
+            updating = wasUpdating;
+        }
+    }
+
+    /** Lanterna runs the selection listeners later on its GUI thread, so a selection that changes nothing is not made at all. */
+    private static void select(ComboBox<String> combo, int index) {
+        if (combo.getSelectedIndex() != index) {
+            combo.setSelectedIndex(index);
+        }
+    }
+
+    private void offerSources(List<ConnectionType> types, ConnectionType selected) {
         if (offered.equals(types)) {
+            boolean wasUpdating = updating;
+            updating = true;
+            try {
+                select(connectionType, Math.max(0, offered.indexOf(selected)));
+            } finally {
+                updating = wasUpdating;
+            }
             return;
         }
         boolean wasUpdating = updating;
@@ -360,7 +409,9 @@ final class TuiSettingsPanel extends Panel {
     private void refreshButtons() {
         Settings fields = readFields();
         SettingsFormRules rules = SettingsFormRules.of(fields, controller.isRecording(), controller.document() != null, controller.recordedInput());
-        offerOnly(rules.connectionTypes(), fields.connectionType());
+        offerSystems(rules.systems(), fields.connectionType().input());
+        offerSources(rules.sources(), fields.connectionType());
+        system.setEnabled(rules.editable());
         tcpPanel.setVisible(fields.connectionType() == ConnectionType.TCP);
         serialPanel.setVisible(fields.connectionType() == ConnectionType.SERIAL);
         filePanel.setVisible(fields.connectionType() == ConnectionType.FILE);
@@ -433,6 +484,10 @@ final class TuiSettingsPanel extends Panel {
 
     ComboBox<String> lenexIntervalCombo() {
         return lenexInterval;
+    }
+
+    ComboBox<String> systemCombo() {
+        return system;
     }
 
     ComboBox<String> connectionTypeCombo() {
