@@ -94,6 +94,7 @@ final class Heat {
         }
         lanes.sort(Comparator.comparingInt(Lane::number));
         lanes.forEach(l -> l.used(message.getLanes().contains(l.number())));
+        computePlaces();
     }
 
     void touch(TimeMessage message) {

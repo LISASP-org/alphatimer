@@ -90,6 +90,15 @@ class LenexReaderTest {
     }
 
     @Test
+    void readsTheFirstLaneOfThePool() throws IOException {
+        LenexMeet withPool = read(meetWith("").replace("<SESSIONS>", "<POOL lanemin=\"0\" lanemax=\"7\" /><SESSIONS>"));
+        LenexMeet withoutPool = read(meetWith(""));
+
+        assertThat(withPool.laneMin()).isEqualTo(OptionalInt.of(0));
+        assertThat(withoutPool.laneMin()).isEmpty();
+    }
+
+    @Test
     void theCourseOfTheSessionOverridesTheCourseOfTheMeet() throws IOException {
         LenexMeet meet = read(meetWith("").replace("<SESSION number=\"1\"", "<SESSION number=\"1\" course=\"SCM\""));
 

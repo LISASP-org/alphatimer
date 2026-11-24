@@ -358,6 +358,19 @@ class HeatTest {
     }
 
     @Test
+    void aLaneThatIsNoLongerUsedGivesUpItsPlace() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+        heat.touch(TestMessageCreator.fin(1, 1, 3, 0, 2200));
+
+        heat.usedLanes(TestMessageCreator.used(1, 1, "0110000000"));
+
+        assertThat(lane(heat, 2).place()).isEqualTo(1);
+        assertThat(lane(heat, 3).place()).isEqualTo(2);
+    }
+
+    @Test
     void heatWithoutFinishTimesGetsNoPlaces() {
         Heat heat = prepared();
         heat.finish(TestMessageCreator.end(1, 1, T0.plusSeconds(30)));

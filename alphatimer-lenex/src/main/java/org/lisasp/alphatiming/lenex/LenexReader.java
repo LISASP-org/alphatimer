@@ -76,7 +76,8 @@ public final class LenexReader {
                 event(event, course, resultsByHeat).ifPresent(events::add);
             }
         }
-        return new LenexMeet(events);
+        OptionalInt laneMin = child(meet, "POOL").map(pool -> number(pool, "lanemin")).orElse(OptionalInt.empty());
+        return new LenexMeet(laneMin, events);
     }
 
     private static Optional<LenexEvent> event(Element event, String course, Map<String, List<LenexResult>> resultsByHeat) {
