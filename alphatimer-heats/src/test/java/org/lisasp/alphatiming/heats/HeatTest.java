@@ -16,7 +16,7 @@ import static org.lisasp.alphatiming.heats.TestMessageCreator.T0;
 class HeatTest {
 
     private static HeatDto emptyHeat() {
-        return new HeatDto(1, 1, HeatStatus.Open, 0, null, null, null, null, null, List.of(1, 2, 3, 4, 5, 6, 7, 8).stream().map(n -> TestLanes.lane(n, LaneStatus.NotUsed, Set.of(), 0)).toList());
+        return new HeatDto(1, "", 1, HeatStatus.Open, 0, null, null, null, null, null, List.of(1, 2, 3, 4, 5, 6, 7, 8).stream().map(n -> TestLanes.lane(n, LaneStatus.NotUsed, Set.of(), 0)).toList());
     }
 
     private static Heat prepared() {

@@ -378,8 +378,8 @@ class RecordingSessionTest {
         private final org.lisasp.alphatiming.heats.InMemoryHeatRepository delegate = new org.lisasp.alphatiming.heats.InMemoryHeatRepository();
 
         @Override
-        public java.util.Optional<HeatDto> find(int event, int heat) {
-            return delegate.find(event, heat);
+        public java.util.Optional<HeatDto> find(int event, String round, int heat) {
+            return delegate.find(event, round, heat);
         }
 
         @Override

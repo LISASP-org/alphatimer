@@ -11,9 +11,9 @@ class InMemoryHeatRepositoryTest {
 
     @Test
     void findAllReturnsTheMostRecentlyChangedHeatFirst() {
-        repository.create(HeatDto.empty(1, 1, 10));
-        repository.create(HeatDto.empty(1, 2, 10));
-        repository.save(HeatDto.empty(1, 1, 10));
+        repository.create(HeatDto.empty(1, "", 1, 10));
+        repository.create(HeatDto.empty(1, "", 2, 10));
+        repository.save(HeatDto.empty(1, "", 1, 10));
 
         assertThat(repository.findAll()).extracting(HeatDto::heat).containsExactly(1, 2);
     }
@@ -29,6 +29,6 @@ class InMemoryHeatRepositoryTest {
 
     @Test
     void savingAnUnknownHeatFails() {
-        assertThatThrownBy(() -> repository.save(HeatDto.empty(1, 1, 10))).isInstanceOf(java.util.NoSuchElementException.class);
+        assertThatThrownBy(() -> repository.save(HeatDto.empty(1, "", 1, 10))).isInstanceOf(java.util.NoSuchElementException.class);
     }
 }

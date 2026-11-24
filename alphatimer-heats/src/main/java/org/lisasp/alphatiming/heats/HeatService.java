@@ -55,15 +55,15 @@ public final class HeatService implements Consumer<RefinedMessage> {
                 || (message instanceof BackupTimeMessage b && b.getMessageType() == RefinedMessageType.PreviousRaceResult);
     }
 
-    private record HeatKey(int event, int heat) {
+    private record HeatKey(int event, String round, int heat) {
 
         static HeatKey of(HeatDto heat) {
-            return new HeatKey(heat.event(), heat.heat());
+            return new HeatKey(heat.event(), heat.round(), heat.heat());
         }
     }
 
     private static boolean sameHeat(HeatDto a, HeatDto b) {
-        return a.event() == b.event() && a.heat() == b.heat();
+        return HeatKey.of(a).equals(HeatKey.of(b));
     }
 
     public LiveHeats liveHeats() {
@@ -90,8 +90,8 @@ public final class HeatService implements Consumer<RefinedMessage> {
             return;
         }
         try {
-            Optional<HeatDto> stored = store.find(message.getEvent(), message.getHeat());
-            HeatDto before = stored.orElseGet(() -> HeatDto.empty(message.getEvent(), message.getHeat(), LANE_COUNT));
+            Optional<HeatDto> stored = store.find(message.getEvent(), message.getRound(), message.getHeat());
+            HeatDto before = stored.orElseGet(() -> HeatDto.empty(message.getEvent(), message.getRound(), message.getHeat(), LANE_COUNT));
             Heat heat = new Heat(before);
             if (message instanceof ReadyToStartMessage m) {
                 heat.readyToStart(m);

@@ -22,6 +22,7 @@ import java.util.List;
 final class Heat {
 
     private final int event;
+    private final String round;
     private final int heat;
     private HeatStatus status;
     private LocalDateTime readyToStart;
@@ -34,6 +35,7 @@ final class Heat {
 
     Heat(HeatDto dto) {
         this.event = dto.event();
+        this.round = dto.round();
         this.heat = dto.heat();
         this.status = dto.status();
         this.readyToStart = dto.readyToStart();
@@ -46,7 +48,7 @@ final class Heat {
     }
 
     HeatDto createDto() {
-        return new HeatDto(event, heat, status, lapCount, readyToStart, started, ended, lastMessage, startTimeOfDayMillis, lanes.stream().map(Lane::createDto).toList());
+        return new HeatDto(event, round, heat, status, lapCount, readyToStart, started, ended, lastMessage, startTimeOfDayMillis, lanes.stream().map(Lane::createDto).toList());
     }
 
     void readyToStart(ReadyToStartMessage message) {

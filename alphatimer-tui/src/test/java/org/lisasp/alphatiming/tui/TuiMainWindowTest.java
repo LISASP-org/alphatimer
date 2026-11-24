@@ -263,10 +263,10 @@ class TuiMainWindowTest {
         render();
         assertThat(screenText()).contains("No data to display yet");
 
-        HeatDto heat = new HeatDto(3, 2, HeatStatus.Finished, 0, null, null, null, null, null, List.of(
+        HeatDto heat = new HeatDto(3, "", 2, HeatStatus.Finished, 0, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.Used, Set.of(), 2, TestLanes.finish(0, 65_430)),
                 TestLanes.lane(2, LaneStatus.Used, Set.of(Penalty.DidNotStart), 0)));
-        HeatDto before = new HeatDto(3, 1, HeatStatus.Finished, 0, null, null, null, null, null, List.of(
+        HeatDto before = new HeatDto(3, "", 1, HeatStatus.Finished, 0, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.Used, Set.of(), 1, TestLanes.finish(0, 61_000))));
         window.liveViewPanel().setHeats(new LiveHeats(heat, before));
         render();
@@ -339,8 +339,8 @@ class TuiMainWindowTest {
     void theLiveViewTellsWhenTheHeatsStartedAndFinished() throws IOException {
         LocalDateTime start = LocalDateTime.of(2026, 5, 1, 10, 0, 0);
         window.showLiveView();
-        window.liveViewPanel().setHeats(new LiveHeats(new HeatDto(3, 2, HeatStatus.Started, 0, null, start.plusMinutes(3), null, null, null, List.of()),
-                                                      new HeatDto(3, 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, null, List.of())));
+        window.liveViewPanel().setHeats(new LiveHeats(new HeatDto(3, "", 2, HeatStatus.Started, 0, null, start.plusMinutes(3), null, null, null, List.of()),
+                                                      new HeatDto(3, "", 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, null, List.of())));
         render();
 
         List<String> lines = screenText().lines().toList();
@@ -353,7 +353,7 @@ class TuiMainWindowTest {
         LocalDateTime start = LocalDateTime.of(2026, 5, 1, 10, 0, 0);
         int halfPastSeven = 7 * 3_600_000 + 30 * 60_000;
         window.showLiveView();
-        window.liveViewPanel().setHeats(new LiveHeats(new HeatDto(3, 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, halfPastSeven, List.of()), null));
+        window.liveViewPanel().setHeats(new LiveHeats(new HeatDto(3, "", 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, halfPastSeven, List.of()), null));
 
         controller.applySettingsIfChanged(controller.document().settings().withTimekeepingOffset(2));
         render();
