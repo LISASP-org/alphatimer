@@ -10,8 +10,8 @@ are inferred, not confirmed by the ARES manual or by recordings:
 - A time adds an entry unless it equals the newest valid entry of its lap and kind. So a deleted time that is sent
   again counts again, and so does a value that returns after a correction.
 
-Related behavior elsewhere: `LegacyService` deletes every stored finish of the lane with that value, regardless of
-lap; deletions in the results of the previous race are
+Related behavior elsewhere: `LegacyService` and `RefinedLegacyService` delete every stored finish of the lane with that
+value, regardless of lap (a deleted backup time does not reach `RefinedLegacyService`); deletions in the results of the previous race are
 ignored with those results.
 
 - **Effect:** if ARES means something else by these messages, a lane shows a withdrawn time or loses a valid one, and

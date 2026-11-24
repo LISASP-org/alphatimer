@@ -25,6 +25,8 @@ import org.lisasp.alphatiming.heats.InMemoryHeatRepository;
 import org.lisasp.alphatiming.legacy.server.InMemoryLaneTimeRepository;
 import org.lisasp.alphatiming.legacy.server.LegacyHttpServer;
 import org.lisasp.alphatiming.legacy.server.LegacyService;
+import org.lisasp.alphatiming.legacy.server.refined.RefinedLegacyService;
+import org.lisasp.alphatimer.api.refinedmessages.RefinedMessageListener;
 import org.lisasp.alphatiming.legacy.api.Heat;
 import org.lisasp.alphatiming.project.db.replay.FileReplayReader;
 import org.lisasp.alphatiming.project.db.replay.ReplayFileException;
@@ -80,6 +82,7 @@ public final class RecordingSession implements AutoCloseable {
     private RawDataRecorder rawRecorder;
     private LegacyHttpServer restServer;
     private final LegacyService legacy = new LegacyService(new InMemoryLaneTimeRepository());
+    private final RefinedLegacyService refinedLegacy = new RefinedLegacyService(new InMemoryLaneTimeRepository());
     private final HeatService heatService;
 
     /** Heats and lane times are not stored; they are rebuilt from the stored messages and live as long as the session. */
@@ -94,7 +97,7 @@ public final class RecordingSession implements AutoCloseable {
         this.time = time;
         List<DataHandlingMessage> messages = new MessageStore(db).findAll();
         List<LenexVersion> versions = new LenexVersionStore(db).findAll();
-        MessageReplay.replay(messages, legacy, heatService);
+        MessageReplay.replay(messages, legacy, refinedLegacy, heatService);
         LenexRecording.replay(versions, heatService::accept);
         if (!versions.isEmpty()) {
             recorded = Input.LENEX;
@@ -154,7 +157,7 @@ public final class RecordingSession implements AutoCloseable {
         }
         closeServer();
         if (enabled) {
-            restServer = new LegacyHttpServer(port, legacy::getHeats);
+            restServer = new LegacyHttpServer(port, legacy::getHeats, refinedLegacy::getHeats);
             log.info("Server started on port {}", port);
         }
     }
@@ -226,6 +229,7 @@ public final class RecordingSession implements AutoCloseable {
         }));
         aggregator.register(refiner);
         aggregator.register(this::announce);
+        refiner.register(isolatedRefined(refinedLegacy));
         refiner.register(heatService::accept);
         converter.register(event -> {
             if (event instanceof Ping) {
@@ -263,6 +267,17 @@ public final class RecordingSession implements AutoCloseable {
                 delegate.accept(m);
             } catch (RuntimeException ex) {
                 log.warn("Could not store received message", ex);
+                reportError(ex);
+            }
+        };
+    }
+
+    private RefinedMessageListener isolatedRefined(RefinedMessageListener delegate) {
+        return m -> {
+            try {
+                delegate.accept(m);
+            } catch (RuntimeException ex) {
+                log.warn("Could not apply refined message to the legacy heats", ex);
                 reportError(ex);
             }
         };
@@ -457,6 +472,10 @@ public final class RecordingSession implements AutoCloseable {
 
     public Heat[] legacyHeats() {
         return legacy.getHeats();
+    }
+
+    public Heat[] refinedLegacyHeats() {
+        return refinedLegacy.getHeats();
     }
 
     @Override

@@ -68,6 +68,7 @@ class LenexRecordingSessionTest {
         await().atMost(Duration.ofSeconds(5)).until(() -> !recorded.isEmpty());
         assertThat(session.liveHeats().known()).extracting(HeatDto::event, HeatDto::heat).containsExactly(org.assertj.core.groups.Tuple.tuple(3, 2));
         assertThat(session.isConnected()).isTrue();
+        assertThat(session.refinedLegacyHeats()).isEmpty();
         session.stop();
         assertThat(session.state()).isEqualTo(RecordingState.STOPPED);
         assertThat(session.isConnected()).isFalse();
@@ -79,6 +80,7 @@ class LenexRecordingSessionTest {
 
         try (RecordingSession opened = new RecordingSession(db, RecordingSession.standard(), LocalDateTime::now)) {
             assertThat(opened.liveHeats().known()).hasSize(1);
+            assertThat(opened.refinedLegacyHeats()).isEmpty();
         }
     }
 

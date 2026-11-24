@@ -179,6 +179,8 @@ class RecordingSessionTest {
             assertThat(second.liveHeats().current()).isEqualTo(session.liveHeats().current());
             assertThat(second.liveHeats().current().lanes().get(0).current().orElseThrow().timeInMillis()).isEqualTo(112_853_930);
             assertThat(LegacySerialization.toXML(second.legacyHeats())).isEqualTo(LegacySerialization.toXML(session.legacyHeats()));
+            assertThat(LegacySerialization.toXML(session.refinedLegacyHeats())).isEqualTo(LegacySerialization.toXML(session.legacyHeats()));
+            assertThat(LegacySerialization.toXML(second.refinedLegacyHeats())).isEqualTo(LegacySerialization.toXML(session.legacyHeats()));
         }
     }
 
@@ -257,8 +259,12 @@ class RecordingSessionTest {
     }
 
     private static HttpResponse<String> fetchHeats(int port) throws Exception {
+        return fetch(port, "/legacy/heats.xml");
+    }
+
+    private static HttpResponse<String> fetch(int port, String path) throws Exception {
         try (HttpClient client = HttpClient.newHttpClient()) {
-            return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/legacy/heats.xml")).build(), HttpResponse.BodyHandlers.ofString());
+            return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).build(), HttpResponse.BodyHandlers.ofString());
         }
     }
 
@@ -284,6 +290,9 @@ class RecordingSessionTest {
         HttpResponse<String> response = fetchHeats(port);
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).isEqualTo(LegacySerialization.toXML(session.legacyHeats()));
+        HttpResponse<String> refined = fetch(port, "/legacy/heats-new.xml");
+        assertThat(refined.statusCode()).isEqualTo(200);
+        assertThat(refined.body()).isEqualTo(LegacySerialization.toXML(session.refinedLegacyHeats())).isEqualTo(response.body());
     }
 
     @Test

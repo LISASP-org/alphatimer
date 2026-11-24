@@ -16,12 +16,22 @@ final class MessageReplay {
     private MessageReplay() {
     }
 
-    static void replay(List<DataHandlingMessage> messages, DataHandlingMessageListener legacy, Consumer<RefinedMessage> heats) {
+    static void replay(List<DataHandlingMessage> messages, DataHandlingMessageListener legacy, Consumer<RefinedMessage> refinedLegacy,
+                       Consumer<RefinedMessage> heats) {
         DataHandlingMessageRefiner refiner = new DataHandlingMessageRefiner();
+        refiner.register(m -> skippingFailure(m, refinedLegacy));
         refiner.register(heats::accept);
         for (DataHandlingMessage message : messages) {
             skippingFailure(message, legacy::accept);
             skippingFailure(message, refiner::accept);
+        }
+    }
+
+    private static void skippingFailure(RefinedMessage message, Consumer<RefinedMessage> consumer) {
+        try {
+            consumer.accept(message);
+        } catch (RuntimeException ex) {
+            log.warn("Could not replay refined message of event {}, heat {}.", message.getEvent(), message.getHeat(), ex);
         }
     }
 
