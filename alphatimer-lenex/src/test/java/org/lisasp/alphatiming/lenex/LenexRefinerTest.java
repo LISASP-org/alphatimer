@@ -73,6 +73,18 @@ class LenexRefinerTest {
     }
 
     @Test
+    void aLaneThatDisappearedLosesItsTimesAndPenalty() {
+        LenexMeet before = meet(heat(2, "", result(4, 62340, ""), result(5, 63000, "DSQ", split(50, 30500))));
+        LenexMeet after = meet(heat(2, "", result(4, 62340, "")));
+
+        assertThat(refiner.refine(before, after, AT)).containsExactly(
+                used(2, LaneNumbering.AssumedOneBased, 4),
+                time(2, 5, RefinedKindOfTime.SplitTime, 1, 30500, RefinedTimeType.DeletedTime),
+                time(2, 5, RefinedKindOfTime.Finish, 2, 63000, RefinedTimeType.DeletedTime),
+                new DisqualifiedMessage(AT, "WK", (short) 3, (byte) 2, "TimedFinal", (byte) 5, true));
+    }
+
+    @Test
     void theStatusOfAResultBecomesAPenalty() {
         List<RefinedMessage> messages = refiner.refine(EMPTY, meet(heat(2, "",
                 result(1, 62340, "DSQ"), result(2, 0, "DNS"), result(3, 0, "DNF"), result(4, 0, "WDR"), result(5, 0, "SICK"),

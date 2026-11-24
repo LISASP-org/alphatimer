@@ -54,6 +54,8 @@ public final class LenexRefiner {
     private record Lane(Map<TimeKey, Integer> times, Optional<Penalty> penalty) {
     }
 
+    private static final Lane NO_RESULT = new Lane(Map.of(), Optional.empty());
+
     private record Heat(HeatKey key, String status, int lapCount, SortedMap<Integer, Lane> lanes) {
     }
 
@@ -96,6 +98,13 @@ public final class LenexRefiner {
         for (Map.Entry<Integer, Lane> entry : heat.lanes().entrySet()) {
             Lane before = old == null ? null : old.lanes().get(entry.getKey());
             refineLane(key, heat.lapCount(), entry.getKey(), before, entry.getValue(), at, messages);
+        }
+        if (old != null) {
+            old.lanes().forEach((lane, before) -> {
+                if (!heat.lanes().containsKey(lane)) {
+                    refineLane(key, heat.lapCount(), lane, before, NO_RESULT, at, messages);
+                }
+            });
         }
         if ("OFFICIAL".equals(heat.status()) && (old == null || !"OFFICIAL".equals(old.status()))) {
             messages.add(new OfficialEndMessage(at, competition, event, number, key.round(), (byte) heat.lapCount()));
