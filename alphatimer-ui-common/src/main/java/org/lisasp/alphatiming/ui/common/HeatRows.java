@@ -60,7 +60,7 @@ public final class HeatRows {
                           .mapToInt(l -> l.finish().map(LaneTime::timeInMillis).orElse(0))
                           .max()
                           .orElse(0);
-        return longest > 0 ? TimeFormat.time(longest) : "";
+        return TimeFormat.duration(longest);
     }
 
     private static String heatText(HeatDto heat) {

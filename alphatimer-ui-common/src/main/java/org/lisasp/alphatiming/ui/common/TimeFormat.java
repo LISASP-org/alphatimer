@@ -12,6 +12,20 @@ public final class TimeFormat {
     private TimeFormat() {
     }
 
+    public static String duration(int millis) {
+        return duration(millis, Locale.getDefault());
+    }
+
+    /** A duration in hundredths, always with its minutes: {@code 0:25.00}, {@code 1:05.43}; empty for none. */
+    public static String duration(int millis, Locale locale) {
+        if (millis <= 0) {
+            return "";
+        }
+        char separator = DecimalFormatSymbols.getInstance(locale).getDecimalSeparator();
+        int hundredths = millis / 10;
+        return String.format("%d:%02d%c%02d", hundredths / 6000, (hundredths / 100) % 60, separator, hundredths % 100);
+    }
+
     public static String time(int millis) {
         return time(millis, Locale.getDefault());
     }
