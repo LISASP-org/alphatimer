@@ -22,7 +22,11 @@ not be redistributed.
     next change of the file is read again.
   - A LENEX refiner compares each version with the previous one and sends refined messages for the changes. No
     `StartMessage` is needed: a time starts an open heat (`Heat.assureStarted`).
-    - `EVENT number`, `HEAT number` (through `RESULT heatid`), `RESULT lane` → event, heat, lane.
+    - `EVENT number`, `EVENT round`, `HEAT number` (through `RESULT heatid`), `RESULT lane` → event, round, heat, lane.
+      `TIM` (also a missing `round`, its default) → `TimedFinal`, `FHT` → `FastestHeats`, `PRE` → `PreliminaryHeat`, `QUA` →
+      `QuarterFinal`, `SEM` → `SemiFinal`, `FIN` → `Final`, `SOP`/`SOQ`/`SOS` → `SwimOffAfterPrelim`/
+      `SwimOffAfterQuarterFinal`/`SwimOffAfterSemiFinal`, `TIMETRIAL` → `TimeTrial`; other values (e.g. `EXTRAHEATS`,
+      written by Splash) unchanged.
     - `SPLIT` → `TimeMessage` `SplitTime`; `swimtime` → `TimeMessage` `Finish`; lap = distance ÷ pool length, lap count
       from the event distance (relays: relay count × distance); message type `CurrentRaceResult`.
     - A time that changed or disappeared: the old value of that lap again as `DeletedTime`, then the new one.
@@ -38,6 +42,11 @@ not be redistributed.
     - Lanes with results → `UsedLanesMessage`.
     - Places are computed by the heat model; reaction times are left out ([Reaction times](reaction-times.md)).
   - Results of athletes and relays are both read.
+  - A heat is identified by event, round and heat: a meet may use one event number for several rounds (prelims, swim-off,
+    semifinals, finals), each with heats 1, 2, …. The round is text in the refined messages and the heat model. An enum
+    of the known rounds gives the consolidated texts; each source converts its own values to them, keeps unknown values
+    unchanged and writes round numbers as number strings. ARES sends no round (only event and heat), so its heats have
+    an empty round.
   - `.lef` and `.lxf` (a zip with one `.lef`) are read.
   - Every version is the complete state of the meet up to its export: a time, penalty or heat missing from it that the
     previous version had was removed. A `status` on meet, session or event ("used for incremental data files" in
