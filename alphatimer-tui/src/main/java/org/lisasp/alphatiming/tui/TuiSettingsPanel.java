@@ -70,7 +70,7 @@ final class TuiSettingsPanel extends Panel {
     private final CommitTextBox competitionKey = new CommitTextBox(30, this::commit);
     private final CommitTextBox timekeepingOffset = new CommitTextBox(4, this::commit);
     private final CommitTextBox autoSave = new CommitTextBox(6, this::commit);
-    private final CommitTextBox restPort = new CommitTextBox(6, this::commit);
+    private final CommitTextBox restPort = new CommitTextBox(6, this::commitServerPort);
     private final CheckBox server = new CheckBox();
     private final Button record = new Button(I18n.get("recording.start"), this::toggleRecording);
     private final Label recordHint = new Label("");
@@ -104,7 +104,7 @@ final class TuiSettingsPanel extends Panel {
 
         addComponent(createSource().withBorder(Borders.singleLine(I18n.get("source.title"))),
                      GridLayout.createLayoutData(GridLayout.Alignment.FILL, GridLayout.Alignment.FILL, true, false));
-        addComponent(createGeneral().withBorder(Borders.singleLine(I18n.get("settings.title"))),
+        addComponent(createGeneral(),
                      GridLayout.createLayoutData(GridLayout.Alignment.FILL, GridLayout.Alignment.FILL, true, false));
         addComponent(log.withBorder(Borders.singleLine(I18n.get("messages.title"))),
                      GridLayout.createLayoutData(GridLayout.Alignment.FILL, GridLayout.Alignment.FILL, true, true, 2, 1));
@@ -113,7 +113,11 @@ final class TuiSettingsPanel extends Panel {
         system.addListener((selected, previous, byUser) -> systemChanged());
         serialPort.addListener((selected, previous, byUser) -> commit());
         serialMode.addListener((selected, previous, byUser) -> commit());
-        server.addListener(checked -> commit());
+        server.addListener(checked -> {
+            if (!updating) {
+                controller.setServer(checked);
+            }
+        });
         lenexInterval.addListener((selected, previous, byUser) -> commit());
 
         refresh();
@@ -166,11 +170,17 @@ final class TuiSettingsPanel extends Panel {
         general.addComponent(timekeepingOffset);
         general.addComponent(new Label(I18n.get("general.autoSave")));
         general.addComponent(autoSave);
-        general.addComponent(new Label(I18n.get("general.serverPort")));
-        general.addComponent(restPort);
-        general.addComponent(new Label(""));
-        general.addComponent(server);
-        return general;
+
+        Panel serverPanel = new Panel(new GridLayout(2));
+        serverPanel.addComponent(new Label(I18n.get("general.serverPort")));
+        serverPanel.addComponent(restPort);
+        serverPanel.addComponent(new Label(""));
+        serverPanel.addComponent(server);
+
+        Panel column = new Panel(new LinearLayout(Direction.VERTICAL));
+        column.addComponent(general.withBorder(Borders.singleLine(I18n.get("settings.title"))));
+        column.addComponent(serverPanel.withBorder(Borders.singleLine(I18n.get("server.title"))));
+        return column;
     }
 
     private static Panel row(com.googlecode.lanterna.gui2.Component... components) {
@@ -218,6 +228,15 @@ final class TuiSettingsPanel extends Panel {
     private static int number(TextBox box) {
         String text = box.getText().trim();
         return text.isEmpty() || text.equals("-") ? 0 : Integer.parseInt(text);
+    }
+
+    /** The port is changed apart from the other settings: while the server is off, also during a recording. */
+    void commitServerPort() {
+        if (updating) {
+            return;
+        }
+        controller.setServerPort(number(restPort));
+        refreshButtons();
     }
 
     void commit() {
@@ -433,7 +452,7 @@ final class TuiSettingsPanel extends Panel {
         competitionKey.setEnabled(rules.editable());
         timekeepingOffset.setEnabled(rules.editable());
         autoSave.setEnabled(rules.editable());
-        server.setEnabled(rules.editable());
+        server.setEnabled(rules.serverEditable());
         restPort.setEnabled(rules.restPortEditable());
         server.setLabel(rules.serverText());
         record.setLabel(rules.recordText());
@@ -484,6 +503,10 @@ final class TuiSettingsPanel extends Panel {
 
     ComboBox<String> lenexIntervalCombo() {
         return lenexInterval;
+    }
+
+    CheckBox serverCheckBox() {
+        return server;
     }
 
     ComboBox<String> systemCombo() {

@@ -43,7 +43,7 @@ class SettingsFormRulesTest {
         assertThat(rules.editable()).isTrue();
         assertThat(rules.hostRequired()).isTrue();
         assertThat(rules.replayFileRequired()).isFalse();
-        assertThat(rules.restPortEditable()).isFalse();
+        assertThat(rules.restPortEditable()).isTrue();
         assertThat(rules.serverText()).isEqualTo("Server: off");
         assertThat(rules.recordText()).isEqualTo("Start recording");
         assertThat(rules.recordEnabled()).isTrue();
@@ -72,6 +72,17 @@ class SettingsFormRulesTest {
     }
 
     @Test
+    void theServerCanBeSwitchedDuringARecordingAndItsPortIsEditableExactlyWhileTheServerIsOff() {
+        assertThat(SettingsFormRules.of(TCP.withRest(1999, true), true, true).serverEditable()).isTrue();
+        assertThat(SettingsFormRules.of(TCP.withRest(1999, true), true, true).restPortEditable()).isFalse();
+        assertThat(SettingsFormRules.of(TCP.withRest(1999, true), false, true).restPortEditable()).isFalse();
+        assertThat(SettingsFormRules.of(TCP.withRest(1999, false), true, true).restPortEditable()).isTrue();
+        assertThat(SettingsFormRules.of(TCP.withRest(1999, false), false, true).restPortEditable()).isTrue();
+        assertThat(SettingsFormRules.of(TCP, false, false).serverEditable()).isFalse();
+        assertThat(SettingsFormRules.of(TCP, false, false).restPortEditable()).isFalse();
+    }
+
+    @Test
     void aLenexInputRequiresItsFile() {
         SettingsFormRules rules = SettingsFormRules.of(TCP.withConnectionType(ConnectionType.LENEX).withLenex("meet.lef", 1), false, true);
 
@@ -82,12 +93,12 @@ class SettingsFormRulesTest {
     }
 
     @Test
-    void aFileReplayRequiresTheFileAndAnEnabledServerItsPort() {
+    void aFileReplayRequiresTheFileAndARunningServerLocksItsPort() {
         SettingsFormRules rules = SettingsFormRules.of(TCP.withConnectionType(ConnectionType.FILE).withReplayFile("x.timing").withRest(1999, true), false, true);
 
         assertThat(rules.hostRequired()).isFalse();
         assertThat(rules.replayFileRequired()).isTrue();
-        assertThat(rules.restPortEditable()).isTrue();
+        assertThat(rules.restPortEditable()).isFalse();
         assertThat(rules.serverText()).isEqualTo("Server: on");
     }
 

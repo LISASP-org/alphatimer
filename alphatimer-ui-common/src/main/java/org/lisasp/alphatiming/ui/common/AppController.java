@@ -241,6 +241,28 @@ public final class AppController implements AutoCloseable {
         defaults.save(settings);
         warnings.clear(StatusWarnings.Kind.CONNECTION_LOST);
         s.start(settings);
+        if (s.state() == RecordingState.RUNNING) {
+            setServer(true);
+        }
+    }
+
+    /**
+     * Switches the server on or off, also while a recording runs (unlike the other settings). A started recording switches
+     * it on; stopping the recording leaves it running.
+     */
+    public void setServer(boolean on) {
+        TimingDocument doc = document;
+        RecordingSession s = session;
+        if (doc == null || doc.settings().restEnabled() == on) {
+            return;
+        }
+        Settings changed = doc.settings().withRest(doc.settings().restPort(), on);
+        doc.updateSettings(changed);
+        scheduleAutoSave(changed);
+        if (s != null) {
+            serve(s, changed);
+        }
+        fireChange();
     }
 
     public void stopRecording() {
@@ -267,7 +289,19 @@ public final class AppController implements AutoCloseable {
         fireChange();
     }
 
-    /** The server runs whenever it is switched on, with or without a recording. */
+    /** Changes the port of the server while it is off, also during a recording; it applies when the server is switched on. */
+    public void setServerPort(int port) {
+        TimingDocument doc = document;
+        if (doc == null || doc.settings().restEnabled() || doc.settings().restPort() == port) {
+            return;
+        }
+        Settings changed = doc.settings().withRest(port, false);
+        doc.updateSettings(changed);
+        scheduleAutoSave(changed);
+        fireChange();
+    }
+
+    /** The server runs whenever it is switched on, with or without a recording (see {@link #setServer}). */
     private void serve(RecordingSession s, Settings settings) {
         try {
             s.serve(settings.restEnabled(), settings.restPort());
