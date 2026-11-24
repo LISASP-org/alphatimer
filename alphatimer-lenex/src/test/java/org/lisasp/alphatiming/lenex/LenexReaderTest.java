@@ -1,5 +1,12 @@
 package org.lisasp.alphatiming.lenex;
 
+import org.lisasp.alphatiming.lenex.api.LenexMeet;
+import org.lisasp.alphatiming.lenex.api.LenexEvent;
+import org.lisasp.alphatiming.lenex.api.LenexHeat;
+import org.lisasp.alphatiming.lenex.api.LenexResult;
+import org.lisasp.alphatiming.lenex.api.LenexSplit;
+import org.lisasp.alphatiming.lenex.api.InvalidLenexException;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

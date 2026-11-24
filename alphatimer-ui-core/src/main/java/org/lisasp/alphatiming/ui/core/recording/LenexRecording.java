@@ -2,9 +2,9 @@ package org.lisasp.alphatiming.ui.core.recording;
 
 import lombok.extern.slf4j.Slf4j;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
-import org.lisasp.alphatiming.lenex.InvalidLenexException;
+import org.lisasp.alphatiming.lenex.api.InvalidLenexException;
 import org.lisasp.alphatiming.lenex.LenexDocuments;
-import org.lisasp.alphatiming.lenex.LenexMeet;
+import org.lisasp.alphatiming.lenex.api.LenexMeet;
 import org.lisasp.alphatiming.lenex.LenexReader;
 import org.lisasp.alphatiming.lenex.LenexRefiner;
 import org.lisasp.alphatiming.project.db.LenexVersion;

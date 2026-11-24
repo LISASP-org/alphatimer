@@ -1,5 +1,7 @@
 package org.lisasp.alphatiming.lenex;
 
+import org.lisasp.alphatiming.lenex.api.InvalidLenexException;
+
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;

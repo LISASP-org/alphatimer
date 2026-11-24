@@ -14,6 +14,10 @@
     <dependencies>
         <dependency>
             <groupId>org.lisasp.alphatiming</groupId>
+            <artifactId>alphatimer-lenex-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.lisasp.alphatiming</groupId>
             <artifactId>alphatimer-refinedmessages-api</artifactId>
         </dependency>
         <dependency>

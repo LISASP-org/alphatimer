@@ -1,5 +1,11 @@
 package org.lisasp.alphatiming.lenex;
 
+import org.lisasp.alphatiming.lenex.api.LenexMeet;
+import org.lisasp.alphatiming.lenex.api.LenexEvent;
+import org.lisasp.alphatiming.lenex.api.LenexHeat;
+import org.lisasp.alphatiming.lenex.api.LenexResult;
+import org.lisasp.alphatiming.lenex.api.LenexSplit;
+
 import org.junit.jupiter.api.Test;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.HeatService;

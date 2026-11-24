@@ -1,4 +1,4 @@
-package org.lisasp.alphatiming.lenex;
+package org.lisasp.alphatiming.lenex.api;
 
 import java.util.List;
 import java.util.OptionalInt;
