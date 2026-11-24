@@ -72,6 +72,17 @@ class SettingsFormRulesTest {
     }
 
     @Test
+    void theServerCanBeSwitchedDuringARecordingButItsPortCannotBeChanged() {
+        SettingsFormRules running = SettingsFormRules.of(TCP.withRest(1999, true), true, true);
+        SettingsFormRules stopped = SettingsFormRules.of(TCP.withRest(1999, true), false, true);
+
+        assertThat(running.serverEditable()).isTrue();
+        assertThat(running.restPortEditable()).isFalse();
+        assertThat(stopped.restPortEditable()).isTrue();
+        assertThat(SettingsFormRules.of(TCP, false, false).serverEditable()).isFalse();
+    }
+
+    @Test
     void aLenexInputRequiresItsFile() {
         SettingsFormRules rules = SettingsFormRules.of(TCP.withConnectionType(ConnectionType.LENEX).withLenex("meet.lef", 1), false, true);
 

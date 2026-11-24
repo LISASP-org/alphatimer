@@ -133,6 +133,7 @@ class AppControllerTest {
 
     @BeforeEach
     void setUp() throws IOException {
+        S = new Settings("localhost", 8585, 60, 0).withCompetitionKey("WK").withRest(freePort(), false);
         work = Files.createDirectories(dir.resolve("work"));
         defaults = new DefaultSettingsStore(dir.resolve("defaults.json"));
         defaults.save(Settings.defaults().withRest(Settings.DEFAULT_REST_PORT, false));
@@ -146,7 +147,8 @@ class AppControllerTest {
         }
     }
 
-    private static final Settings S = new Settings("localhost", 8585, 60, 0).withCompetitionKey("WK");
+    /** Starting a recording starts the server, so every test gets a port of its own instead of the default. */
+    private Settings S;
 
     private static int freePort() throws IOException {
         try (ServerSocket probe = new ServerSocket(0)) {
@@ -181,6 +183,38 @@ class AppControllerTest {
 
         controller.applySettings(S.withRest(port, false));
         assertThat(serves(port)).isFalse();
+    }
+
+    @Test
+    void startingARecordingStartsTheServerAndStoppingItKeepsTheServerRunning() throws IOException {
+        int port = freePort();
+        controller.init();
+        controller.applySettings(S.withRest(port, false));
+        assertThat(serves(port)).isFalse();
+
+        controller.startRecording();
+        assertThat(serves(port)).isTrue();
+        assertThat(controller.document().settings().restEnabled()).isTrue();
+
+        controller.stopRecording();
+        assertThat(serves(port)).isTrue();
+    }
+
+    @Test
+    void theServerCanBeStoppedAndStartedAgainDuringARecording() throws IOException {
+        int port = freePort();
+        controller.init();
+        controller.applySettings(S.withRest(port, false));
+        controller.startRecording();
+
+        controller.setServer(false);
+        assertThat(serves(port)).isFalse();
+        assertThat(controller.isRecording()).isTrue();
+        assertThat(controller.document().settings().restEnabled()).isFalse();
+
+        controller.setServer(true);
+        assertThat(serves(port)).isTrue();
+        controller.stopRecording();
     }
 
     @Test
@@ -955,7 +989,7 @@ class AppControllerTest {
         List<Runnable> loseConnection = new CopyOnWriteArrayList<>();
         try (AppController recording = losingController(loseConnection)) {
             recording.init();
-            recording.applySettings(SERIAL);
+            recording.applySettings(SERIAL.withRest(S.restPort(), false));
             List<String> log = new CopyOnWriteArrayList<>();
             recording.addMessageListener(log::add);
             recording.startRecording();

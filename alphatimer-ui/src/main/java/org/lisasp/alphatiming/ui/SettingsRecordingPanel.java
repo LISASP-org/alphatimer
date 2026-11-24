@@ -167,7 +167,11 @@ public final class SettingsRecordingPanel extends JPanel {
         timekeepingOffset.addChangeListener(e -> commit());
         autoSave.addChangeListener(e -> commit());
         restPort.addChangeListener(e -> commit());
-        serverToggle.addActionListener(e -> commit());
+        serverToggle.addActionListener(e -> {
+            if (!updating) {
+                controller.setServer(serverToggle.isSelected());
+            }
+        });
 
         refresh();
     }
@@ -249,16 +253,25 @@ public final class SettingsRecordingPanel extends JPanel {
         competitionForm.add(I18n.get("general.competitionKey"), competitionKey);
         competitionForm.add(I18n.get("general.timekeepingOffset"), timekeepingOffset);
         competitionForm.add(I18n.get("general.autoSave"), autoSave);
-        competitionForm.add(I18n.get("general.serverPort"), restPort);
-        competitionForm.add((Component) null, serverToggle);
         JPanel competition = competitionForm.getPanel();
         competition.setBorder(BorderUtils.createLabeledBorder(I18n.get("settings.title"), true));
+
+        SimpleFormBuilder serverForm = newBuilder();
+        serverForm.add(I18n.get("general.serverPort"), restPort);
+        serverForm.add((Component) null, serverToggle);
+        JPanel server = serverForm.getPanel();
+        server.setBorder(BorderUtils.createLabeledBorder(I18n.get("server.title"), true));
+
+        JPanel general = new JPanel(new FormLayout("fill:default:grow", "fill:default, 4dlu, fill:default"));
+        general.setOpaque(false);
+        general.add(competition, CC.xy(1, 1));
+        general.add(server, CC.xy(1, 3));
 
         FormLayout formLayout = new FormLayout("fill:default:grow, 4dlu, fill:default:grow", "fill:default");
         formLayout.setColumnGroups(new int[][]{{1, 3}});
         JPanel form = new JPanel(formLayout);
         form.add(input, CC.xy(1, 1));
-        form.add(competition, CC.xy(3, 1));
+        form.add(general, CC.xy(3, 1));
         return form;
     }
 
@@ -450,9 +463,10 @@ public final class SettingsRecordingPanel extends JPanel {
             case FILE -> FILE_CARD;
             case LENEX -> LENEX_CARD;
         });
-        for (Component field : new Component[]{system, connectionType, host, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, lenexFile, chooseLenexFile, lenexInterval, competitionKey, timekeepingOffset, autoSave, serverToggle}) {
+        for (Component field : new Component[]{system, connectionType, host, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, lenexFile, chooseLenexFile, lenexInterval, competitionKey, timekeepingOffset, autoSave}) {
             field.setEnabled(rules.editable());
         }
+        serverToggle.setEnabled(rules.serverEditable());
         restPort.setEnabled(rules.restPortEditable());
         serverToggle.setText(rules.serverText());
         recordToggle.setSelected(running);

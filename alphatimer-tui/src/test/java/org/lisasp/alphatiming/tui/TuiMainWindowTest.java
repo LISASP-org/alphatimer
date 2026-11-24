@@ -231,6 +231,28 @@ class TuiMainWindowTest {
     }
 
     @Test
+    void theServerHasItsOwnPanelAndCanBeSwitchedWhileRecording() throws IOException {
+        TuiSettingsPanel settings = window.settingsPanel();
+        controller.applySettings(new org.lisasp.alphatiming.ui.core.settings.Settings("localhost", 8585, 60, 0).withCompetitionKey("WK")
+                                         .withRest(freePort(), false));
+        controller.startRecording();
+        settings.refresh();
+        render();
+
+        assertThat(screenText()).contains("Server for JAuswertung");
+        assertThat(controller.document().settings().restEnabled()).isTrue();
+        assertThat(settings.serverCheckBox().isEnabled()).isTrue();
+        assertThat(settings.hostField().isEnabled()).isFalse();
+        controller.stopRecording();
+    }
+
+    private static int freePort() throws IOException {
+        try (java.net.ServerSocket probe = new java.net.ServerSocket(0)) {
+            return probe.getLocalPort();
+        }
+    }
+
+    @Test
     void aNegativeTimekeepingOffsetCanBeTypedCharacterByCharacter() throws IOException {
         TuiSettingsPanel settings = window.settingsPanel();
         settings.timekeepingOffsetField().setText("");
