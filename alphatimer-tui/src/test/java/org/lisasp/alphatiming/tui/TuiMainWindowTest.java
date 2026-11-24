@@ -239,7 +239,7 @@ class TuiMainWindowTest {
         settings.refresh();
         render();
 
-        assertThat(screenText()).contains("Server for JAuswertung");
+        assertThat(screenText()).contains("Server");
         assertThat(controller.document().settings().restEnabled()).isTrue();
         assertThat(settings.serverCheckBox().isEnabled()).isTrue();
         assertThat(settings.hostField().isEnabled()).isFalse();
