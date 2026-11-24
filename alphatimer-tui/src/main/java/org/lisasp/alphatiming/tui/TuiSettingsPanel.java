@@ -70,7 +70,7 @@ final class TuiSettingsPanel extends Panel {
     private final CommitTextBox competitionKey = new CommitTextBox(30, this::commit);
     private final CommitTextBox timekeepingOffset = new CommitTextBox(4, this::commit);
     private final CommitTextBox autoSave = new CommitTextBox(6, this::commit);
-    private final CommitTextBox restPort = new CommitTextBox(6, this::commit);
+    private final CommitTextBox restPort = new CommitTextBox(6, this::commitServerPort);
     private final CheckBox server = new CheckBox();
     private final Button record = new Button(I18n.get("recording.start"), this::toggleRecording);
     private final Label recordHint = new Label("");
@@ -228,6 +228,15 @@ final class TuiSettingsPanel extends Panel {
     private static int number(TextBox box) {
         String text = box.getText().trim();
         return text.isEmpty() || text.equals("-") ? 0 : Integer.parseInt(text);
+    }
+
+    /** The port is changed apart from the other settings: while the server is off, also during a recording. */
+    void commitServerPort() {
+        if (updating) {
+            return;
+        }
+        controller.setServerPort(number(restPort));
+        refreshButtons();
     }
 
     void commit() {

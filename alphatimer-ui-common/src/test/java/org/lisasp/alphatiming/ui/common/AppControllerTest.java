@@ -218,6 +218,35 @@ class AppControllerTest {
     }
 
     @Test
+    void thePortCanBeChangedWhileTheServerIsOffAlsoDuringARecording() throws IOException {
+        int port = freePort();
+        int other = freePort();
+        controller.init();
+        controller.applySettings(S.withRest(port, false));
+        controller.startRecording();
+        controller.setServer(false);
+
+        controller.setServerPort(other);
+        controller.setServer(true);
+
+        assertThat(controller.document().settings().restPort()).isEqualTo(other);
+        assertThat(serves(other)).isTrue();
+        assertThat(serves(port)).isFalse();
+        controller.stopRecording();
+    }
+
+    @Test
+    void thePortOfARunningServerIsNotChanged() throws IOException {
+        int port = freePort();
+        controller.init();
+        controller.applySettings(S.withRest(port, true));
+
+        controller.setServerPort(freePort());
+
+        assertThat(controller.document().settings().restPort()).isEqualTo(port);
+    }
+
+    @Test
     void aServerPortInUseIsAWarningUntilTheServerIsSwitchedOffAndDoesNotKeepTheRecordingFromStarting() throws IOException {
         controller.init();
         try (ServerSocket blocker = new ServerSocket(0)) {

@@ -166,7 +166,11 @@ public final class SettingsRecordingPanel extends JPanel {
         port.addChangeListener(e -> commit());
         timekeepingOffset.addChangeListener(e -> commit());
         autoSave.addChangeListener(e -> commit());
-        restPort.addChangeListener(e -> commit());
+        restPort.addChangeListener(e -> {
+            if (!updating) {
+                controller.setServerPort((Integer) restPort.getValue());
+            }
+        });
         serverToggle.addActionListener(e -> {
             if (!updating) {
                 controller.setServer(serverToggle.isSelected());

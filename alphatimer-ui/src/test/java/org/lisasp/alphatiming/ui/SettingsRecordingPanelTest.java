@@ -94,6 +94,23 @@ class SettingsRecordingPanelTest {
     }
 
     @Test
+    void thePortFieldIsEditableExactlyWhileTheServerIsOff() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            assertThat(panel.serverPortSpinner().isEnabled()).isTrue();
+
+            panel.serverToggle().doClick();
+            panel.refresh();
+            assertThat(panel.serverPortSpinner().isEnabled()).isFalse();
+
+            panel.recordToggle().doClick();
+            panel.serverToggle().doClick();
+            panel.refresh();
+            assertThat(controller.isRecording()).isTrue();
+            assertThat(panel.serverPortSpinner().isEnabled()).isTrue();
+        });
+    }
+
+    @Test
     void theServerCanBeSwitchedOffWithTheButtonDuringARecording() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             panel.startRecording();

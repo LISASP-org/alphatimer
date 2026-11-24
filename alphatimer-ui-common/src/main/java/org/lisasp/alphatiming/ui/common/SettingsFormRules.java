@@ -14,6 +14,7 @@ import java.util.Optional;
  *
  * @param systems the timing systems offered: once the project holds data, only the one of its data
  * @param sources the sources offered: those of the selected system
+ * @param restPortEditable whether the server port can be changed: while the server is off, also during a recording
  * @param serverEditable whether the server can be switched: with a project, also while a recording runs
  */
 public record SettingsFormRules(boolean editable,
@@ -41,7 +42,7 @@ public record SettingsFormRules(boolean editable,
                                      fields.connectionType() == ConnectionType.LENEX,
                                      recorded.map(List::of).orElse(List.of(Input.values())),
                                      sourcesOf(fields.connectionType().input()),
-                                     !running && fields.restEnabled(),
+                                     hasDocument && !fields.restEnabled(),
                                      hasDocument,
                                      fields.restEnabled() ? I18n.get("general.server.on") : I18n.get("general.server.off"),
                                      running ? I18n.get("recording.stop") : I18n.get("recording.start"),

@@ -289,6 +289,18 @@ public final class AppController implements AutoCloseable {
         fireChange();
     }
 
+    /** Changes the port of the server while it is off, also during a recording; it applies when the server is switched on. */
+    public void setServerPort(int port) {
+        TimingDocument doc = document;
+        if (doc == null || doc.settings().restEnabled() || doc.settings().restPort() == port) {
+            return;
+        }
+        Settings changed = doc.settings().withRest(port, false);
+        doc.updateSettings(changed);
+        scheduleAutoSave(changed);
+        fireChange();
+    }
+
     /** The server runs whenever it is switched on, with or without a recording (see {@link #setServer}). */
     private void serve(RecordingSession s, Settings settings) {
         try {
