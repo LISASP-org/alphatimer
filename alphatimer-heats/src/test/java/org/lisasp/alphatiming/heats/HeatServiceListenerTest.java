@@ -84,5 +84,10 @@ class HeatServiceListenerTest {
             }
             heats.put(List.of(dto.event(), dto.round(), dto.heat()), dto);
         }
+
+        @Override
+        public void delete(int event, String round, int heat) {
+            heats.remove(List.of(event, round, heat));
+        }
     }
 }

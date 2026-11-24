@@ -393,6 +393,11 @@ class RecordingSessionTest {
         }
 
         @Override
+        public void delete(int event, String round, int heat) {
+            delegate.delete(event, round, heat);
+        }
+
+        @Override
         public HeatDto create(HeatDto dto) {
             throw new IllegalStateException("heat rejected");
         }

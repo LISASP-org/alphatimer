@@ -61,4 +61,9 @@ public final class InMemoryHeatRepository implements HeatRepository {
         heats.put(key, dto);
         return dto;
     }
+
+    @Override
+    public synchronized void delete(int event, String round, int heat) {
+        heats.remove(new Key(event, round, heat));
+    }
 }

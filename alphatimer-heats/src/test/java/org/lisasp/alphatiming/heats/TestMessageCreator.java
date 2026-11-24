@@ -4,6 +4,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.HeatRemovedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
@@ -134,6 +135,10 @@ public final class TestMessageCreator {
 
     public static WithdrawnMessage wdrRemoved(int event, int heat, int lane) {
         return new WithdrawnMessage(T0.plusSeconds(90), "WK", (short) event, (byte) heat, "", (byte) lane, true);
+    }
+
+    public static HeatRemovedMessage removed(int event, int heat) {
+        return new HeatRemovedMessage(T0.plusSeconds(120), "WK", (short) event, (byte) heat, "");
     }
 
     public static OfficialEndMessage end(int event, int heat, LocalDateTime at) {

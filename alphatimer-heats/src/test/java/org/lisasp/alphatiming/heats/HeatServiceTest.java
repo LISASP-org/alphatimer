@@ -39,6 +39,38 @@ class HeatServiceTest {
     }
 
     @Test
+    void aRemovedHeatIsForgottenAndTheLiveViewShowsTheRemainingHeats() {
+        InMemoryHeatRepository store = new InMemoryHeatRepository();
+        HeatService service = new HeatService(store);
+        service.accept(TestMessageCreator.used(1, 1, "1000000000"));
+        service.accept(TestMessageCreator.split(1, 1, 1, 1, 1000));
+        service.accept(TestMessageCreator.used(1, 2, "1000000000"));
+        service.accept(TestMessageCreator.split(1, 2, 1, 1, 2000));
+
+        service.accept(TestMessageCreator.removed(1, 2));
+
+        assertThat(store.find(1, "", 2)).isEmpty();
+        assertThat(service.liveHeats().known()).extracting(HeatDto::heat).containsExactly(1);
+        assertThat(service.liveHeats().current().heat()).isEqualTo(1);
+        assertThat(service.liveHeats().previous()).isNull();
+    }
+
+    @Test
+    void removingAnUnknownHeatChangesNothing() {
+        InMemoryHeatRepository store = new InMemoryHeatRepository();
+        HeatService service = new HeatService(store);
+        service.accept(TestMessageCreator.used(1, 1, "1000000000"));
+        List<LiveHeats> seen = new ArrayList<>();
+        service.register(seen::add);
+        seen.clear();
+
+        service.accept(TestMessageCreator.removed(1, 9));
+
+        assertThat(seen).isEmpty();
+        assertThat(store.find(1, "", 1)).isPresent();
+    }
+
+    @Test
     void aReadyToStartAnnouncesTheHeat() {
         InMemoryHeatRepository store = new InMemoryHeatRepository();
         HeatService service = new HeatService(store);

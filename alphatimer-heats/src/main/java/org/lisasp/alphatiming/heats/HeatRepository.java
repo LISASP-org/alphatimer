@@ -16,4 +16,6 @@ public interface HeatRepository {
     HeatDto create(HeatDto dto);
 
     void save(HeatDto dto);
+
+    void delete(int event, String round, int heat);
 }

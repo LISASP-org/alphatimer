@@ -6,6 +6,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.HeatRemovedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
@@ -90,6 +91,10 @@ public final class HeatService implements Consumer<RefinedMessage> {
         if (isRepeatOfAPreviousRace(message)) {
             return;
         }
+        if (message instanceof HeatRemovedMessage m) {
+            remove(m);
+            return;
+        }
         try {
             Optional<HeatDto> stored = store.find(message.getEvent(), message.getRound(), message.getHeat());
             HeatDto before = stored.orElseGet(() -> HeatDto.empty(message.getEvent(), message.getRound(), message.getHeat(), LANE_COUNT));
@@ -159,6 +164,23 @@ public final class HeatService implements Consumer<RefinedMessage> {
             store.save(after);
             known.put(HeatKey.of(after), after);
         }
+    }
+
+    private void remove(HeatRemovedMessage message) {
+        HeatKey key = new HeatKey(message.getEvent(), message.getRound(), message.getHeat());
+        if (!known.containsKey(key)) {
+            return;
+        }
+        try {
+            store.delete(key.event(), key.round(), key.heat());
+            known.remove(key);
+            live = LiveHeats.of(List.copyOf(known.sequencedValues().reversed()), usedLanes);
+        } catch (RuntimeException ex) {
+            log.warn("Could not remove heat {}/{}/{}", key.event(), key.round(), key.heat(), ex);
+            onError.accept(ex);
+            return;
+        }
+        announce(live);
     }
 
     private void announce(LiveHeats heats) {
