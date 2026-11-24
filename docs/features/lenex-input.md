@@ -30,6 +30,11 @@ not be redistributed.
     - `SPLIT` → `TimeMessage` `SplitTime`; `swimtime` → `TimeMessage` `Finish`; lap = distance ÷ pool length, lap count
       from the event distance (relays: relay count × distance); message type `CurrentRaceResult`.
     - A time that changed or disappeared: the old value of that lap again as `DeletedTime`, then the new one.
+    - A penalty that disappeared: its message again with `removed` set (`DidNotStartMessage`, `DidNotFinishMessage`,
+      `DisqualifiedMessage`, `WithdrawnMessage`), like a deleted time; the lane loses the penalty, the places are
+      computed again and a heat without official end is no longer ended if the lane is no longer done.
+    - A heat that disappeared: `HeatRemovedMessage` (event, round, heat); the heat model forgets the heat, the live view
+      shows the remaining heats.
     - `RESULT status` `DSQ`/`DNS`/`DNF` → `DisqualifiedMessage`/`DidNotStartMessage`/`DidNotFinishMessage`.
     - `HEAT status` `RUNNING` → `StartMessage`; `OFFICIAL` → `OfficialEndMessage`. `UNOFFICIAL`/`INOFFICIAL` need no
       message: once every used lane has a finish or a penalty the heat model ends the heat, so the refiner sends the used
@@ -79,5 +84,3 @@ not be redistributed.
 - **Open questions:**
   - What SwimTime and Splash actually write and when (per heat, whole meet, atomically); needs a file of a real
     installation.
-  - How a removed penalty or a removed heat is refined: the refined messages can delete a time (`DeletedTime`), but
-    neither withdraw a penalty nor remove a heat.
