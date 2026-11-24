@@ -1,5 +1,6 @@
 package org.lisasp.alphatiming.lenex;
 
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeOrigin;
 import org.lisasp.alphatiming.lenex.api.LenexMeet;
 import org.lisasp.alphatiming.lenex.api.LenexEvent;
 import org.lisasp.alphatiming.lenex.api.LenexHeat;
@@ -176,6 +177,6 @@ class LenexRefinerTest {
 
     private static TimeMessage time(int heat, int lane, RefinedKindOfTime kind, int lap, int millis, RefinedTimeType type) {
         return new TimeMessage(AT, "WK", (short) 3, (byte) heat, "TimedFinal", RefinedMessageType.CurrentRaceResult, kind, (byte) lane,
-                               (byte) lap, (byte) 2, (byte) 0, millis, type);
+                               (byte) lap, (byte) 2, (byte) 0, millis, type, RefinedTimeOrigin.Primary);
     }
 }

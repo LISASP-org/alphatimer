@@ -4,6 +4,7 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.*;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeOrigin;
 import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedTimeMessage;
 
 import java.util.function.Consumer;
@@ -29,7 +30,8 @@ public class TimeParser implements Parser {
                         message.getLapCount(),
                         message.getRank(),
                         message.getTimeInMillis(),
-                        utils.convertTimeType(message.getTimeInfo(), message.getTimeType())));
+                        utils.convertTimeType(message.getTimeInfo(), message.getTimeType()),
+                        RefinedTimeOrigin.Primary));
             } else {
                 resultCollector.accept(new DroppedTimeMessage(message));
             }

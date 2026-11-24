@@ -1,9 +1,9 @@
 package org.lisasp.alphatiming.heats;
 
-import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedKindOfTime;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeOrigin;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
 import java.util.ArrayList;
@@ -92,7 +92,7 @@ final class Lane {
         enforceStatus();
     }
 
-    boolean backup(BackupTimeMessage message) {
+    boolean backup(TimeMessage message) {
         int lap = message.getCurrentLap();
         if (!isUsed() || message.getTimeInMillis() <= 0 || repeatsNewest(lap, TimeKind.Backup, message.getTimeInMillis())) {
             return false;
@@ -114,12 +114,17 @@ final class Lane {
         boolean changed = false;
         for (int i = 0; i < times.size(); i++) {
             LaneTime time = times.get(i);
-            if (!time.deleted() && time.kind() != TimeKind.Backup && time.lap() == message.getCurrentLap() && time.timeInMillis() == message.getTimeInMillis()) {
+            if (!time.deleted() && isBackup(time) == (message.getOrigin() == RefinedTimeOrigin.Backup) && time.lap() == message.getCurrentLap()
+                    && time.timeInMillis() == message.getTimeInMillis()) {
                 times.set(i, time.asDeleted());
                 changed = true;
             }
         }
         return changed;
+    }
+
+    private static boolean isBackup(LaneTime time) {
+        return time.kind() == TimeKind.Backup;
     }
 
     private static TimeSource sourceOf(TimeMessage message) {

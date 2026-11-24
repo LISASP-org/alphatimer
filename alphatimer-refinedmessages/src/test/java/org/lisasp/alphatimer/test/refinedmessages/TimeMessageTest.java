@@ -1,5 +1,6 @@
 package org.lisasp.alphatimer.test.refinedmessages;
 
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeOrigin;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -76,7 +77,7 @@ class TimeMessageTest {
                                  lapCount,
                                  (byte) 0,
                                  0,
-                                 RefinedTimeType.Normal),
+                                 RefinedTimeType.Normal, RefinedTimeOrigin.Primary),
                 new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
     }
 
@@ -187,7 +188,7 @@ class TimeMessageTest {
 
     private static TimeMessage refined(RefinedMessageType messageType, RefinedTimeType timeType) {
         return new TimeMessage(TIMESTAMP, "TestWK", EVENT, HEAT, messageType, RefinedKindOfTime.Finish, (byte) 2, (byte) 2, LAP_COUNT, (byte) 1,
-                               65_430, timeType);
+                               65_430, timeType, RefinedTimeOrigin.Primary);
     }
 
     @ParameterizedTest

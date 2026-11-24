@@ -7,8 +7,11 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeInfo;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeMarker;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeType;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
-import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
-import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedBackupTimeMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedKindOfTime;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeOrigin;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
+import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedTimeMessage;
 
 import java.util.function.Consumer;
 
@@ -20,16 +23,21 @@ public class BackupTimeParser implements Parser {
     public void accept(DataHandlingMessage message, Consumer<RefinedMessage> resultCollector) {
         if (isBackupTime(message)) {
             if (isValid(message)) {
-                resultCollector.accept(new BackupTimeMessage(message.getTimestamp(),
-                                                             message.getCompetition(),
-                                                             message.getEvent(),
-                                                             message.getHeat(),
-                                                             utils.convertMessageType(message.getMessageType()),
-                                                             message.getLane(),
-                                                             message.getCurrentLap(),
-                                                             message.getTimeInMillis()));
+                resultCollector.accept(new TimeMessage(message.getTimestamp(),
+                                                       message.getCompetition(),
+                                                       message.getEvent(),
+                                                       message.getHeat(),
+                                                       utils.convertMessageType(message.getMessageType()),
+                                                       kindOf(message),
+                                                       message.getLane(),
+                                                       message.getCurrentLap(),
+                                                       message.getLapCount(),
+                                                       message.getRank(),
+                                                       message.getTimeInMillis(),
+                                                       message.getTimeType() == TimeType.DeletedTime ? RefinedTimeType.DeletedTime : RefinedTimeType.Normal,
+                                                       RefinedTimeOrigin.Backup));
             } else {
-                resultCollector.accept(new DroppedBackupTimeMessage(message));
+                resultCollector.accept(new DroppedTimeMessage(message));
             }
         }
     }
@@ -42,8 +50,15 @@ public class BackupTimeParser implements Parser {
         return utils.isRaceTime(message) && message.getTimeInfo() == TimeInfo.Backup;
     }
 
+    /** Message type 7 names no kind of time; it is a finish when it belongs to the last lap. */
+    private RefinedKindOfTime kindOf(DataHandlingMessage message) {
+        if (message.getKindOfTime() == KindOfTime.Backup) {
+            return message.getCurrentLap() == message.getLapCount() ? RefinedKindOfTime.Finish : RefinedKindOfTime.SplitTime;
+        }
+        return utils.convertKindOfTime(message.getKindOfTime());
+    }
+
     private boolean isValid(DataHandlingMessage message) {
-        return message.getLane() > 0 && message.getCurrentLap() > 0 && message.getTimeInMillis() > 0
-                && message.getTimeType() != TimeType.DeletedTime && message.getTimeMarker() == TimeMarker.Empty;
+        return message.getLane() > 0 && message.getCurrentLap() > 0 && message.getTimeInMillis() > 0 && message.getTimeMarker() == TimeMarker.Empty;
     }
 }
