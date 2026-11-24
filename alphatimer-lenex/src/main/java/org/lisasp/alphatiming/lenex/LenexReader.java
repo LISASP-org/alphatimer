@@ -45,7 +45,7 @@ public final class LenexReader {
     private LenexReader() {
     }
 
-    public static LenexMeet read(Path file) throws IOException {
+    static LenexMeet read(Path file) throws IOException {
         try (InputStream in = Files.newInputStream(file)) {
             return read(in);
         }

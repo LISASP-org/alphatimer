@@ -4,7 +4,7 @@ import java.util.Map;
 import java.util.OptionalInt;
 
 /** The pool lengths of the LENEX courses (section 5.4 of LENEX 3.0), in the unit of the event's distances. */
-public final class Courses {
+final class Courses {
 
     private static final Map<String, Double> POOL_LENGTHS = Map.ofEntries(
             Map.entry("LCM", 50.0),
@@ -22,7 +22,7 @@ public final class Courses {
     }
 
     /** Empty for open water and unknown courses, which have no laps. */
-    public static OptionalInt laps(String course, int distance) {
+    static OptionalInt laps(String course, int distance) {
         Double length = POOL_LENGTHS.get(course);
         if (length == null) {
             return OptionalInt.empty();

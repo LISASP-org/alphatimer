@@ -2,13 +2,13 @@ package org.lisasp.alphatiming.lenex;
 
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.Round;
 
-public final class LenexRounds {
+final class LenexRounds {
 
     private LenexRounds() {
     }
 
     /** The round of an event as text of the refined messages; a missing round is {@code TIM}, the default of LENEX 3.0. */
-    public static String consolidated(String lenex) {
+    static String consolidated(String lenex) {
         Round round = switch (lenex) {
             case "", "TIM" -> Round.TimedFinal;
             case "FHT" -> Round.FastestHeats;
