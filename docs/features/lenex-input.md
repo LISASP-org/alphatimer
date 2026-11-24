@@ -9,7 +9,8 @@ not be redistributed.
 - **Goal:** a LENEX file on the local disk is an input source of AlphaTiming like TCP, serial and file replay; whatever
   software writes it, its results reach the heat model.
 - **Behavior:**
-  - A watcher reads the file whenever it has changed; the versions are recorded, so the project file keeps what arrived
+  - A watcher checks the file at an interval of its settings (1 s by default) and reads it whenever it has changed; the
+    versions are recorded, so the project file keeps what arrived
     and the project can be rebuilt from it.
   - Versions are recorded compressed in a table of their own (not in `rawdata`, which holds the serial byte stream),
     as XML in one line: the parsed file written again without line breaks and indentation between the elements, then
