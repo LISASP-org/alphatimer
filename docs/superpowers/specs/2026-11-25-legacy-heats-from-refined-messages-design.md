@@ -126,7 +126,7 @@ On all other 1,189 heats of the recordings both outputs are identical.
 The legacy format knows event and heat, not the round. In `swimrankings-example-results` 93 event/heat numbers occur in
 several rounds (`PreliminaryHeat`, `Final`, `EXTRAHEATS`, `SwimOffAfterPrelim`); their times end up in one legacy heat,
 the lanes holding the times of every round. The other LENEX examples number their events per round, so this does not
-occur there. Undecided how such heats should be served.
+occur there. Undecided how such heats should be served; tracked in `docs/issues/lenex-rounds-merge-in-legacy-heats.md`.
 
 ## Verification
 
