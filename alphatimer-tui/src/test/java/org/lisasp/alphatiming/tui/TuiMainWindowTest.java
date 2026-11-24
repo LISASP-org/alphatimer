@@ -155,7 +155,7 @@ class TuiMainWindowTest {
 
     @Test
     void showsMenuNavigationSettingsAndStatusLikeTheGui() {
-        assertThat(screenText()).contains("File", "Recording", "Settings & Recording", "Live View", "Connection type", "Stopped", "unsaved project");
+        assertThat(screenText()).contains("File", "Recording", "Settings & Recording", "Live View", "Timing system", "Source", "Stopped", "unsaved project");
     }
 
     @Test
@@ -258,15 +258,48 @@ class TuiMainWindowTest {
     }
 
     @Test
+    void theLenexFieldsFollowTheConnectionTypeAndKeepFileAndInterval() throws IOException {
+        TuiSettingsPanel settings = window.settingsPanel();
+        settings.systemCombo().setSelectedIndex(1);
+        render();
+        assertThat(settings.connectionTypeCombo().getItemCount()).isEqualTo(1);
+        settings.lenexFileField().setText("/data/meet.lef");
+        settings.lenexIntervalCombo().setSelectedIndex(3);
+        settings.commit();
+        render();
+
+        assertThat(settings.lenexFields().isVisible()).isTrue();
+        assertThat(settings.tcpFields().isVisible()).isFalse();
+        assertThat(controller.document().settings().lenexFile()).isEqualTo("/data/meet.lef");
+        assertThat(controller.document().settings().lenexIntervalSeconds()).isEqualTo(30);
+        assertThat(controller.document().settings().connectionType()).isEqualTo(ConnectionType.LENEX);
+        assertThat(screenText()).contains("Timing system", "LENEX", "Source", "File", "30 s");
+    }
+
+    @Test
+    void onceAresDataIsRecordedOnlyOmegaIsOfferedWithItsSources() throws IOException {
+        assertThat(window.settingsPanel().systemCombo().getItemCount()).isEqualTo(2);
+        controller.applySettings(new org.lisasp.alphatiming.ui.core.settings.Settings("localhost", 8585, 60, 0).withCompetitionKey("WK"));
+        controller.startRecording();
+
+        receive("\u0001\u0002\u00082A ?< 400101   1\u0004\u0001\u0002\u0008\n3 4\u0002    1:05.43 \u0004");
+        controller.stopRecording();
+        window.settingsPanel().refresh();
+
+        assertThat(window.settingsPanel().systemCombo().getItemCount()).isEqualTo(1);
+        assertThat(window.settingsPanel().connectionTypeCombo().getItemCount()).isEqualTo(3);
+    }
+
+    @Test
     void theLiveViewShowsTheHeatWithItsLanes() throws IOException {
         window.showLiveView();
         render();
         assertThat(screenText()).contains("No data to display yet");
 
-        HeatDto heat = new HeatDto(3, 2, HeatStatus.Finished, 0, null, null, null, null, null, List.of(
+        HeatDto heat = new HeatDto(3, "", 2, HeatStatus.Finished, 0, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.Used, Set.of(), 2, TestLanes.finish(0, 65_430)),
                 TestLanes.lane(2, LaneStatus.Used, Set.of(Penalty.DidNotStart), 0)));
-        HeatDto before = new HeatDto(3, 1, HeatStatus.Finished, 0, null, null, null, null, null, List.of(
+        HeatDto before = new HeatDto(3, "", 1, HeatStatus.Finished, 0, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.Used, Set.of(), 1, TestLanes.finish(0, 61_000))));
         window.liveViewPanel().setHeats(new LiveHeats(heat, before));
         render();
@@ -332,15 +365,15 @@ class TuiMainWindowTest {
 
         window.handleInput(new KeyStroke(KeyType.F5));
         render();
-        assertThat(screenText()).contains("Connection type");
+        assertThat(screenText()).contains("Source");
     }
 
     @Test
     void theLiveViewTellsWhenTheHeatsStartedAndFinished() throws IOException {
         LocalDateTime start = LocalDateTime.of(2026, 5, 1, 10, 0, 0);
         window.showLiveView();
-        window.liveViewPanel().setHeats(new LiveHeats(new HeatDto(3, 2, HeatStatus.Started, 0, null, start.plusMinutes(3), null, null, null, List.of()),
-                                                      new HeatDto(3, 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, null, List.of())));
+        window.liveViewPanel().setHeats(new LiveHeats(new HeatDto(3, "", 2, HeatStatus.Started, 0, null, start.plusMinutes(3), null, null, null, List.of()),
+                                                      new HeatDto(3, "", 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, null, List.of())));
         render();
 
         List<String> lines = screenText().lines().toList();
@@ -353,7 +386,7 @@ class TuiMainWindowTest {
         LocalDateTime start = LocalDateTime.of(2026, 5, 1, 10, 0, 0);
         int halfPastSeven = 7 * 3_600_000 + 30 * 60_000;
         window.showLiveView();
-        window.liveViewPanel().setHeats(new LiveHeats(new HeatDto(3, 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, halfPastSeven, List.of()), null));
+        window.liveViewPanel().setHeats(new LiveHeats(new HeatDto(3, "", 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, halfPastSeven, List.of()), null));
 
         controller.applySettingsIfChanged(controller.document().settings().withTimekeepingOffset(2));
         render();

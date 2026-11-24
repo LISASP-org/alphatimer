@@ -14,11 +14,18 @@ public final class LiveTexts {
     }
 
     public static String title(HeatDto heat) {
-        return heat == null ? I18n.get("live.none") : I18n.get("live.title", String.valueOf(heat.event()), String.valueOf(heat.heat()));
+        if (heat == null) {
+            return I18n.get("live.none");
+        }
+        if (heat.round().isEmpty()) {
+            return I18n.get("live.title", String.valueOf(heat.event()), String.valueOf(heat.heat()));
+        }
+        return I18n.get("live.titleWithRound", String.valueOf(heat.event()), RoundTexts.label(heat.round()), String.valueOf(heat.heat()));
     }
 
-    public static String clock(HeatDto heat, LocalDateTime now, boolean recording) {
-        return TimeFormat.running(RunningClock.millis(heat, now, recording));
+    /** Empty for an input that is not live: its heats have no running time (see {@code RecordingSession.isLive}). */
+    public static String clock(HeatDto heat, LocalDateTime now, boolean recording, boolean live) {
+        return live ? TimeFormat.running(RunningClock.millis(heat, now, recording)) : "";
     }
 
     /**

@@ -1,5 +1,7 @@
 package org.lisasp.alphatiming.ui.common;
 
+import org.lisasp.alphatiming.ui.core.recording.LenexChanges;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +32,13 @@ class MessageTextTest {
     @AfterEach
     void restoreLocale() {
         Locale.setDefault(original);
+    }
+
+    @Test
+    void aRecordedLenexVersionTellsItsChangesAndHeats() {
+        assertThat(MessageText.describe(new LenexChanges(12, 3))).isEqualTo("LENEX: 12 changes in 3 heats");
+        Locale.setDefault(Locale.GERMAN);
+        assertThat(MessageText.describe(new LenexChanges(12, 3))).isEqualTo("LENEX: 12 Änderungen in 3 Läufen");
     }
 
     private static DataHandlingMessage message(KindOfTime kind, MessageType type, int lane, int rank, int millis) {

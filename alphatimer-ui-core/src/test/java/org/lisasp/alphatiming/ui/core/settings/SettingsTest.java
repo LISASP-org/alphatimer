@@ -41,6 +41,30 @@ class SettingsTest {
     }
 
     @Test
+    void lenexNeedsAFileAndAnIntervalOfTheChoices() {
+        Settings lenex = valid().withConnectionType(ConnectionType.LENEX);
+
+        assertThat(lenex.validate()).containsExactly(SettingsProblem.LENEX_FILE_MISSING);
+        assertThat(lenex.withLenex("/data/meet.lef", 5).validate()).isEmpty();
+        assertThat(lenex.withLenex("/data/meet.lef", 7).validate()).containsExactly(SettingsProblem.LENEX_INTERVAL_INVALID);
+        assertThat(Settings.LENEX_INTERVALS_SECONDS).containsExactly(1, 5, 15, 30, 60);
+    }
+
+    @Test
+    void theLenexIntervalIsFiveSecondsUnlessSet() {
+        assertThat(valid().lenexIntervalSeconds()).isEqualTo(5);
+        assertThat(valid().withLenex("/data/meet.lef", 0).lenexIntervalSeconds()).isEqualTo(5);
+    }
+
+    @Test
+    void otherChangesKeepTheLenexSettings() {
+        Settings changed = valid().withLenex("/data/meet.lef", 15).withTcp("other", 1).withCompetitionKey("X").withRest(2000, true);
+
+        assertThat(changed.lenexFile()).isEqualTo("/data/meet.lef");
+        assertThat(changed.lenexIntervalSeconds()).isEqualTo(15);
+    }
+
+    @Test
     void autoSaveIntervalMustBeInRange() {
         assertThat(new Settings("h", 1, 4, 0).withCompetitionKey("WK").validate()).containsExactly(SettingsProblem.AUTO_SAVE_RANGE);
         assertThat(new Settings("h", 1, 3601, 0).withCompetitionKey("WK").validate()).hasSize(1);

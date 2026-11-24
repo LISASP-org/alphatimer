@@ -19,6 +19,8 @@
         <module>alphatimer-serial-core</module>
         <module>alphatimer-heats</module>
         <module>alphatimer-legacy-api</module>
+        <module>alphatimer-lenex-api</module>
+        <module>alphatimer-lenex</module>
         <module>alphatimer-legacy-server</module>
         <module>alphatimer-project-db</module>
         <module>alphatimer-ui-core</module>
@@ -77,6 +79,8 @@
             <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-serial-core</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-heats</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-legacy-api</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-lenex-api</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-lenex</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-legacy-server</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-project-db</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-heats</artifactId><version>${project.version}</version><type>test-jar</type></dependency>

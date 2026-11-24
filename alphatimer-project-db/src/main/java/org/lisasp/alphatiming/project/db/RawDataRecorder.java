@@ -122,6 +122,10 @@ public final class RawDataRecorder implements ByteConsumer, AutoCloseable {
         }
     }
 
+    public static boolean hasData(TimingDatabase db) {
+        return db.read(em -> em.createQuery("select count(r) from RawDataChunkEntity r", Long.class).getSingleResult()) > 0;
+    }
+
     public static List<byte[]> readAll(TimingDatabase db) {
         return db.read(em -> em.createQuery("select r from RawDataChunkEntity r order by r.id", RawDataChunkEntity.class)
                                .getResultList()

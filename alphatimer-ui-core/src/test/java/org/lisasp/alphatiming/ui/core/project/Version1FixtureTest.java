@@ -1,6 +1,7 @@
 package org.lisasp.alphatiming.ui.core.project;
 
 import org.junit.jupiter.api.Test;
+import org.lisasp.alphatiming.project.db.LenexVersionStore;
 import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.HeatStatus;
@@ -81,6 +82,18 @@ class Version1FixtureTest {
             Object version = doc.database().read(em -> em.createNativeQuery("pragma user_version").getSingleResult());
             assertThat(version).isEqualTo(1);
             assertThat(session.liveHeats().known()).hasSize(1);
+        }
+    }
+
+    @Test
+    void aVersion1FileTakesLenexVersions() throws Exception {
+        try (TimingDocument doc = TimingDocument.open(copyOfFixture(), work())) {
+            LenexVersionStore store = new LenexVersionStore(doc.database());
+            assertThat(store.findAll()).isEmpty();
+
+            store.record(LocalDateTime.of(2026, 5, 1, 11, 0), "<LENEX />".getBytes(java.nio.charset.StandardCharsets.UTF_8), true);
+
+            assertThat(store.findAll()).hasSize(1);
         }
     }
 }

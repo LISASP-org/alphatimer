@@ -6,11 +6,14 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DisqualifiedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotStartMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.HeatRemovedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.OfficialEndMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.WithdrawnMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.LaneNumbering;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedRefinedMessage;
 
@@ -35,6 +38,7 @@ public final class HeatService implements Consumer<RefinedMessage> {
     private final SortedSet<Integer> usedLanes = new TreeSet<>();
     private final LinkedHashMap<HeatKey, HeatDto> known = new LinkedHashMap<>();
     private volatile LiveHeats live = LiveHeats.NONE;
+    private LaneNumbering laneNumbering = LaneNumbering.AssumedOneBased;
 
     public HeatService(HeatRepository store) {
         this(store, ex -> { });
@@ -55,15 +59,15 @@ public final class HeatService implements Consumer<RefinedMessage> {
                 || (message instanceof BackupTimeMessage b && b.getMessageType() == RefinedMessageType.PreviousRaceResult);
     }
 
-    private record HeatKey(int event, int heat) {
+    private record HeatKey(int event, String round, int heat) {
 
         static HeatKey of(HeatDto heat) {
-            return new HeatKey(heat.event(), heat.heat());
+            return new HeatKey(heat.event(), heat.round(), heat.heat());
         }
     }
 
     private static boolean sameHeat(HeatDto a, HeatDto b) {
-        return a.event() == b.event() && a.heat() == b.heat();
+        return HeatKey.of(a).equals(HeatKey.of(b));
     }
 
     public LiveHeats liveHeats() {
@@ -89,9 +93,13 @@ public final class HeatService implements Consumer<RefinedMessage> {
         if (isRepeatOfAPreviousRace(message)) {
             return;
         }
+        if (message instanceof HeatRemovedMessage m) {
+            remove(m);
+            return;
+        }
         try {
-            Optional<HeatDto> stored = store.find(message.getEvent(), message.getHeat());
-            HeatDto before = stored.orElseGet(() -> HeatDto.empty(message.getEvent(), message.getHeat(), LANE_COUNT));
+            Optional<HeatDto> stored = store.find(message.getEvent(), message.getRound(), message.getHeat());
+            HeatDto before = stored.orElseGet(() -> HeatDto.empty(message.getEvent(), message.getRound(), message.getHeat(), LANE_COUNT));
             Heat heat = new Heat(before);
             if (message instanceof ReadyToStartMessage m) {
                 heat.readyToStart(m);
@@ -109,15 +117,22 @@ public final class HeatService implements Consumer<RefinedMessage> {
                 heat.didNotFinish(m);
             } else if (message instanceof DisqualifiedMessage m) {
                 heat.disqualified(m);
+            } else if (message instanceof WithdrawnMessage m) {
+                heat.withdrawn(m);
             } else if (message instanceof OfficialEndMessage m) {
                 heat.finish(m);
             } else {
                 log.debug("Did not apply message '{}'.", message);
                 return;
             }
+            heat.timeFromResults(message.getTimestamp(), lastEndOfOtherHeats(before));
             HeatDto after = heat.createDto();
-            if (after.equals(before)) {
+            boolean renumbered = message instanceof UsedLanesMessage m && m.getNumbering() != laneNumbering;
+            if (after.equals(before) && !renumbered) {
                 return;
+            }
+            if (message instanceof UsedLanesMessage m) {
+                laneNumbering = m.getNumbering();
             }
             estimateEndsOfOtherHeats(after, message.getTimestamp());
             if (stored.isPresent()) {
@@ -128,7 +143,7 @@ public final class HeatService implements Consumer<RefinedMessage> {
             after.lanes().stream().filter(l -> l.status() == LaneStatus.Used).forEach(l -> usedLanes.add(l.number()));
             known.remove(HeatKey.of(after));
             known.put(HeatKey.of(after), after);
-            live = LiveHeats.of(List.copyOf(known.sequencedValues().reversed()), usedLanes);
+            live = LiveHeats.of(List.copyOf(known.sequencedValues().reversed()), usedLanes, laneNumbering);
         } catch (RuntimeException ex) {
             log.warn("Could not apply message '{}'.", message, ex);
             onError.accept(ex);
@@ -156,6 +171,31 @@ public final class HeatService implements Consumer<RefinedMessage> {
             store.save(after);
             known.put(HeatKey.of(after), after);
         }
+    }
+
+    private void remove(HeatRemovedMessage message) {
+        HeatKey key = new HeatKey(message.getEvent(), message.getRound(), message.getHeat());
+        if (!known.containsKey(key)) {
+            return;
+        }
+        try {
+            store.delete(key.event(), key.round(), key.heat());
+            known.remove(key);
+            live = LiveHeats.of(List.copyOf(known.sequencedValues().reversed()), usedLanes, laneNumbering);
+        } catch (RuntimeException ex) {
+            log.warn("Could not remove heat {}/{}/{}", key.event(), key.round(), key.heat(), ex);
+            onError.accept(ex);
+            return;
+        }
+        announce(live);
+    }
+
+    private LocalDateTime lastEndOfOtherHeats(HeatDto heat) {
+        return known.values().stream()
+                    .filter(h -> !sameHeat(h, heat) && h.ended() != null)
+                    .map(HeatDto::ended)
+                    .max(LocalDateTime::compareTo)
+                    .orElse(null);
     }
 
     private void announce(LiveHeats heats) {

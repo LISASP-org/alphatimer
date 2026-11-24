@@ -37,7 +37,7 @@ class LaneRowsTest {
     }
 
     private static HeatDto heat() {
-        return new HeatDto(1, 1, HeatStatus.Started, 2, null, null, null, null, null, List.of(
+        return new HeatDto(1, "", 1, HeatStatus.Started, 2, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.NotUsed, Set.of(), 0),
                 TestLanes.lane(2, LaneStatus.Used, Set.of(), 0, TestLanes.split(1, 12_340)),
                 TestLanes.lane(3, LaneStatus.Used, Set.of(), 1, TestLanes.finish(2, 25_000)),
@@ -55,7 +55,7 @@ class LaneRowsTest {
 
     @Test
     void lanesUsedBeforeKeepAnEmptyRowAndNeverUsedLanesStayHidden() {
-        HeatDto heat = new HeatDto(1, 2, HeatStatus.Started, 2, null, null, null, null, null, List.of(
+        HeatDto heat = new HeatDto(1, "", 2, HeatStatus.Started, 2, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.NotUsed, Set.of(), 0),
                 TestLanes.lane(2, LaneStatus.Used, Set.of(), 0, TestLanes.split(1, 12_340)),
                 TestLanes.lane(3, LaneStatus.NotUsed, Set.of(), 0),
@@ -79,7 +79,7 @@ class LaneRowsTest {
     @Test
     void aDeletedFinishShowsTheEarlierSplitAsNotFinished() {
         LaneTime deletedFinish = new LaneTime(2, TimeKind.Finish, 61_230, TimeSource.Live, TimeType.Normal, true, TestMessageCreator.T0);
-        HeatDto heat = new HeatDto(1, 1, HeatStatus.Started, 2, null, null, null, null, null, List.of(
+        HeatDto heat = new HeatDto(1, "", 1, HeatStatus.Started, 2, null, null, null, null, null, List.of(
                 new LaneDto(1, LaneStatus.Used, Set.of(), 0, List.of(TestLanes.split(1, 30_000), deletedFinish))));
 
         assertThat(LaneRows.from(heat, Set.of())).containsExactly(new LaneRows.Row(1, "30.00", "Lap 1", 0, false));
@@ -98,7 +98,7 @@ class LaneRowsTest {
 
     @Test
     void aDisqualifiedLaneShowsItsTimeWithoutPlace() {
-        HeatDto heat = new HeatDto(1, 1, HeatStatus.Finished, 2, null, null, null, null, null, List.of(
+        HeatDto heat = new HeatDto(1, "", 1, HeatStatus.Finished, 2, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.Used, Set.of(Penalty.Disqualified), 0, TestLanes.finish(2, 25_000))));
 
         assertThat(LaneRows.from(heat, java.util.Set.of())).containsExactly(new LaneRows.Row(1, "25.00", "DSQ", 0, true));
@@ -108,8 +108,27 @@ class LaneRowsTest {
     }
 
     @Test
+    void aKnownLaneThatTheHeatDoesNotHaveIsShownEmpty() {
+        HeatDto heat = new HeatDto(1, "", 1, HeatStatus.Started, 2, null, null, null, null, null, List.of(
+                TestLanes.lane(1, LaneStatus.Used, Set.of(), 0, TestLanes.split(1, 12_340))));
+
+        assertThat(LaneRows.from(heat, java.util.Set.of(0, 1))).extracting(LaneRows.Row::lane).containsExactly(0, 1);
+    }
+
+    @Test
+    void aWithdrawnLaneShowsWdr() {
+        HeatDto heat = new HeatDto(1, "", 1, HeatStatus.Finished, 2, null, null, null, null, null, List.of(
+                TestLanes.lane(1, LaneStatus.Used, Set.of(Penalty.Withdrawn), 0)));
+
+        assertThat(LaneRows.from(heat, java.util.Set.of()).getFirst().detail()).isEqualTo("WDR");
+
+        Locale.setDefault(Locale.GERMANY);
+        assertThat(LaneRows.from(heat, java.util.Set.of()).getFirst().detail()).isEqualTo("abgem.");
+    }
+
+    @Test
     void everyPenaltyOfALaneIsShown() {
-        HeatDto heat = new HeatDto(1, 1, HeatStatus.Finished, 2, null, null, null, null, null, List.of(
+        HeatDto heat = new HeatDto(1, "", 1, HeatStatus.Finished, 2, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.Used, Set.of(Penalty.DidNotFinish, Penalty.Disqualified), 0, TestLanes.finish(2, 25_000))));
 
         assertThat(LaneRows.from(heat, java.util.Set.of()).getFirst().detail()).isEqualTo("DNF, DSQ");

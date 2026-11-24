@@ -36,6 +36,10 @@ public class SettingsEntity {
     private String replayFile;
     /** Added after the first version: null in older project files, which means no offset. */
     private Integer timekeepingOffsetHours;
+    /** Added with the LENEX input: null in older project files, which have none. */
+    private String lenexFile;
+    /** Added with the LENEX input: null in older project files, which means the default interval. */
+    private Integer lenexIntervalSeconds;
 
     public SettingsEntity(String tcpHost, int tcpPort, int autoSaveSeconds, int restPort) {
         this.tcpHost = tcpHost;

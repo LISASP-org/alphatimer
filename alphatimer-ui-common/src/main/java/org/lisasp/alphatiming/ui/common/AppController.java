@@ -17,6 +17,7 @@ import org.lisasp.alphatiming.ui.core.recording.RecordingState;
 import org.lisasp.alphatiming.ui.core.recording.WriteListener;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.DefaultSettingsStore;
+import org.lisasp.alphatiming.ui.core.settings.Input;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
 import java.io.IOException;
@@ -290,6 +291,18 @@ public final class AppController implements AutoCloseable {
         return true;
     }
 
+    /** The input of the data the open project holds; empty while it holds none. */
+    public Optional<Input> recordedInput() {
+        RecordingSession s = session;
+        return s == null ? Optional.empty() : s.recordedInput();
+    }
+
+    /** Whether the heats of the selected input have a running time; LENEX holds results only. */
+    public boolean isLiveInput() {
+        TimingDocument doc = document;
+        return doc == null || RecordingSession.isLive(doc.settings());
+    }
+
     public boolean isRecording() {
         RecordingSession s = session;
         return s != null && s.state() == RecordingState.RUNNING;
@@ -472,6 +485,10 @@ public final class AppController implements AutoCloseable {
         next.addMessageListener(message -> {
             messageReceived();
             announce(MessageText.describe(message, doc.settings().timekeepingOffsetHours()));
+        });
+        next.addLenexListener(changes -> {
+            messageReceived();
+            announce(MessageText.describe(changes));
         });
         next.addPingListener(this::pingReceived);
         next.addConnectionLostListener(this::onConnectionLost);

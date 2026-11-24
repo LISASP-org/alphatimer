@@ -11,6 +11,9 @@ public interface RefinedMessage {
 
     byte getHeat();
 
+    /** The round of the heat as text; empty if the source sends none (see {@code Round}). */
+    String getRound();
+
     LocalDateTime getTimestamp();
 
     /**

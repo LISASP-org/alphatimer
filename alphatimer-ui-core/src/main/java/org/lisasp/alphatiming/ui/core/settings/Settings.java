@@ -9,6 +9,7 @@ import java.util.List;
  * @param competitionKey          one value per project file; it names all data of the project, so a change renames them all
  * @param timekeepingOffsetHours  added to the times of day the device sent whenever they are shown; what is recorded keeps
  *                                the transmitted value, so a change also applies to what was recorded before
+ * @param lenexIntervalSeconds    how often the LENEX file is checked; one of {@link #LENEX_INTERVALS_SECONDS}
  */
 public record Settings(ConnectionType connectionType,
                        String tcpHost,
@@ -20,10 +21,14 @@ public record Settings(ConnectionType connectionType,
                        boolean restEnabled,
                        String replayFile,
                        String competitionKey,
-                       int timekeepingOffsetHours) {
+                       int timekeepingOffsetHours,
+                       String lenexFile,
+                       int lenexIntervalSeconds) {
 
     public static final int DEFAULT_REST_PORT = 1999;
     public static final int MAX_TIMEKEEPING_OFFSET_HOURS = 23;
+    public static final List<Integer> LENEX_INTERVALS_SECONDS = List.of(1, 5, 15, 30, 60);
+    public static final int DEFAULT_LENEX_INTERVAL_SECONDS = 5;
 
     public Settings {
         connectionType = connectionType == null ? ConnectionType.TCP : connectionType;
@@ -32,6 +37,12 @@ public record Settings(ConnectionType connectionType,
         serialPort = serialPort == null ? "" : serialPort;
         replayFile = replayFile == null ? "" : replayFile;
         competitionKey = competitionKey == null ? "" : competitionKey;
+        lenexFile = lenexFile == null ? "" : lenexFile;
+        lenexIntervalSeconds = lenexIntervalSeconds == 0 ? DEFAULT_LENEX_INTERVAL_SECONDS : lenexIntervalSeconds;
+    }
+
+    public Settings(ConnectionType connectionType, String tcpHost, int tcpPort, String serialPort, SerialMode serialMode, int autoSaveSeconds, int restPort, boolean restEnabled, String replayFile, String competitionKey, int timekeepingOffsetHours) {
+        this(connectionType, tcpHost, tcpPort, serialPort, serialMode, autoSaveSeconds, restPort, restEnabled, replayFile, competitionKey, timekeepingOffsetHours, "", DEFAULT_LENEX_INTERVAL_SECONDS);
     }
 
     public Settings(ConnectionType connectionType, String tcpHost, int tcpPort, String serialPort, SerialMode serialMode, int autoSaveSeconds, int restPort, boolean restEnabled, String replayFile, String competitionKey) {
@@ -55,31 +66,35 @@ public record Settings(ConnectionType connectionType,
     }
 
     public Settings withTcp(String host, int port) {
-        return new Settings(connectionType, host, port, serialPort, serialMode, autoSaveSeconds, restPort, restEnabled, replayFile, competitionKey, timekeepingOffsetHours);
+        return new Settings(connectionType, host, port, serialPort, serialMode, autoSaveSeconds, restPort, restEnabled, replayFile, competitionKey, timekeepingOffsetHours, lenexFile, lenexIntervalSeconds);
     }
 
     public Settings withSerial(String port, SerialMode mode) {
-        return new Settings(connectionType, tcpHost, tcpPort, port, mode, autoSaveSeconds, restPort, restEnabled, replayFile, competitionKey, timekeepingOffsetHours);
+        return new Settings(connectionType, tcpHost, tcpPort, port, mode, autoSaveSeconds, restPort, restEnabled, replayFile, competitionKey, timekeepingOffsetHours, lenexFile, lenexIntervalSeconds);
     }
 
     public Settings withConnectionType(ConnectionType type) {
-        return new Settings(type, tcpHost, tcpPort, serialPort, serialMode, autoSaveSeconds, restPort, restEnabled, replayFile, competitionKey, timekeepingOffsetHours);
+        return new Settings(type, tcpHost, tcpPort, serialPort, serialMode, autoSaveSeconds, restPort, restEnabled, replayFile, competitionKey, timekeepingOffsetHours, lenexFile, lenexIntervalSeconds);
     }
 
     public Settings withReplayFile(String file) {
-        return new Settings(connectionType, tcpHost, tcpPort, serialPort, serialMode, autoSaveSeconds, restPort, restEnabled, file, competitionKey, timekeepingOffsetHours);
+        return new Settings(connectionType, tcpHost, tcpPort, serialPort, serialMode, autoSaveSeconds, restPort, restEnabled, file, competitionKey, timekeepingOffsetHours, lenexFile, lenexIntervalSeconds);
     }
 
     public Settings withRest(int port, boolean enabled) {
-        return new Settings(connectionType, tcpHost, tcpPort, serialPort, serialMode, autoSaveSeconds, port, enabled, replayFile, competitionKey, timekeepingOffsetHours);
+        return new Settings(connectionType, tcpHost, tcpPort, serialPort, serialMode, autoSaveSeconds, port, enabled, replayFile, competitionKey, timekeepingOffsetHours, lenexFile, lenexIntervalSeconds);
     }
 
     public Settings withCompetitionKey(String key) {
-        return new Settings(connectionType, tcpHost, tcpPort, serialPort, serialMode, autoSaveSeconds, restPort, restEnabled, replayFile, key, timekeepingOffsetHours);
+        return new Settings(connectionType, tcpHost, tcpPort, serialPort, serialMode, autoSaveSeconds, restPort, restEnabled, replayFile, key, timekeepingOffsetHours, lenexFile, lenexIntervalSeconds);
     }
 
     public Settings withTimekeepingOffset(int hours) {
-        return new Settings(connectionType, tcpHost, tcpPort, serialPort, serialMode, autoSaveSeconds, restPort, restEnabled, replayFile, competitionKey, hours);
+        return new Settings(connectionType, tcpHost, tcpPort, serialPort, serialMode, autoSaveSeconds, restPort, restEnabled, replayFile, competitionKey, hours, lenexFile, lenexIntervalSeconds);
+    }
+
+    public Settings withLenex(String file, int intervalSeconds) {
+        return new Settings(connectionType, tcpHost, tcpPort, serialPort, serialMode, autoSaveSeconds, restPort, restEnabled, replayFile, competitionKey, timekeepingOffsetHours, file, intervalSeconds);
     }
 
     public List<SettingsProblem> validate() {
@@ -103,6 +118,14 @@ public record Settings(ConnectionType connectionType,
             case FILE -> {
                 if (replayFile.isBlank()) {
                     problems.add(SettingsProblem.REPLAY_FILE_MISSING);
+                }
+            }
+            case LENEX -> {
+                if (lenexFile.isBlank()) {
+                    problems.add(SettingsProblem.LENEX_FILE_MISSING);
+                }
+                if (!LENEX_INTERVALS_SECONDS.contains(lenexIntervalSeconds)) {
+                    problems.add(SettingsProblem.LENEX_INTERVAL_INVALID);
                 }
             }
         }

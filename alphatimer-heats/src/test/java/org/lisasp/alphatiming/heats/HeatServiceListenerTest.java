@@ -27,9 +27,9 @@ class HeatServiceListenerTest {
 
         service.accept(TestMessageCreator.used(1, 1, "1100000000"));
 
-        assertThat(store.find(1, 1)).isPresent();
+        assertThat(store.find(1, "", 1)).isPresent();
         assertThat(seen).hasSize(1);
-        assertThat(seen.get(0).current()).isEqualTo(store.find(1, 1).orElseThrow());
+        assertThat(seen.get(0).current()).isEqualTo(store.find(1, "", 1).orElseThrow());
         assertThat(errors).isEmpty();
     }
 
@@ -53,12 +53,12 @@ class HeatServiceListenerTest {
 
     private static final class InMemoryHeats implements HeatRepository {
 
-        private final Map<List<Integer>, HeatDto> heats = new HashMap<>();
+        private final Map<List<Object>, HeatDto> heats = new HashMap<>();
         private boolean failing;
 
         @Override
-        public Optional<HeatDto> find(int event, int heat) {
-            return Optional.ofNullable(heats.get(List.of(event, heat)));
+        public Optional<HeatDto> find(int event, String round, int heat) {
+            return Optional.ofNullable(heats.get(List.of(event, round, heat)));
         }
 
         @Override
@@ -82,7 +82,12 @@ class HeatServiceListenerTest {
             if (failing) {
                 throw new StoreBrokenException();
             }
-            heats.put(List.of(dto.event(), dto.heat()), dto);
+            heats.put(List.of(dto.event(), dto.round(), dto.heat()), dto);
+        }
+
+        @Override
+        public void delete(int event, String round, int heat) {
+            heats.remove(List.of(event, round, heat));
         }
     }
 }

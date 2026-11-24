@@ -2,6 +2,7 @@ package org.lisasp.alphatiming.ui;
 
 import org.lisasp.alphatiming.ui.common.AppController;
 import org.lisasp.alphatiming.ui.common.I18n;
+import org.lisasp.alphatiming.ui.common.LatestOnly;
 import org.lisasp.alphatiming.ui.common.PingIndicator;
 import org.lisasp.alphatiming.ui.common.SignOfLife;
 import org.lisasp.alphatiming.ui.common.TimeFormat;
@@ -104,7 +105,8 @@ public final class JAlphaTiming extends JFrame {
 
         controller.addChangeListener(() -> SwingUtilities.invokeLater(this::refresh));
         controller.addSignOfLifeListener(() -> SwingUtilities.invokeLater(this::showSignOfLife));
-        controller.addHeatListener(h -> SwingUtilities.invokeLater(() -> liveViewPanel.setHeats(h)));
+        LatestOnly<LiveHeats> heats = new LatestOnly<>(SwingUtilities::invokeLater, liveViewPanel::setHeats);
+        controller.addHeatListener(heats::submit);
         controller.addStateListener(s -> SwingUtilities.invokeLater(this::refresh));
         controller.addMessageListener(text -> SwingUtilities.invokeLater(() -> {
             String now = TimeFormat.clock(LocalTime.now());
@@ -283,6 +285,7 @@ public final class JAlphaTiming extends JFrame {
         stopItem.setEnabled(status.canStop());
         settingsPanel.refresh();
         liveViewPanel.setTimekeepingOffset(controller.timekeepingOffsetHours());
+        liveViewPanel.setLive(controller.isLiveInput());
         liveViewPanel.setRecording(status.recording());
     }
 

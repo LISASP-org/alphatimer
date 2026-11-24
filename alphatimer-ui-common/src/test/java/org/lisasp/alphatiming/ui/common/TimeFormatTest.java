@@ -10,6 +10,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TimeFormatTest {
 
     @Test
+    void aDurationAlwaysShowsItsMinutes() {
+        assertThat(TimeFormat.duration(25_000, Locale.ENGLISH)).isEqualTo("0:25.00");
+        assertThat(TimeFormat.duration(65_430, Locale.ENGLISH)).isEqualTo("1:05.43");
+        assertThat(TimeFormat.duration(25_000, Locale.GERMAN)).isEqualTo("0:25,00");
+        assertThat(TimeFormat.duration(0, Locale.ENGLISH)).isEmpty();
+    }
+
+    @Test
     void laneTimes() {
         assertThat(TimeFormat.time(0)).isEmpty();
         assertThat(TimeFormat.time(-5)).isEmpty();

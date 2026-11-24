@@ -15,6 +15,8 @@ import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.LiveHeats;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableColumnModel;
 import java.awt.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -53,6 +55,7 @@ public final class LiveViewPanel extends JPanel {
     private LiveHeats heats;
     private int timekeepingOffsetHours;
     private boolean recording;
+    private boolean liveInput = true;
     private List<LaneRows.Row> displayed = List.of();
     private List<LaneRows.Row> displayedPrevious = List.of();
 
@@ -85,6 +88,7 @@ public final class LiveViewPanel extends JPanel {
         live.add(top, CC.xy(1, 3));
 
         heatTable.getTableHeader().setReorderingAllowed(false);
+        alignHeatColumns();
         heatTable.setFillsViewportHeight(true);
         JPanel body = new JPanel(new FormLayout(COLUMNS, "fill:0px:grow"));
         body.add(live, CC.xy(1, 1));
@@ -128,6 +132,11 @@ public final class LiveViewPanel extends JPanel {
     /**
      * The clock only runs while a recording is running. Call on the EDT.
      */
+    /** Whether the input has a running time; without, the clock stays empty. Call on the EDT. */
+    public void setLive(boolean liveInput) {
+        this.liveInput = liveInput;
+    }
+
     public void setRecording(boolean recording) {
         this.recording = recording;
         updateClock();
@@ -181,7 +190,22 @@ public final class LiveViewPanel extends JPanel {
     }
 
     private void updateClock() {
-        clock.setText(LiveTexts.clock(heat, LocalDateTime.now(), recording));
+        clock.setText(LiveTexts.clock(heat, LocalDateTime.now(), recording, liveInput));
+    }
+
+    /** Start and finish centered, the duration right-aligned like a number; the heat column with its round is twice as wide. */
+    private void alignHeatColumns() {
+        TableColumnModel columns = heatTable.getColumnModel();
+        columns.getColumn(0).setCellRenderer(aligned(SwingConstants.CENTER));
+        columns.getColumn(1).setCellRenderer(aligned(SwingConstants.CENTER));
+        columns.getColumn(2).setCellRenderer(aligned(SwingConstants.RIGHT));
+        columns.getColumn(3).setPreferredWidth(2 * columns.getColumn(0).getPreferredWidth());
+    }
+
+    private static DefaultTableCellRenderer aligned(int alignment) {
+        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
+        renderer.setHorizontalAlignment(alignment);
+        return renderer;
     }
 
     JTable heatTable() {

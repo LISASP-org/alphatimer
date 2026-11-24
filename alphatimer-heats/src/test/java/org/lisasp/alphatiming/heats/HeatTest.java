@@ -1,6 +1,7 @@
 package org.lisasp.alphatiming.heats;
 
 import org.junit.jupiter.api.Test;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.LaneNumbering;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
@@ -16,7 +17,7 @@ import static org.lisasp.alphatiming.heats.TestMessageCreator.T0;
 class HeatTest {
 
     private static HeatDto emptyHeat() {
-        return new HeatDto(1, 1, HeatStatus.Open, 0, null, null, null, null, null, List.of(1, 2, 3, 4, 5, 6, 7, 8).stream().map(n -> TestLanes.lane(n, LaneStatus.NotUsed, Set.of(), 0)).toList());
+        return new HeatDto(1, "", 1, HeatStatus.Open, 0, null, null, null, null, null, List.of(1, 2, 3, 4, 5, 6, 7, 8).stream().map(n -> TestLanes.lane(n, LaneStatus.NotUsed, Set.of(), 0)).toList());
     }
 
     private static Heat prepared() {
@@ -27,7 +28,7 @@ class HeatTest {
     }
 
     private static LaneDto lane(Heat heat, int number) {
-        return heat.createDto().lanes().get(number - 1);
+        return heat.createDto().lanes().stream().filter(l -> l.number() == number).findFirst().orElseThrow();
     }
 
     @Test
@@ -288,6 +289,85 @@ class HeatTest {
         heat.disqualified(TestMessageCreator.dsq(1, 1, 3));
 
         assertThat(heat.createDto().ended()).isEqualTo(T0.plusSeconds(60));
+    }
+
+    @Test
+    void aWithdrawnLaneGetsNoPlaceAndIsDoneForTheClock() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+
+        heat.withdrawn(TestMessageCreator.wdr(1, 1, 3));
+
+        assertThat(lane(heat, 3).penalties()).containsExactly(Penalty.Withdrawn);
+        assertThat(lane(heat, 3).place()).isZero();
+        assertThat(heat.createDto().ended()).isEqualTo(T0.plusSeconds(60));
+    }
+
+    @Test
+    void aRemovedDisqualificationGivesTheLaneItsPlaceBack() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+        heat.touch(TestMessageCreator.fin(1, 1, 3, 0, 2200));
+        heat.disqualified(TestMessageCreator.dsq(1, 1, 1));
+
+        heat.disqualified(TestMessageCreator.dsqRemoved(1, 1, 1));
+
+        assertThat(lane(heat, 1).penalties()).isEmpty();
+        assertThat(lane(heat, 1).place()).isEqualTo(1);
+        assertThat(lane(heat, 2).place()).isEqualTo(2);
+    }
+
+    @Test
+    void removingThePenaltyOfALaneWithoutFinishReopensTheEndOfTheHeat() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+        heat.disqualified(TestMessageCreator.dsq(1, 1, 3));
+
+        heat.disqualified(TestMessageCreator.dsqRemoved(1, 1, 3));
+
+        assertThat(heat.createDto().ended()).isNull();
+        assertThat(heat.createDto().status()).isEqualTo(HeatStatus.Started);
+    }
+
+    @Test
+    void everyPenaltyCanBeRemoved() {
+        Heat heat = prepared();
+        heat.didNotStart(TestMessageCreator.dns(1, 1, 1));
+        heat.didNotFinish(TestMessageCreator.dnf(1, 1, 2));
+        heat.withdrawn(TestMessageCreator.wdr(1, 1, 3));
+
+        heat.didNotStart(TestMessageCreator.dnsRemoved(1, 1, 1));
+        heat.didNotFinish(TestMessageCreator.dnfRemoved(1, 1, 2));
+        heat.withdrawn(TestMessageCreator.wdrRemoved(1, 1, 3));
+
+        assertThat(heat.createDto().lanes()).allMatch(l -> l.penalties().isEmpty());
+    }
+
+    @Test
+    void aHeatTakesTheLanesAsTheSourceNumbersThemAlsoLaneZero() {
+        Heat heat = new Heat(emptyHeat());
+        heat.usedLanes(TestMessageCreator.usedNumbered(1, 1, LaneNumbering.ZeroBased, 0, 1, 2));
+
+        heat.touch(TestMessageCreator.fin(1, 1, 0, 0, 2000));
+
+        assertThat(heat.createDto().lanes()).filteredOn(l -> l.status() == LaneStatus.Used).extracting(LaneDto::number).containsExactly(0, 1, 2);
+        assertThat(lane(heat, 0).finish()).isPresent();
+    }
+
+    @Test
+    void aLaneThatIsNoLongerUsedGivesUpItsPlace() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+        heat.touch(TestMessageCreator.fin(1, 1, 3, 0, 2200));
+
+        heat.usedLanes(TestMessageCreator.used(1, 1, "0110000000"));
+
+        assertThat(lane(heat, 2).place()).isEqualTo(1);
+        assertThat(lane(heat, 3).place()).isEqualTo(2);
     }
 
     @Test

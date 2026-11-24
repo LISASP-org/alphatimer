@@ -1,5 +1,7 @@
 package org.lisasp.alphatiming.ui.common;
 
+import org.lisasp.alphatiming.ui.core.recording.LenexChanges;
+
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.KindOfTime;
 
@@ -9,6 +11,10 @@ import java.time.LocalTime;
 public final class MessageText {
 
     private MessageText() {
+    }
+
+    public static String describe(LenexChanges changes) {
+        return I18n.get("message.lenex", String.valueOf(changes.changes()), String.valueOf(changes.heats()));
     }
 
     public static String processingError(Exception ex) {

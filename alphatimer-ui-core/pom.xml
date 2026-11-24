@@ -22,6 +22,8 @@
         <dependency><groupId>org.lisasp</groupId><artifactId>basics-notification</artifactId></dependency>
 
         <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-heats</artifactId></dependency>
+        <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-lenex-api</artifactId></dependency>
+        <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-lenex</artifactId></dependency>
         <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-legacy-server</artifactId></dependency>
         <dependency><groupId>org.lisasp.alphatiming</groupId><artifactId>alphatimer-project-db</artifactId></dependency>
 

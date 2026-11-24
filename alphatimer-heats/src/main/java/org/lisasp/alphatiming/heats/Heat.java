@@ -1,6 +1,5 @@
 package org.lisasp.alphatiming.heats;
 
-import org.lisasp.alphatimer.api.ares.serial.events.messages.values.UsedLanes;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
@@ -11,17 +10,21 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.WithdrawnMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 final class Heat {
 
     private final int event;
+    private final String round;
     private final int heat;
     private HeatStatus status;
     private LocalDateTime readyToStart;
@@ -34,6 +37,7 @@ final class Heat {
 
     Heat(HeatDto dto) {
         this.event = dto.event();
+        this.round = dto.round();
         this.heat = dto.heat();
         this.status = dto.status();
         this.readyToStart = dto.readyToStart();
@@ -46,7 +50,7 @@ final class Heat {
     }
 
     HeatDto createDto() {
-        return new HeatDto(event, heat, status, lapCount, readyToStart, started, ended, lastMessage, startTimeOfDayMillis, lanes.stream().map(Lane::createDto).toList());
+        return new HeatDto(event, round, heat, status, lapCount, readyToStart, started, ended, lastMessage, startTimeOfDayMillis, lanes.stream().map(Lane::createDto).toList());
     }
 
     void readyToStart(ReadyToStartMessage message) {
@@ -80,10 +84,17 @@ final class Heat {
                 && (message.getTimeType() == RefinedTimeType.Normal || message.getTimeType() == RefinedTimeType.ManualTime);
     }
 
+    /** The source numbers the lanes; a lane the heat does not have yet (lane 0, more than ten lanes) is added. */
     void usedLanes(UsedLanesMessage message) {
-        UsedLanes used = UsedLanes.fromValue(message.getUsedLanes());
         lastMessage = message.getTimestamp();
-        lanes.forEach(l -> l.used(used.isUsed(l.number() - 1)));
+        for (int number : message.getLanes()) {
+            if (lanes.stream().noneMatch(l -> l.number() == number)) {
+                lanes.add(new Lane(new LaneDto(number, LaneStatus.NotUsed, Set.of(), 0, List.of())));
+            }
+        }
+        lanes.sort(Comparator.comparingInt(Lane::number));
+        lanes.forEach(l -> l.used(message.getLanes().contains(l.number())));
+        computePlaces();
     }
 
     void touch(TimeMessage message) {
@@ -110,13 +121,14 @@ final class Heat {
 
     /**
      * The device withdraws a time by sending it again as deleted, after the race time has moved on; a deleted final time
-     * comes as a split time of the last lap. Every time of the lane with that lap and value is marked as deleted.
+     * comes as a split time of the last lap. Every time of the lane with that lap and value is marked as deleted. Only a heat
+     * with live times runs on; a heat known from results alone was over when they arrived.
      */
     private void deleteTime(Lane lane, TimeMessage message) {
         lastMessage = message.getTimestamp();
         if (lane.deleteTime(message)) {
             computePlaces();
-            if (status == HeatStatus.Started && !lane.isDone()) {
+            if (status == HeatStatus.Started && !lane.isDone() && hasLiveTimes()) {
                 ended = null;
             }
         }
@@ -133,27 +145,62 @@ final class Heat {
     }
 
     void didNotStart(DidNotStartMessage message) {
-        Lane lane = lane(message.getLane());
-        assureStarted(message);
-        lastMessage = message.getTimestamp();
-        lane.didNotStart();
-        update(message);
+        penalty(message, message.getLane(), Penalty.DidNotStart, message.isRemoved());
     }
 
     void didNotFinish(DidNotFinishMessage message) {
-        Lane lane = lane(message.getLane());
-        assureStarted(message);
-        lastMessage = message.getTimestamp();
-        lane.didNotFinish();
-        update(message);
+        penalty(message, message.getLane(), Penalty.DidNotFinish, message.isRemoved());
     }
 
     void disqualified(DisqualifiedMessage message) {
-        Lane lane = lane(message.getLane());
+        penalty(message, message.getLane(), Penalty.Disqualified, message.isRemoved());
+    }
+
+    void withdrawn(WithdrawnMessage message) {
+        penalty(message, message.getLane(), Penalty.Withdrawn, message.isRemoved());
+    }
+
+    private void penalty(RefinedMessage message, int laneNumber, Penalty penalty, boolean removed) {
+        Lane lane = lane(laneNumber);
+        if (removed) {
+            removePenalty(lane, penalty, message);
+            return;
+        }
         assureStarted(message);
         lastMessage = message.getTimestamp();
-        lane.disqualified();
+        lane.penalize(penalty);
         update(message);
+    }
+
+    /** Like a deleted time: a heat that is not officially over is no longer ended while the lane lacks a result. */
+    private void removePenalty(Lane lane, Penalty penalty, RefinedMessage message) {
+        lastMessage = message.getTimestamp();
+        if (lane.removePenalty(penalty)) {
+            computePlaces();
+            if (status == HeatStatus.Started && !lane.isDone() && hasLiveTimes()) {
+                ended = null;
+            }
+        }
+    }
+
+    /**
+     * Results of a heat without live times (a LENEX file) arrive after the race; the arrival of the version that started
+     * and ended it is its end, and its start lies the longest finish before, unless that is before the end of the heat that
+     * ended last. Later corrections arrive after the end and do not move the heat.
+     */
+    void timeFromResults(LocalDateTime arrival, LocalDateTime lastEndOfOtherHeats) {
+        if (started == null || ended == null || !started.equals(arrival) || !ended.equals(arrival) || hasLiveTimes()) {
+            return;
+        }
+        int longest = lanes.stream().filter(Lane::isUsed).mapToInt(Lane::finishInMillis).max().orElse(0);
+        LocalDateTime start = arrival.minus(Duration.ofMillis(longest));
+        if (longest > 0 && (lastEndOfOtherHeats == null || !start.isBefore(lastEndOfOtherHeats))) {
+            started = start;
+        }
+    }
+
+    private boolean hasLiveTimes() {
+        return lanes.stream().anyMatch(Lane::hasLiveTime);
     }
 
     void estimateEnd(LocalDateTime at) {

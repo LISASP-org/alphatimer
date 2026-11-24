@@ -41,6 +41,10 @@ final class Lane {
         return status == LaneStatus.Used && (finish().isPresent() || !penalties.isEmpty());
     }
 
+    boolean hasLiveTime() {
+        return times.stream().anyMatch(t -> t.source() == TimeSource.Live);
+    }
+
     boolean isUsed() {
         return status == LaneStatus.Used;
     }
@@ -130,21 +134,13 @@ final class Lane {
         };
     }
 
-    void didNotStart() {
-        penalize(Penalty.DidNotStart);
-    }
-
-    void didNotFinish() {
-        penalize(Penalty.DidNotFinish);
-    }
-
-    void disqualified() {
-        penalize(Penalty.Disqualified);
-    }
-
-    private void penalize(Penalty penalty) {
+    void penalize(Penalty penalty) {
         penalties.add(penalty);
         place = 0;
+    }
+
+    boolean removePenalty(Penalty penalty) {
+        return penalties.remove(penalty);
     }
 
     private void enforceStatus() {

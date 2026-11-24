@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <artifactId>alphatiming-parent</artifactId>
+        <groupId>org.lisasp.alphatiming</groupId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>alphatimer-lenex</artifactId>
+    <name>AlphaTiming LENEX</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.lisasp.alphatiming</groupId>
+            <artifactId>alphatimer-lenex-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.lisasp.alphatiming</groupId>
+            <artifactId>alphatimer-refinedmessages-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.lisasp.alphatiming</groupId>
+            <artifactId>alphatimer-heats</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

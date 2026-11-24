@@ -25,6 +25,7 @@ import org.lisasp.alphatiming.ui.common.ShownDocument;
 import org.lisasp.alphatiming.ui.common.TimeFormat;
 import org.lisasp.alphatiming.ui.core.project.TimingDocument;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
+import org.lisasp.alphatiming.ui.core.settings.Input;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
@@ -32,6 +33,7 @@ import java.io.File;
 import java.time.LocalTime;
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Deque;
 import java.util.regex.Pattern;
 
@@ -45,6 +47,8 @@ final class TuiSettingsPanel extends Panel {
     private final AppController controller;
     private final WindowBasedTextGUI gui;
 
+    private final ComboBox<String> system = new ComboBox<>(Arrays.stream(Input.values()).map(I18n::label).toList());
+    private List<Input> offeredSystems = List.of(Input.values());
     private final ComboBox<String> connectionType = new ComboBox<>(Arrays.stream(ConnectionType.values()).map(I18n::label).toList());
     private final CommitTextBox host = new CommitTextBox(30, this::commit);
     private final CommitTextBox port = new CommitTextBox(6, this::commit);
@@ -58,6 +62,11 @@ final class TuiSettingsPanel extends Panel {
     private final ComboBox<String> serialMode = new ComboBox<>(Arrays.stream(SerialMode.values()).map(I18n::label).toList());
     private final CommitTextBox replayFile = new CommitTextBox(40, this::commit);
     private final Button chooseFile = new Button(I18n.get("input.chooseFile"), this::chooseReplayFile);
+    private final CommitTextBox lenexFile = new CommitTextBox(40, this::commit);
+    private final Button chooseLenexFile = new Button(I18n.get("input.chooseFile"), this::chooseLenexFile);
+    private final ComboBox<String> lenexInterval = new ComboBox<>(Settings.LENEX_INTERVALS_SECONDS.stream().map(s -> I18n.get("input.lenexInterval.seconds", s)).toList());
+    private final Label lenexFileLabel = new Label(I18n.get("input.lenexFile"));
+    private List<ConnectionType> offered = List.of(ConnectionType.values());
     private final CommitTextBox competitionKey = new CommitTextBox(30, this::commit);
     private final CommitTextBox timekeepingOffset = new CommitTextBox(4, this::commit);
     private final CommitTextBox autoSave = new CommitTextBox(6, this::commit);
@@ -73,6 +82,7 @@ final class TuiSettingsPanel extends Panel {
     private final Panel tcpPanel = new Panel(new GridLayout(2));
     private final Panel serialPanel = new Panel(new GridLayout(2));
     private final Panel filePanel = new Panel(new GridLayout(2));
+    private final Panel lenexPanel = new Panel(new GridLayout(2));
     private final ShownDocument shownDocument = new ShownDocument();
 
     private boolean updating;
@@ -100,15 +110,19 @@ final class TuiSettingsPanel extends Panel {
                      GridLayout.createLayoutData(GridLayout.Alignment.FILL, GridLayout.Alignment.FILL, true, true, 2, 1));
 
         connectionType.addListener((selected, previous, byUser) -> connectionChanged());
+        system.addListener((selected, previous, byUser) -> systemChanged());
         serialPort.addListener((selected, previous, byUser) -> commit());
         serialMode.addListener((selected, previous, byUser) -> commit());
         server.addListener(checked -> commit());
+        lenexInterval.addListener((selected, previous, byUser) -> commit());
 
         refresh();
     }
 
     private Panel createSource() {
         Panel type = new Panel(new GridLayout(2));
+        type.addComponent(new Label(I18n.get("input.system")));
+        type.addComponent(system);
         type.addComponent(new Label(I18n.get("input.type")));
         type.addComponent(connectionType);
 
@@ -135,6 +149,11 @@ final class TuiSettingsPanel extends Panel {
         source.addComponent(tcpPanel);
         source.addComponent(serialPanel);
         source.addComponent(filePanel);
+        lenexPanel.addComponent(lenexFileLabel);
+        lenexPanel.addComponent(row(lenexFile, chooseLenexFile));
+        lenexPanel.addComponent(new Label(I18n.get("input.lenexInterval")));
+        lenexPanel.addComponent(lenexInterval);
+        source.addComponent(lenexPanel);
         source.addComponent(row(record, recordHint));
         return source;
     }
@@ -162,8 +181,22 @@ final class TuiSettingsPanel extends Panel {
         return row;
     }
 
+    /** Another system starts with its first source; the form then offers the sources of that system. */
+    private void systemChanged() {
+        if (updating) {
+            return;
+        }
+        Input chosen = offeredSystems.get(Math.max(0, system.getSelectedIndex()));
+        if (chosen == selectedType().input()) {
+            return;
+        }
+        ConnectionType source = SettingsFormRules.sourceFor(chosen, selectedType());
+        offerSources(List.of(source), source);
+        connectionChanged();
+    }
+
     private ConnectionType selectedType() {
-        return ConnectionType.values()[Math.max(0, connectionType.getSelectedIndex())];
+        return offered.get(Math.max(0, connectionType.getSelectedIndex()));
     }
 
     private Settings readFields() {
@@ -177,7 +210,9 @@ final class TuiSettingsPanel extends Panel {
                             server.isChecked(),
                             replayFile.getText().trim(),
                             competitionKey.getText().trim(),
-                            number(timekeepingOffset));
+                            number(timekeepingOffset),
+                            lenexFile.getText().trim(),
+                            Settings.LENEX_INTERVALS_SECONDS.get(Math.max(0, lenexInterval.getSelectedIndex())));
     }
 
     private static int number(TextBox box) {
@@ -275,6 +310,17 @@ final class TuiSettingsPanel extends Panel {
         }
     }
 
+    private void chooseLenexFile() {
+        File file = new FileDialogBuilder().setTitle(I18n.get("input.lenexFile"))
+                                           .setActionLabel(I18n.get("menu.open"))
+                                           .build()
+                                           .showDialog(gui);
+        if (file != null) {
+            lenexFile.setText(file.getAbsolutePath());
+            commit();
+        }
+    }
+
     /** Brings the fields in line with the document; fields being edited keep their text until the document is replaced. */
     void refresh() {
         TimingDocument doc = controller.document();
@@ -283,7 +329,10 @@ final class TuiSettingsPanel extends Panel {
         try {
             if (doc != null) {
                 Settings s = doc.settings();
-                connectionType.setSelectedIndex(s.connectionType().ordinal());
+                offerSystems(offeredSystems, s.connectionType().input());
+                offerSources(SettingsFormRules.of(s, false, true).sources(), s.connectionType());
+                setUnlessEdited(lenexFile, s.lenexFile(), replaced);
+                lenexInterval.setSelectedIndex(Math.max(0, Settings.LENEX_INTERVALS_SECONDS.indexOf(s.lenexIntervalSeconds())));
                 setUnlessEdited(competitionKey, s.competitionKey(), replaced);
                 setUnlessEdited(host, s.tcpHost(), replaced);
                 setUnlessEdited(port, String.valueOf(s.tcpPort()), replaced);
@@ -306,6 +355,51 @@ final class TuiSettingsPanel extends Panel {
         refreshButtons();
     }
 
+    private void offerSystems(List<Input> systems, Input selected) {
+        boolean wasUpdating = updating;
+        updating = true;
+        try {
+            if (!offeredSystems.equals(systems)) {
+                offeredSystems = List.copyOf(systems);
+                system.clearItems();
+                offeredSystems.forEach(s -> system.addItem(I18n.label(s)));
+            }
+            select(system, Math.max(0, offeredSystems.indexOf(selected)));
+        } finally {
+            updating = wasUpdating;
+        }
+    }
+
+    /** Lanterna runs the selection listeners later on its GUI thread, so a selection that changes nothing is not made at all. */
+    private static void select(ComboBox<String> combo, int index) {
+        if (combo.getSelectedIndex() != index) {
+            combo.setSelectedIndex(index);
+        }
+    }
+
+    private void offerSources(List<ConnectionType> types, ConnectionType selected) {
+        if (offered.equals(types)) {
+            boolean wasUpdating = updating;
+            updating = true;
+            try {
+                select(connectionType, Math.max(0, offered.indexOf(selected)));
+            } finally {
+                updating = wasUpdating;
+            }
+            return;
+        }
+        boolean wasUpdating = updating;
+        updating = true;
+        try {
+            offered = List.copyOf(types);
+            connectionType.clearItems();
+            offered.forEach(t -> connectionType.addItem(I18n.label(t)));
+            connectionType.setSelectedIndex(Math.max(0, offered.indexOf(selected)));
+        } finally {
+            updating = wasUpdating;
+        }
+    }
+
     private static void setUnlessEdited(TextBox box, String text, boolean replaced) {
         if ((replaced || !box.isFocused()) && !box.getText().equals(text)) {
             box.setText(text);
@@ -314,10 +408,18 @@ final class TuiSettingsPanel extends Panel {
 
     private void refreshButtons() {
         Settings fields = readFields();
-        SettingsFormRules rules = SettingsFormRules.of(fields, controller.isRecording(), controller.document() != null);
+        SettingsFormRules rules = SettingsFormRules.of(fields, controller.isRecording(), controller.document() != null, controller.recordedInput());
+        offerSystems(rules.systems(), fields.connectionType().input());
+        offerSources(rules.sources(), fields.connectionType());
+        system.setEnabled(rules.editable());
         tcpPanel.setVisible(fields.connectionType() == ConnectionType.TCP);
         serialPanel.setVisible(fields.connectionType() == ConnectionType.SERIAL);
         filePanel.setVisible(fields.connectionType() == ConnectionType.FILE);
+        lenexPanel.setVisible(fields.connectionType() == ConnectionType.LENEX);
+        lenexFileLabel.setText(I18n.get("input.lenexFile") + (rules.lenexFileRequired() ? " *" : ""));
+        lenexFile.setEnabled(rules.editable());
+        chooseLenexFile.setEnabled(rules.editable());
+        lenexInterval.setEnabled(rules.editable());
         hostLabel.setText(I18n.get("input.tcpHost") + (rules.hostRequired() ? " *" : ""));
         replayFileLabel.setText(I18n.get("input.replayFile") + (rules.replayFileRequired() ? " *" : ""));
         connectionType.setEnabled(rules.editable());
@@ -370,6 +472,22 @@ final class TuiSettingsPanel extends Panel {
 
     Panel fileFields() {
         return filePanel;
+    }
+
+    Panel lenexFields() {
+        return lenexPanel;
+    }
+
+    TextBox lenexFileField() {
+        return lenexFile;
+    }
+
+    ComboBox<String> lenexIntervalCombo() {
+        return lenexInterval;
+    }
+
+    ComboBox<String> systemCombo() {
+        return system;
     }
 
     ComboBox<String> connectionTypeCombo() {

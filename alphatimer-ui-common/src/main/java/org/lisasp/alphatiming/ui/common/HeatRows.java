@@ -1,6 +1,8 @@
 package org.lisasp.alphatiming.ui.common;
 
 import org.lisasp.alphatiming.heats.HeatDto;
+import org.lisasp.alphatiming.heats.LaneTime;
+import org.lisasp.alphatiming.heats.LaneStatus;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -15,7 +17,8 @@ import java.util.Locale;
  */
 public final class HeatRows {
 
-    public record Row(String start, String finish, String heat) {
+    /** @param duration the longest finish of the heat; empty while it has none */
+    public record Row(String start, String finish, String duration, String heat) {
     }
 
     private record Shown(HeatDto heat, LocalDateTime start, LocalDateTime end) {
@@ -24,6 +27,7 @@ public final class HeatRows {
     private static final Comparator<Shown> ORDER = Comparator.comparing(Shown::start)
                                                              .thenComparing(Shown::end, Comparator.nullsLast(Comparator.<LocalDateTime>naturalOrder()))
                                                              .thenComparingInt(s -> s.heat().event())
+                                                             .thenComparing(s -> s.heat().round())
                                                              .thenComparingInt(s -> s.heat().heat())
                                                              .reversed();
 
@@ -46,6 +50,21 @@ public final class HeatRows {
     private static Row toRow(HeatDto heat, int timekeepingOffsetHours) {
         return new Row(TimeFormat.clock(LiveTexts.timeOfDay(heat, heat.started(), timekeepingOffsetHours)),
                        heat.ended() == null ? "" : LiveTexts.endTime(heat, heat.ended(), timekeepingOffsetHours),
-                       String.format(Locale.ROOT, "%02d-%03d", heat.event(), heat.heat()));
+                       duration(heat),
+                       heatText(heat));
+    }
+
+    private static String duration(HeatDto heat) {
+        int longest = heat.lanes().stream()
+                          .filter(l -> l.status() == LaneStatus.Used)
+                          .mapToInt(l -> l.finish().map(LaneTime::timeInMillis).orElse(0))
+                          .max()
+                          .orElse(0);
+        return TimeFormat.duration(longest);
+    }
+
+    private static String heatText(HeatDto heat) {
+        String number = String.format(Locale.ROOT, "%02d-%03d", heat.event(), heat.heat());
+        return heat.round().isEmpty() ? number : number + " " + RoundTexts.label(heat.round());
     }
 }

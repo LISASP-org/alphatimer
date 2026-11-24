@@ -25,7 +25,7 @@ public final class TimingDatabase implements AutoCloseable {
 
     private static final byte[] SQLITE_HEADER = "SQLite format 3\0".getBytes(StandardCharsets.US_ASCII);
 
-    private static final Class<?>[] ENTITIES = {SettingsEntity.class, RawDataChunkEntity.class, AresMessageEntity.class};
+    private static final Class<?>[] ENTITIES = {SettingsEntity.class, RawDataChunkEntity.class, AresMessageEntity.class, LenexVersionEntity.class};
 
     private final ReentrantLock lock = new ReentrantLock();
     private final AtomicLong writeCount = new AtomicLong();

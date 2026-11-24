@@ -3,6 +3,7 @@ package org.lisasp.alphatiming.ui.common;
 import org.lisasp.alphatiming.ui.core.recording.RecordedData;
 import org.lisasp.alphatiming.ui.core.recording.RecordingError;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
+import org.lisasp.alphatiming.ui.core.settings.Input;
 import org.lisasp.alphatiming.ui.core.settings.SerialMode;
 import org.lisasp.alphatiming.ui.core.settings.SettingsProblem;
 
@@ -36,6 +37,10 @@ public final class I18n {
 
     public static String describe(FileFailure failure) {
         return get("failure." + failure.kind().name(), failure.file(), failure.detail());
+    }
+
+    public static String label(Input system) {
+        return get("input.system." + system.name());
     }
 
     public static String label(ConnectionType type) {

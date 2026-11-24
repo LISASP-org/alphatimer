@@ -6,7 +6,7 @@ import java.util.SortedSet;
 
 public interface HeatRepository {
 
-    Optional<HeatDto> find(int event, int heat);
+    Optional<HeatDto> find(int event, String round, int heat);
 
     SortedSet<Integer> findUsedLanes();
 
@@ -16,4 +16,6 @@ public interface HeatRepository {
     HeatDto create(HeatDto dto);
 
     void save(HeatDto dto);
+
+    void delete(int event, String round, int heat);
 }

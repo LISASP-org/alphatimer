@@ -1,5 +1,9 @@
 package org.lisasp.alphatiming.ui.common;
 
+import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
+
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.LaneDto;
 import org.lisasp.alphatiming.heats.LaneStatus;
@@ -27,11 +31,15 @@ public final class LaneRows {
         if (heat == null) {
             return List.of();
         }
-        return heat.lanes()
-                   .stream()
-                   .filter(l -> l.status() == LaneStatus.Used || knownLanes.contains(l.number()))
-                   .map(l -> l.status() == LaneStatus.Used ? toRow(l) : new Row(l.number(), "", "", 0, false))
-                   .toList();
+        Map<Integer, LaneDto> lanes = heat.lanes().stream().collect(Collectors.toMap(LaneDto::number, l -> l));
+        SortedSet<Integer> shown = new TreeSet<>(knownLanes);
+        lanes.values().stream().filter(l -> l.status() == LaneStatus.Used).forEach(l -> shown.add(l.number()));
+        return shown.stream()
+                    .map(number -> {
+                        LaneDto lane = lanes.get(number);
+                        return lane != null && lane.status() == LaneStatus.Used ? toRow(lane) : new Row(number, "", "", 0, false);
+                    })
+                    .toList();
     }
 
     private static Row toRow(LaneDto lane) {
@@ -57,6 +65,7 @@ public final class LaneRows {
             case DidNotStart -> I18n.get("lane.dns");
             case DidNotFinish -> I18n.get("lane.dnf");
             case Disqualified -> I18n.get("lane.dsq");
+            case Withdrawn -> I18n.get("lane.wdr");
         };
     }
 }

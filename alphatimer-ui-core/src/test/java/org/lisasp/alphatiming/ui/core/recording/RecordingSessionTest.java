@@ -139,6 +139,20 @@ class RecordingSessionTest {
         assertThat(heats).isNotEmpty();
     }
 
+    @Test
+    void anAresRecordingMarksTheProjectAsAresWhenItsDataArrives() {
+        assertThat(session.recordedInput()).isEmpty();
+        session.start(settings(0));
+        assertThat(session.recordedInput()).isEmpty();
+
+        reader().push(DataHandlingMessageTestData.message1);
+        reader().push(DataHandlingMessageTestData.message2);
+        session.stop();
+
+        assertThat(session.recordedInput()).contains(org.lisasp.alphatiming.ui.core.settings.Input.ARES);
+        assertThat(secondSession().recordedInput()).contains(org.lisasp.alphatiming.ui.core.settings.Input.ARES);
+    }
+
     private void recordHeatWithLane1Finished() {
         session.start(settings(0));
         reader().push(DataHandlingMessageTestData.message1);
@@ -378,8 +392,8 @@ class RecordingSessionTest {
         private final org.lisasp.alphatiming.heats.InMemoryHeatRepository delegate = new org.lisasp.alphatiming.heats.InMemoryHeatRepository();
 
         @Override
-        public java.util.Optional<HeatDto> find(int event, int heat) {
-            return delegate.find(event, heat);
+        public java.util.Optional<HeatDto> find(int event, String round, int heat) {
+            return delegate.find(event, round, heat);
         }
 
         @Override
@@ -390,6 +404,11 @@ class RecordingSessionTest {
         @Override
         public List<HeatDto> findAll() {
             return delegate.findAll();
+        }
+
+        @Override
+        public void delete(int event, String round, int heat) {
+            delegate.delete(event, round, heat);
         }
 
         @Override
