@@ -49,24 +49,28 @@ public final class LenexReader {
      * which accepts any byte: zips without the UTF-8 flag name their entries in the creator's code page.
      */
     public static LenexMeet read(InputStream in) throws IOException {
+        return read(parse(unzipped(in)));
+    }
+
+    static InputStream unzipped(InputStream in) throws IOException {
         BufferedInputStream buffered = new BufferedInputStream(in);
         buffered.mark(ZIP_SIGNATURE.length);
         byte[] start = buffered.readNBytes(ZIP_SIGNATURE.length);
         buffered.reset();
         if (!Arrays.equals(start, ZIP_SIGNATURE)) {
-            return readXml(buffered);
+            return buffered;
         }
         ZipInputStream zip = new ZipInputStream(buffered, StandardCharsets.ISO_8859_1);
         for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
             if (!entry.isDirectory() && entry.getName().toLowerCase(Locale.ROOT).endsWith(".lef")) {
-                return readXml(zip);
+                return zip;
             }
         }
         throw new InvalidLenexException("The zipped file holds no .lef file");
     }
 
-    private static LenexMeet readXml(InputStream in) throws IOException {
-        Element meet = child(parse(in).getDocumentElement(), "MEETS").flatMap(meets -> child(meets, "MEET"))
+    private static LenexMeet read(Document document) throws InvalidLenexException {
+        Element meet = child(document.getDocumentElement(), "MEETS").flatMap(meets -> child(meets, "MEET"))
                                                                     .orElseThrow(() -> new InvalidLenexException("The file holds no meet"));
         Map<String, List<LenexResult>> resultsByHeat = resultsByHeat(meet);
         List<LenexEvent> events = new ArrayList<>();
@@ -149,7 +153,7 @@ public final class LenexReader {
         }
     }
 
-    private static Document parse(InputStream in) throws IOException {
+    static Document parse(InputStream in) throws IOException {
         DocumentBuilder builder;
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
