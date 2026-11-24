@@ -242,6 +242,8 @@ class TuiMainWindowTest {
         assertThat(screenText()).contains("Server");
         assertThat(controller.document().settings().restEnabled()).isTrue();
         assertThat(settings.serverCheckBox().isEnabled()).isTrue();
+        assertThat(settings.serverCheckBox().isChecked()).isTrue();
+        assertThat(settings.serverCheckBox().getLabel()).isEqualTo("Server: on");
         assertThat(settings.hostField().isEnabled()).isFalse();
         controller.stopRecording();
     }

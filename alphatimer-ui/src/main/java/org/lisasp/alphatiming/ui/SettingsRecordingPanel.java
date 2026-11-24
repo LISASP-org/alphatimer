@@ -150,7 +150,7 @@ public final class SettingsRecordingPanel extends JPanel {
             } else {
                 controller.stopRecording();
             }
-            refreshButtons();
+            refresh();
         });
         host.addActionListener(e -> commit());
         FocusAdapter commitOnFocusLost = new FocusAdapter() {
