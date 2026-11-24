@@ -9,6 +9,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.WithdrawnMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedKindOfTime;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
@@ -113,6 +114,26 @@ public final class TestMessageCreator {
 
     public static DisqualifiedMessage dsq(int event, int heat, int lane) {
         return new DisqualifiedMessage(T0.plusSeconds(60), "WK", (short) event, (byte) heat, (byte) lane);
+    }
+
+    public static WithdrawnMessage wdr(int event, int heat, int lane) {
+        return new WithdrawnMessage(T0.plusSeconds(60), "WK", (short) event, (byte) heat, "", (byte) lane, false);
+    }
+
+    public static DisqualifiedMessage dsqRemoved(int event, int heat, int lane) {
+        return new DisqualifiedMessage(T0.plusSeconds(90), "WK", (short) event, (byte) heat, "", (byte) lane, true);
+    }
+
+    public static DidNotStartMessage dnsRemoved(int event, int heat, int lane) {
+        return new DidNotStartMessage(T0.plusSeconds(90), "WK", (short) event, (byte) heat, "", (byte) lane, true);
+    }
+
+    public static DidNotFinishMessage dnfRemoved(int event, int heat, int lane) {
+        return new DidNotFinishMessage(T0.plusSeconds(90), "WK", (short) event, (byte) heat, "", (byte) lane, true);
+    }
+
+    public static WithdrawnMessage wdrRemoved(int event, int heat, int lane) {
+        return new WithdrawnMessage(T0.plusSeconds(90), "WK", (short) event, (byte) heat, "", (byte) lane, true);
     }
 
     public static OfficialEndMessage end(int event, int heat, LocalDateTime at) {

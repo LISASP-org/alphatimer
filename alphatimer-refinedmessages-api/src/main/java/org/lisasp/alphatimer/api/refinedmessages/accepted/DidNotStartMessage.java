@@ -15,8 +15,10 @@ public class DidNotStartMessage implements RefinedMessage {
     private final byte heat;
     private final String round;
     private final byte lane;
+    /** true when the source withdraws the penalty it sent before */
+    private final boolean removed;
 
     public DidNotStartMessage(LocalDateTime timestamp, String competition, short event, byte heat, byte lane) {
-        this(timestamp, competition, event, heat, "", lane);
+        this(timestamp, competition, event, heat, "", lane, false);
     }
 }

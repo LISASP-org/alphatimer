@@ -291,6 +291,61 @@ class HeatTest {
     }
 
     @Test
+    void aWithdrawnLaneGetsNoPlaceAndIsDoneForTheClock() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+
+        heat.withdrawn(TestMessageCreator.wdr(1, 1, 3));
+
+        assertThat(lane(heat, 3).penalties()).containsExactly(Penalty.Withdrawn);
+        assertThat(lane(heat, 3).place()).isZero();
+        assertThat(heat.createDto().ended()).isEqualTo(T0.plusSeconds(60));
+    }
+
+    @Test
+    void aRemovedDisqualificationGivesTheLaneItsPlaceBack() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+        heat.touch(TestMessageCreator.fin(1, 1, 3, 0, 2200));
+        heat.disqualified(TestMessageCreator.dsq(1, 1, 1));
+
+        heat.disqualified(TestMessageCreator.dsqRemoved(1, 1, 1));
+
+        assertThat(lane(heat, 1).penalties()).isEmpty();
+        assertThat(lane(heat, 1).place()).isEqualTo(1);
+        assertThat(lane(heat, 2).place()).isEqualTo(2);
+    }
+
+    @Test
+    void removingThePenaltyOfALaneWithoutFinishReopensTheEndOfTheHeat() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 2000));
+        heat.touch(TestMessageCreator.fin(1, 1, 2, 0, 2100));
+        heat.disqualified(TestMessageCreator.dsq(1, 1, 3));
+
+        heat.disqualified(TestMessageCreator.dsqRemoved(1, 1, 3));
+
+        assertThat(heat.createDto().ended()).isNull();
+        assertThat(heat.createDto().status()).isEqualTo(HeatStatus.Started);
+    }
+
+    @Test
+    void everyPenaltyCanBeRemoved() {
+        Heat heat = prepared();
+        heat.didNotStart(TestMessageCreator.dns(1, 1, 1));
+        heat.didNotFinish(TestMessageCreator.dnf(1, 1, 2));
+        heat.withdrawn(TestMessageCreator.wdr(1, 1, 3));
+
+        heat.didNotStart(TestMessageCreator.dnsRemoved(1, 1, 1));
+        heat.didNotFinish(TestMessageCreator.dnfRemoved(1, 1, 2));
+        heat.withdrawn(TestMessageCreator.wdrRemoved(1, 1, 3));
+
+        assertThat(heat.createDto().lanes()).allMatch(l -> l.penalties().isEmpty());
+    }
+
+    @Test
     void heatWithoutFinishTimesGetsNoPlaces() {
         Heat heat = prepared();
         heat.finish(TestMessageCreator.end(1, 1, T0.plusSeconds(30)));

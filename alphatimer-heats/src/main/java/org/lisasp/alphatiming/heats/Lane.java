@@ -130,21 +130,13 @@ final class Lane {
         };
     }
 
-    void didNotStart() {
-        penalize(Penalty.DidNotStart);
-    }
-
-    void didNotFinish() {
-        penalize(Penalty.DidNotFinish);
-    }
-
-    void disqualified() {
-        penalize(Penalty.Disqualified);
-    }
-
-    private void penalize(Penalty penalty) {
+    void penalize(Penalty penalty) {
         penalties.add(penalty);
         place = 0;
+    }
+
+    boolean removePenalty(Penalty penalty) {
+        return penalties.remove(penalty);
     }
 
     private void enforceStatus() {

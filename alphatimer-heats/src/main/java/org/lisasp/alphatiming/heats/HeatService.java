@@ -11,6 +11,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.WithdrawnMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedRefinedMessage;
 
@@ -109,6 +110,8 @@ public final class HeatService implements Consumer<RefinedMessage> {
                 heat.didNotFinish(m);
             } else if (message instanceof DisqualifiedMessage m) {
                 heat.disqualified(m);
+            } else if (message instanceof WithdrawnMessage m) {
+                heat.withdrawn(m);
             } else if (message instanceof OfficialEndMessage m) {
                 heat.finish(m);
             } else {

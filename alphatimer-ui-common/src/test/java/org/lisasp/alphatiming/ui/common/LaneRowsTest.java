@@ -108,6 +108,17 @@ class LaneRowsTest {
     }
 
     @Test
+    void aWithdrawnLaneShowsWdr() {
+        HeatDto heat = new HeatDto(1, "", 1, HeatStatus.Finished, 2, null, null, null, null, null, List.of(
+                TestLanes.lane(1, LaneStatus.Used, Set.of(Penalty.Withdrawn), 0)));
+
+        assertThat(LaneRows.from(heat, java.util.Set.of()).getFirst().detail()).isEqualTo("WDR");
+
+        Locale.setDefault(Locale.GERMANY);
+        assertThat(LaneRows.from(heat, java.util.Set.of()).getFirst().detail()).isEqualTo("abgem.");
+    }
+
+    @Test
     void everyPenaltyOfALaneIsShown() {
         HeatDto heat = new HeatDto(1, "", 1, HeatStatus.Finished, 2, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.Used, Set.of(Penalty.DidNotFinish, Penalty.Disqualified), 0, TestLanes.finish(2, 25_000))));

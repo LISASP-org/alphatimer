@@ -1,5 +1,5 @@
 package org.lisasp.alphatiming.heats;
 
 public enum Penalty {
-    DidNotStart, DidNotFinish, Disqualified
+    DidNotStart, DidNotFinish, Disqualified, Withdrawn
 }

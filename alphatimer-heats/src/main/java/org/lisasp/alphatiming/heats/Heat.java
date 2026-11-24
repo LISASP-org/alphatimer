@@ -11,6 +11,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.WithdrawnMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
@@ -135,27 +136,42 @@ final class Heat {
     }
 
     void didNotStart(DidNotStartMessage message) {
-        Lane lane = lane(message.getLane());
-        assureStarted(message);
-        lastMessage = message.getTimestamp();
-        lane.didNotStart();
-        update(message);
+        penalty(message, message.getLane(), Penalty.DidNotStart, message.isRemoved());
     }
 
     void didNotFinish(DidNotFinishMessage message) {
-        Lane lane = lane(message.getLane());
-        assureStarted(message);
-        lastMessage = message.getTimestamp();
-        lane.didNotFinish();
-        update(message);
+        penalty(message, message.getLane(), Penalty.DidNotFinish, message.isRemoved());
     }
 
     void disqualified(DisqualifiedMessage message) {
-        Lane lane = lane(message.getLane());
+        penalty(message, message.getLane(), Penalty.Disqualified, message.isRemoved());
+    }
+
+    void withdrawn(WithdrawnMessage message) {
+        penalty(message, message.getLane(), Penalty.Withdrawn, message.isRemoved());
+    }
+
+    private void penalty(RefinedMessage message, int laneNumber, Penalty penalty, boolean removed) {
+        Lane lane = lane(laneNumber);
+        if (removed) {
+            removePenalty(lane, penalty, message);
+            return;
+        }
         assureStarted(message);
         lastMessage = message.getTimestamp();
-        lane.disqualified();
+        lane.penalize(penalty);
         update(message);
+    }
+
+    /** Like a deleted time: a heat that is not officially over is no longer ended while the lane lacks a result. */
+    private void removePenalty(Lane lane, Penalty penalty, RefinedMessage message) {
+        lastMessage = message.getTimestamp();
+        if (lane.removePenalty(penalty)) {
+            computePlaces();
+            if (status == HeatStatus.Started && !lane.isDone()) {
+                ended = null;
+            }
+        }
     }
 
     void estimateEnd(LocalDateTime at) {

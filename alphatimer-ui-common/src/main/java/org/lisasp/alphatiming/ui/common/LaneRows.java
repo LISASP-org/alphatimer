@@ -57,6 +57,7 @@ public final class LaneRows {
             case DidNotStart -> I18n.get("lane.dns");
             case DidNotFinish -> I18n.get("lane.dnf");
             case Disqualified -> I18n.get("lane.dsq");
+            case Withdrawn -> I18n.get("lane.wdr");
         };
     }
 }
