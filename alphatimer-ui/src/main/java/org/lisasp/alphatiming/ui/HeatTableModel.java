@@ -22,7 +22,7 @@ final class HeatTableModel extends AbstractTableModel {
 
     @Override
     public int getColumnCount() {
-        return 3;
+        return 4;
     }
 
     @Override
@@ -30,6 +30,7 @@ final class HeatTableModel extends AbstractTableModel {
         return switch (column) {
             case 0 -> I18n.get("heats.start");
             case 1 -> I18n.get("heats.finish");
+            case 2 -> I18n.get("heats.duration");
             default -> I18n.get("heats.heat");
         };
     }
@@ -40,6 +41,7 @@ final class HeatTableModel extends AbstractTableModel {
         return switch (columnIndex) {
             case 0 -> row.start();
             case 1 -> row.finish();
+            case 2 -> row.duration();
             default -> row.heat();
         };
     }

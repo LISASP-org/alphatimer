@@ -1,6 +1,8 @@
 package org.lisasp.alphatiming.ui.common;
 
 import org.lisasp.alphatiming.heats.HeatDto;
+import org.lisasp.alphatiming.heats.LaneTime;
+import org.lisasp.alphatiming.heats.LaneStatus;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -15,7 +17,8 @@ import java.util.Locale;
  */
 public final class HeatRows {
 
-    public record Row(String start, String finish, String heat) {
+    /** @param duration the longest finish of the heat; empty while it has none */
+    public record Row(String start, String finish, String duration, String heat) {
     }
 
     private record Shown(HeatDto heat, LocalDateTime start, LocalDateTime end) {
@@ -47,7 +50,17 @@ public final class HeatRows {
     private static Row toRow(HeatDto heat, int timekeepingOffsetHours) {
         return new Row(TimeFormat.clock(LiveTexts.timeOfDay(heat, heat.started(), timekeepingOffsetHours)),
                        heat.ended() == null ? "" : LiveTexts.endTime(heat, heat.ended(), timekeepingOffsetHours),
+                       duration(heat),
                        heatText(heat));
+    }
+
+    private static String duration(HeatDto heat) {
+        int longest = heat.lanes().stream()
+                          .filter(l -> l.status() == LaneStatus.Used)
+                          .mapToInt(l -> l.finish().map(LaneTime::timeInMillis).orElse(0))
+                          .max()
+                          .orElse(0);
+        return longest > 0 ? TimeFormat.time(longest) : "";
     }
 
     private static String heatText(HeatDto heat) {

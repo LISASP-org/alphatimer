@@ -5,6 +5,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.lisasp.alphatiming.heats.HeatDto;
 import org.lisasp.alphatiming.heats.HeatStatus;
+import org.lisasp.alphatiming.heats.TestLanes;
+import java.util.Set;
+import org.lisasp.alphatiming.heats.LaneStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -37,31 +40,40 @@ class HeatRowsTest {
     void aRowShowsStartFinishAndTheHeat() {
         List<HeatRows.Row> rows = HeatRows.from(List.of(heat(3, 2, TEN, TEN.plusSeconds(65))), 0);
 
-        assertThat(rows).containsExactly(new HeatRows.Row("10:00:00", "10:01:05", "03-002"));
+        assertThat(rows).containsExactly(new HeatRows.Row("10:00:00", "10:01:05", "", "03-002"));
     }
 
     @Test
     void theHeatNamesItsRound() {
         HeatDto heat = new HeatDto(3, "Final", 2, HeatStatus.Started, 0, null, TEN, null, TEN, null, List.of());
 
-        assertThat(HeatRows.from(List.of(heat), 0)).containsExactly(new HeatRows.Row("10:00:00", "", "03-002 Final"));
+        assertThat(HeatRows.from(List.of(heat), 0)).containsExactly(new HeatRows.Row("10:00:00", "", "", "03-002 Final"));
+    }
+
+    @Test
+    void theDurationIsTheLongestFinish() {
+        HeatDto heat = new HeatDto(3, "", 2, HeatStatus.Finished, 2, null, TEN, TEN.plusSeconds(66), TEN, null, List.of(
+                TestLanes.lane(1, LaneStatus.Used, Set.of(), 2, TestLanes.finish(2, 65_430)),
+                TestLanes.lane(2, LaneStatus.Used, Set.of(), 1, TestLanes.finish(2, 61_000))));
+
+        assertThat(HeatRows.from(List.of(heat), 0)).extracting(HeatRows.Row::duration).containsExactly("1:05.43");
     }
 
     @Test
     void anUnfinishedHeatHasNoFinish() {
-        assertThat(HeatRows.from(List.of(heat(3, 2, TEN, null)), 0)).containsExactly(new HeatRows.Row("10:00:00", "", "03-002"));
+        assertThat(HeatRows.from(List.of(heat(3, 2, TEN, null)), 0)).containsExactly(new HeatRows.Row("10:00:00", "", "", "03-002"));
     }
 
     @Test
     void anEstimatedFinishIsMarked() {
         HeatDto estimated = new HeatDto(3, "", 2, HeatStatus.FinishedEstimated, 0, null, TEN, TEN.plusSeconds(65), null, null, List.of());
 
-        assertThat(HeatRows.from(List.of(estimated), 0)).containsExactly(new HeatRows.Row("10:00:00", "\u224810:01:05", "03-002"));
+        assertThat(HeatRows.from(List.of(estimated), 0)).containsExactly(new HeatRows.Row("10:00:00", "\u224810:01:05", "", "03-002"));
     }
 
     @Test
     void aHeatWithoutStartIsNotListed() {
-        assertThat(HeatRows.from(List.of(heat(3, 2, null, null), heat(3, 1, TEN, null)), 0)).containsExactly(new HeatRows.Row("10:00:00", "", "03-001"));
+        assertThat(HeatRows.from(List.of(heat(3, 2, null, null), heat(3, 1, TEN, null)), 0)).containsExactly(new HeatRows.Row("10:00:00", "", "", "03-001"));
     }
 
     @Test
@@ -69,7 +81,7 @@ class HeatRowsTest {
         int halfPastSeven = 7 * 3_600_000 + 30 * 60_000;
         HeatDto heat = new HeatDto(3, "", 2, HeatStatus.Finished, 0, null, TEN, TEN.plusSeconds(65), null, halfPastSeven, List.of());
 
-        assertThat(HeatRows.from(List.of(heat), 1)).containsExactly(new HeatRows.Row("08:30:00", "08:31:05", "03-002"));
+        assertThat(HeatRows.from(List.of(heat), 1)).containsExactly(new HeatRows.Row("08:30:00", "08:31:05", "", "03-002"));
     }
 
     @Test

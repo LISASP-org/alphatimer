@@ -84,6 +84,72 @@ class HeatServiceTest {
     }
 
     @Test
+    void aHeatTimedOnlyByResultsStartsItsLongestFinishBeforeItsArrival() {
+        InMemoryHeatRepository store = new InMemoryHeatRepository();
+        HeatService service = new HeatService(store);
+        LocalDateTime arrival = T0.plusMinutes(10);
+
+        results(service, 1, 1, arrival, 61_000, 65_430);
+        service.accept(TestMessageCreator.end(1, 1, arrival));
+
+        HeatDto heat = store.find(1, "", 1).orElseThrow();
+        assertThat(heat.started()).isEqualTo(arrival.minusNanos(65_430_000_000L));
+        assertThat(heat.ended()).isEqualTo(arrival);
+    }
+
+    @Test
+    void aCalculatedStartBeforeTheEndOfTheLastHeatKeepsTheArrival() {
+        InMemoryHeatRepository store = new InMemoryHeatRepository();
+        HeatService service = new HeatService(store);
+        LocalDateTime first = T0.plusMinutes(10);
+        results(service, 1, 1, first, 61_000);
+        LocalDateTime second = first.plusSeconds(30);
+
+        results(service, 1, 2, second, 62_000);
+
+        HeatDto heat = store.find(1, "", 2).orElseThrow();
+        assertThat(heat.started()).isEqualTo(second);
+        assertThat(heat.ended()).isEqualTo(second);
+    }
+
+    @Test
+    void aLaterCorrectionDoesNotMoveAHeatTimedByResults() {
+        InMemoryHeatRepository store = new InMemoryHeatRepository();
+        HeatService service = new HeatService(store);
+        LocalDateTime arrival = T0.plusMinutes(10);
+        results(service, 1, 1, arrival, 61_000);
+
+        service.accept(TestMessageCreator.resultDeletedFinAt(1, 1, 1, 61_000, arrival.plusMinutes(20)));
+        service.accept(TestMessageCreator.resultFinAt(1, 1, 1, 61_100, arrival.plusMinutes(20)));
+
+        HeatDto heat = store.find(1, "", 1).orElseThrow();
+        assertThat(heat.started()).isEqualTo(arrival.minusSeconds(61));
+        assertThat(heat.ended()).isEqualTo(arrival);
+    }
+
+    @Test
+    void aLiveHeatKeepsItsLiveStart() {
+        InMemoryHeatRepository store = new InMemoryHeatRepository();
+        HeatService service = new HeatService(store);
+        service.accept(TestMessageCreator.used(1, 1, "1000000000"));
+        service.accept(TestMessageCreator.start(1, 1, T0));
+        service.accept(TestMessageCreator.finAt(1, 1, 1, 61_000, T0.plusSeconds(61)));
+
+        assertThat(store.find(1, "", 1).orElseThrow().started()).isEqualTo(T0);
+    }
+
+    private static void results(HeatService service, int event, int heat, LocalDateTime arrival, int... finishes) {
+        StringBuilder lanes = new StringBuilder("0000000000");
+        for (int i = 0; i < finishes.length; i++) {
+            lanes.setCharAt(i, '1');
+        }
+        service.accept(TestMessageCreator.usedAt(event, heat, lanes.toString(), arrival));
+        for (int i = 0; i < finishes.length; i++) {
+            service.accept(TestMessageCreator.resultFinAt(event, heat, i + 1, finishes[i], arrival));
+        }
+    }
+
+    @Test
     void aReadyToStartAnnouncesTheHeat() {
         InMemoryHeatRepository store = new InMemoryHeatRepository();
         HeatService service = new HeatService(store);

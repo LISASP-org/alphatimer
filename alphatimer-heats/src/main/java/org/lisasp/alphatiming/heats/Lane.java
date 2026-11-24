@@ -41,6 +41,10 @@ final class Lane {
         return status == LaneStatus.Used && (finish().isPresent() || !penalties.isEmpty());
     }
 
+    boolean hasLiveTime() {
+        return times.stream().anyMatch(t -> t.source() == TimeSource.Live);
+    }
+
     boolean isUsed() {
         return status == LaneStatus.Used;
     }

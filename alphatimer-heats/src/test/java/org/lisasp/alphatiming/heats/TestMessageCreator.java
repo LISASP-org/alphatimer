@@ -39,6 +39,20 @@ public final class TestMessageCreator {
         return new UsedLanesMessage(T0, "WK", (short) event, (byte) heat, "", java.util.List.of(lanes), numbering);
     }
 
+    public static TimeMessage resultFinAt(int event, int heat, int lane, int millis, LocalDateTime at) {
+        return new TimeMessage(at, "WK", (short) event, (byte) heat, "", RefinedMessageType.CurrentRaceResult, RefinedKindOfTime.Finish, (byte) lane,
+                               (byte) 2, (byte) 2, (byte) 0, millis, RefinedTimeType.Normal);
+    }
+
+    public static TimeMessage resultDeletedFinAt(int event, int heat, int lane, int millis, LocalDateTime at) {
+        return new TimeMessage(at, "WK", (short) event, (byte) heat, "", RefinedMessageType.CurrentRaceResult, RefinedKindOfTime.Finish, (byte) lane,
+                               (byte) 2, (byte) 2, (byte) 0, millis, RefinedTimeType.DeletedTime);
+    }
+
+    public static UsedLanesMessage usedAt(int event, int heat, String lanes, LocalDateTime at) {
+        return new UsedLanesMessage(at, "WK", (short) event, (byte) heat, lanes);
+    }
+
     public static TimeMessage finInRound(int event, String round, int heat, int lane, int millis) {
         return new TimeMessage(T0.plusSeconds(1), "WK", (short) event, (byte) heat, round, RefinedMessageType.Live, RefinedKindOfTime.Finish,
                                (byte) lane, (byte) 2, (byte) 2, (byte) 0, millis, RefinedTimeType.Normal);

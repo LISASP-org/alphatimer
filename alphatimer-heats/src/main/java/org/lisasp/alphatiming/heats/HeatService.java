@@ -125,6 +125,7 @@ public final class HeatService implements Consumer<RefinedMessage> {
                 log.debug("Did not apply message '{}'.", message);
                 return;
             }
+            heat.timeFromResults(message.getTimestamp(), lastEndOfOtherHeats(before));
             HeatDto after = heat.createDto();
             boolean renumbered = message instanceof UsedLanesMessage m && m.getNumbering() != laneNumbering;
             if (after.equals(before) && !renumbered) {
@@ -187,6 +188,14 @@ public final class HeatService implements Consumer<RefinedMessage> {
             return;
         }
         announce(live);
+    }
+
+    private LocalDateTime lastEndOfOtherHeats(HeatDto heat) {
+        return known.values().stream()
+                    .filter(h -> !sameHeat(h, heat) && h.ended() != null)
+                    .map(HeatDto::ended)
+                    .max(LocalDateTime::compareTo)
+                    .orElse(null);
     }
 
     private void announce(LiveHeats heats) {

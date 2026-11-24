@@ -65,6 +65,10 @@ not be redistributed.
     previous version had was removed. A `status` on meet, session or event ("used for incremental data files" in
     LENEX 3.0) tells the progress of the meet and is read like any other file; LENEX defines no partial file by time.
     Result files split by club are not supported.
+  - A LENEX file holds results that arrive after the race. A heat known from results alone (no live time) ends at the
+    arrival of the version that started and ended it, and starts the longest finish before, unless that start lies before
+    the end of the heat that ended last; then start and end are that arrival. Later corrections do not move or reopen it.
+    The heat table has a column "Duration" with the longest finish of each heat (for every input).
   - Every input has a live tag: ARES over TCP or serial is live, LENEX is not, a replay file is live or not depending on
     its format. The tag belongs to the input, not to the messages; the program derives it from the selected input. An
     input that is not live shows no running clock. The LENEX refiner sends its times as `CurrentRaceResult`, never as

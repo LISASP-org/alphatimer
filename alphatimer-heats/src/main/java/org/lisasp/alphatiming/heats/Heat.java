@@ -121,13 +121,14 @@ final class Heat {
 
     /**
      * The device withdraws a time by sending it again as deleted, after the race time has moved on; a deleted final time
-     * comes as a split time of the last lap. Every time of the lane with that lap and value is marked as deleted.
+     * comes as a split time of the last lap. Every time of the lane with that lap and value is marked as deleted. Only a heat
+     * with live times runs on; a heat known from results alone was over when they arrived.
      */
     private void deleteTime(Lane lane, TimeMessage message) {
         lastMessage = message.getTimestamp();
         if (lane.deleteTime(message)) {
             computePlaces();
-            if (status == HeatStatus.Started && !lane.isDone()) {
+            if (status == HeatStatus.Started && !lane.isDone() && hasLiveTimes()) {
                 ended = null;
             }
         }
@@ -176,10 +177,30 @@ final class Heat {
         lastMessage = message.getTimestamp();
         if (lane.removePenalty(penalty)) {
             computePlaces();
-            if (status == HeatStatus.Started && !lane.isDone()) {
+            if (status == HeatStatus.Started && !lane.isDone() && hasLiveTimes()) {
                 ended = null;
             }
         }
+    }
+
+    /**
+     * Results of a heat without live times (a LENEX file) arrive after the race; the arrival of the version that started
+     * and ended it is its end, and its start lies the longest finish before, unless that is before the end of the heat that
+     * ended last. Later corrections arrive after the end and do not move the heat.
+     */
+    void timeFromResults(LocalDateTime arrival, LocalDateTime lastEndOfOtherHeats) {
+        if (started == null || ended == null || !started.equals(arrival) || !ended.equals(arrival) || hasLiveTimes()) {
+            return;
+        }
+        int longest = lanes.stream().filter(Lane::isUsed).mapToInt(Lane::finishInMillis).max().orElse(0);
+        LocalDateTime start = arrival.minus(Duration.ofMillis(longest));
+        if (longest > 0 && (lastEndOfOtherHeats == null || !start.isBefore(lastEndOfOtherHeats))) {
+            started = start;
+        }
+    }
+
+    private boolean hasLiveTimes() {
+        return lanes.stream().anyMatch(Lane::hasLiveTime);
     }
 
     void estimateEnd(LocalDateTime at) {
