@@ -23,7 +23,9 @@ import org.lisasp.alphatiming.ui.common.AppController;
 import org.lisasp.alphatiming.ui.common.PingIndicator;
 import org.lisasp.alphatiming.ui.common.SignOfLife;
 import org.lisasp.alphatiming.ui.common.AppStatus;
+import org.lisasp.alphatiming.heats.LiveHeats;
 import org.lisasp.alphatiming.ui.common.I18n;
+import org.lisasp.alphatiming.ui.common.LatestOnly;
 import org.lisasp.alphatiming.ui.common.TimeFormat;
 
 import java.time.LocalTime;
@@ -82,7 +84,8 @@ final class TuiMainWindow extends BasicWindow {
         controller.addChangeListener(() -> later(this::refresh));
         controller.addStateListener(state -> later(this::refresh));
         controller.addSignOfLifeListener(() -> later(this::showSignOfLife));
-        controller.addHeatListener(heats -> later(() -> liveViewPanel.setHeats(heats)));
+        LatestOnly<LiveHeats> heats = new LatestOnly<>(this::later, liveViewPanel::setHeats);
+        controller.addHeatListener(heats::submit);
         controller.addMessageListener(text -> later(() -> {
             settingsPanel.appendMessage(text);
             statusLastMessage.setText(I18n.get("status.lastMessage", TimeFormat.clock(LocalTime.now())));
