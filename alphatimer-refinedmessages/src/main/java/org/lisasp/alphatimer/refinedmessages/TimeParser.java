@@ -45,6 +45,9 @@ public class TimeParser implements Parser {
 
     /** ARES marks a manual time in the time type, the time info or both; a time edited from the keyboard in the time info. */
     private static boolean isAcceptedTime(TimeInfo timeInfo, TimeType timeType) {
+        if (timeType == TimeType.DeletedTime) {
+            return true;
+        }
         return switch (timeInfo) {
             case Normal -> timeType == TimeType.Empty || timeType == TimeType.DeletedTime || timeType == TimeType.CorrectedTime
                     || timeType == TimeType.ManualTime;

@@ -207,6 +207,14 @@ class TimeMessageTest {
         assertEquals(List.of(refined(RefinedMessageType.CurrentRaceResult, refinedTimeType)), listener.received);
     }
 
+    @ParameterizedTest
+    @CsvSource({"Manual", "Edited", "UnknownAsterisk"})
+    void aDeletionIsRefinedAsDeletionWhateverItsTimeInfo(TimeInfo timeInfo) {
+        refiner.accept(time(MessageType.CurrentRaceResults, TimeType.DeletedTime, (byte) 2, timeInfo));
+
+        assertEquals(List.of(refined(RefinedMessageType.CurrentRaceResult, RefinedTimeType.DeletedTime)), listener.received);
+    }
+
     /** ARES manual 5.3.6 and 7: a manually generated time is a valid time ([V]M); the recordings mark it in the time type only. */
     @ParameterizedTest
     @CsvSource({"ManualTime, Normal", "ManualTime, Manual", "Empty, Manual"})
