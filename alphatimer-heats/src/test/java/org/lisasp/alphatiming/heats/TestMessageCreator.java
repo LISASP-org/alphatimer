@@ -11,6 +11,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.WithdrawnMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.LaneNumbering;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedKindOfTime;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
@@ -30,7 +31,12 @@ public final class TestMessageCreator {
     }
 
     public static UsedLanesMessage usedInRound(int event, String round, int heat, String lanes) {
-        return new UsedLanesMessage(T0, "WK", (short) event, (byte) heat, round, lanes);
+        return new UsedLanesMessage(T0, "WK", (short) event, (byte) heat, round, new UsedLanesMessage(T0, "WK", (short) event, (byte) heat, lanes).getLanes(),
+                                    LaneNumbering.OneBased);
+    }
+
+    public static UsedLanesMessage usedNumbered(int event, int heat, LaneNumbering numbering, Integer... lanes) {
+        return new UsedLanesMessage(T0, "WK", (short) event, (byte) heat, "", java.util.List.of(lanes), numbering);
     }
 
     public static TimeMessage finInRound(int event, String round, int heat, int lane, int millis) {

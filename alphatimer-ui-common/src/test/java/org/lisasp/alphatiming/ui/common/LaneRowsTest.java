@@ -108,6 +108,14 @@ class LaneRowsTest {
     }
 
     @Test
+    void aKnownLaneThatTheHeatDoesNotHaveIsShownEmpty() {
+        HeatDto heat = new HeatDto(1, "", 1, HeatStatus.Started, 2, null, null, null, null, null, List.of(
+                TestLanes.lane(1, LaneStatus.Used, Set.of(), 0, TestLanes.split(1, 12_340))));
+
+        assertThat(LaneRows.from(heat, java.util.Set.of(0, 1))).extracting(LaneRows.Row::lane).containsExactly(0, 1);
+    }
+
+    @Test
     void aWithdrawnLaneShowsWdr() {
         HeatDto heat = new HeatDto(1, "", 1, HeatStatus.Finished, 2, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.Used, Set.of(Penalty.Withdrawn), 0)));

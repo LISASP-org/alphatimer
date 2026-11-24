@@ -1,6 +1,7 @@
 package org.lisasp.alphatiming.heats;
 
 import org.junit.jupiter.api.Test;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.LaneNumbering;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
@@ -27,7 +28,7 @@ class HeatTest {
     }
 
     private static LaneDto lane(Heat heat, int number) {
-        return heat.createDto().lanes().get(number - 1);
+        return heat.createDto().lanes().stream().filter(l -> l.number() == number).findFirst().orElseThrow();
     }
 
     @Test
@@ -343,6 +344,17 @@ class HeatTest {
         heat.withdrawn(TestMessageCreator.wdrRemoved(1, 1, 3));
 
         assertThat(heat.createDto().lanes()).allMatch(l -> l.penalties().isEmpty());
+    }
+
+    @Test
+    void aHeatTakesTheLanesAsTheSourceNumbersThemAlsoLaneZero() {
+        Heat heat = new Heat(emptyHeat());
+        heat.usedLanes(TestMessageCreator.usedNumbered(1, 1, LaneNumbering.ZeroBased, 0, 1, 2));
+
+        heat.touch(TestMessageCreator.fin(1, 1, 0, 0, 2000));
+
+        assertThat(heat.createDto().lanes()).filteredOn(l -> l.status() == LaneStatus.Used).extracting(LaneDto::number).containsExactly(0, 1, 2);
+        assertThat(lane(heat, 0).finish()).isPresent();
     }
 
     @Test

@@ -1,6 +1,5 @@
 package org.lisasp.alphatiming.heats;
 
-import org.lisasp.alphatimer.api.ares.serial.events.messages.values.UsedLanes;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.DidNotFinishMessage;
@@ -18,7 +17,9 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 final class Heat {
 
@@ -83,10 +84,16 @@ final class Heat {
                 && (message.getTimeType() == RefinedTimeType.Normal || message.getTimeType() == RefinedTimeType.ManualTime);
     }
 
+    /** The source numbers the lanes; a lane the heat does not have yet (lane 0, more than ten lanes) is added. */
     void usedLanes(UsedLanesMessage message) {
-        UsedLanes used = UsedLanes.fromValue(message.getUsedLanes());
         lastMessage = message.getTimestamp();
-        lanes.forEach(l -> l.used(used.isUsed(l.number() - 1)));
+        for (int number : message.getLanes()) {
+            if (lanes.stream().noneMatch(l -> l.number() == number)) {
+                lanes.add(new Lane(new LaneDto(number, LaneStatus.NotUsed, Set.of(), 0, List.of())));
+            }
+        }
+        lanes.sort(Comparator.comparingInt(Lane::number));
+        lanes.forEach(l -> l.used(message.getLanes().contains(l.number())));
     }
 
     void touch(TimeMessage message) {

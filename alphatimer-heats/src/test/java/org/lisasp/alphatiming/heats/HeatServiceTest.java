@@ -2,6 +2,7 @@ package org.lisasp.alphatiming.heats;
 
 import org.junit.jupiter.api.Test;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.LaneNumbering;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 
 import java.time.LocalDateTime;
@@ -68,6 +69,18 @@ class HeatServiceTest {
 
         assertThat(seen).isEmpty();
         assertThat(store.find(1, "", 1)).isPresent();
+    }
+
+    @Test
+    void theNewestLaneNumberingHoldsForTheProject() {
+        HeatService service = new HeatService(new InMemoryHeatRepository());
+        assertThat(service.liveHeats().laneNumbering()).isEqualTo(LaneNumbering.AssumedOneBased);
+
+        service.accept(TestMessageCreator.usedNumbered(1, 1, LaneNumbering.AssumedOneBased, 1, 2));
+        service.accept(TestMessageCreator.usedNumbered(1, 2, LaneNumbering.ZeroBased, 0, 1));
+
+        assertThat(service.liveHeats().laneNumbering()).isEqualTo(LaneNumbering.ZeroBased);
+        assertThat(service.liveHeats().usedLanes()).containsExactly(0, 1, 2);
     }
 
     @Test
@@ -301,7 +314,6 @@ class HeatServiceTest {
         assertThat(seen).isEmpty();
         service.accept(TestMessageCreator.used(1, 1, "1100000000"));
         service.accept(TestMessageCreator.split(1, 1, 11, 1, 1000)); // lane 11 does not exist: logged, no change, no exception
-        service.accept(TestMessageCreator.used(1, 1, "short")); // malformed: logged
         assertThat(seen).hasSize(1);
     }
 

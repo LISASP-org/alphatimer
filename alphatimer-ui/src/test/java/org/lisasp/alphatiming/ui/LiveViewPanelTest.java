@@ -71,7 +71,7 @@ class LiveViewPanelTest {
         HeatDto finished = new HeatDto(3, "", 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, null, List.of());
         HeatDto open = new HeatDto(4, "", 1, HeatStatus.Open, 0, null, null, null, null, null, List.of());
         LiveViewPanel panel = new LiveViewPanel();
-        panel.setHeats(new LiveHeats(running, finished, new java.util.TreeSet<>(), List.of(open, running, finished)));
+        panel.setHeats(new LiveHeats(running, finished, new java.util.TreeSet<>(), List.of(open, running, finished), null));
         panel.setSize(1000, 900);
         layoutAll(panel);
 

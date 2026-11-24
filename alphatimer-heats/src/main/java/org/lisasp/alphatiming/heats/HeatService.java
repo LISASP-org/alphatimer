@@ -13,6 +13,7 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.WithdrawnMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.LaneNumbering;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedRefinedMessage;
 
@@ -37,6 +38,7 @@ public final class HeatService implements Consumer<RefinedMessage> {
     private final SortedSet<Integer> usedLanes = new TreeSet<>();
     private final LinkedHashMap<HeatKey, HeatDto> known = new LinkedHashMap<>();
     private volatile LiveHeats live = LiveHeats.NONE;
+    private LaneNumbering laneNumbering = LaneNumbering.AssumedOneBased;
 
     public HeatService(HeatRepository store) {
         this(store, ex -> { });
@@ -124,8 +126,12 @@ public final class HeatService implements Consumer<RefinedMessage> {
                 return;
             }
             HeatDto after = heat.createDto();
-            if (after.equals(before)) {
+            boolean renumbered = message instanceof UsedLanesMessage m && m.getNumbering() != laneNumbering;
+            if (after.equals(before) && !renumbered) {
                 return;
+            }
+            if (message instanceof UsedLanesMessage m) {
+                laneNumbering = m.getNumbering();
             }
             estimateEndsOfOtherHeats(after, message.getTimestamp());
             if (stored.isPresent()) {
@@ -136,7 +142,7 @@ public final class HeatService implements Consumer<RefinedMessage> {
             after.lanes().stream().filter(l -> l.status() == LaneStatus.Used).forEach(l -> usedLanes.add(l.number()));
             known.remove(HeatKey.of(after));
             known.put(HeatKey.of(after), after);
-            live = LiveHeats.of(List.copyOf(known.sequencedValues().reversed()), usedLanes);
+            live = LiveHeats.of(List.copyOf(known.sequencedValues().reversed()), usedLanes, laneNumbering);
         } catch (RuntimeException ex) {
             log.warn("Could not apply message '{}'.", message, ex);
             onError.accept(ex);
@@ -174,7 +180,7 @@ public final class HeatService implements Consumer<RefinedMessage> {
         try {
             store.delete(key.event(), key.round(), key.heat());
             known.remove(key);
-            live = LiveHeats.of(List.copyOf(known.sequencedValues().reversed()), usedLanes);
+            live = LiveHeats.of(List.copyOf(known.sequencedValues().reversed()), usedLanes, laneNumbering);
         } catch (RuntimeException ex) {
             log.warn("Could not remove heat {}/{}/{}", key.event(), key.round(), key.heat(), ex);
             onError.accept(ex);
