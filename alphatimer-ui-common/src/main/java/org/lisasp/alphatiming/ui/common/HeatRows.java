@@ -24,6 +24,7 @@ public final class HeatRows {
     private static final Comparator<Shown> ORDER = Comparator.comparing(Shown::start)
                                                              .thenComparing(Shown::end, Comparator.nullsLast(Comparator.<LocalDateTime>naturalOrder()))
                                                              .thenComparingInt(s -> s.heat().event())
+                                                             .thenComparing(s -> s.heat().round())
                                                              .thenComparingInt(s -> s.heat().heat())
                                                              .reversed();
 
@@ -46,6 +47,11 @@ public final class HeatRows {
     private static Row toRow(HeatDto heat, int timekeepingOffsetHours) {
         return new Row(TimeFormat.clock(LiveTexts.timeOfDay(heat, heat.started(), timekeepingOffsetHours)),
                        heat.ended() == null ? "" : LiveTexts.endTime(heat, heat.ended(), timekeepingOffsetHours),
-                       String.format(Locale.ROOT, "%02d-%03d", heat.event(), heat.heat()));
+                       heatText(heat));
+    }
+
+    private static String heatText(HeatDto heat) {
+        String number = String.format(Locale.ROOT, "%02d-%03d", heat.event(), heat.heat());
+        return heat.round().isEmpty() ? number : number + " " + RoundTexts.label(heat.round());
     }
 }

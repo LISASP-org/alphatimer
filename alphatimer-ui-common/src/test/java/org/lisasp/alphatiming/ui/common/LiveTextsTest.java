@@ -40,6 +40,18 @@ class LiveTextsTest {
     }
 
     @Test
+    void theTitleNamesTheRoundBetweenEventAndHeat() {
+        assertThat(LiveTexts.title(inRound("Final"))).isEqualTo("Event 3 · Final · Heat 2");
+        assertThat(LiveTexts.title(inRound("EXTRAHEATS"))).isEqualTo("Event 3 · EXTRAHEATS · Heat 2");
+        Locale.setDefault(Locale.GERMAN);
+        assertThat(LiveTexts.title(inRound("Final"))).isEqualTo("Wettkampf 3 · Finale · Lauf 2");
+    }
+
+    private static HeatDto inRound(String round) {
+        return new HeatDto(3, round, 2, HeatStatus.Started, 0, null, START, null, START.plusSeconds(60), null, List.of());
+    }
+
+    @Test
     void theClockShowsTheRunningTimeOfTheHeat() {
         assertThat(LiveTexts.clock(started(), START.plusSeconds(65).plusNanos(500_000_000), true)).isEqualTo("1:05.5");
         assertThat(LiveTexts.clock(started(), START.plusSeconds(65), false)).isEqualTo("1:00.0");

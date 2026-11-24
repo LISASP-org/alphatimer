@@ -34,7 +34,11 @@ class FinishedHeatsTest {
     }
 
     private static HeatDto heat(int event, int heat, HeatStatus status) {
-        return new HeatDto(event, "", heat, status, 0, null, null, null, null, null, List.of(
+        return heat(event, "", heat, status);
+    }
+
+    private static HeatDto heat(int event, String round, int heat, HeatStatus status) {
+        return new HeatDto(event, round, heat, status, 0, null, null, null, null, null, List.of(
                 TestLanes.lane(1, LaneStatus.Used, Set.of(), 2, TestLanes.finish(0, 65_430)),
                 TestLanes.lane(2, LaneStatus.Used, Set.of(), 1, TestLanes.finish(0, 61_000)),
                 TestLanes.lane(3, LaneStatus.Used, Set.of(Penalty.DidNotStart), 0),
@@ -56,6 +60,13 @@ class FinishedHeatsTest {
     void runningHeatsAndNoHeatAreNotDescribed() {
         assertThat(finished.describe(new LiveHeats(heat(3, 2, HeatStatus.Started), null))).isEmpty();
         assertThat(finished.describe(LiveHeats.NONE)).isEmpty();
+    }
+
+    @Test
+    void theSameHeatOfAnotherRoundIsDescribedToo() {
+        finished.describe(new LiveHeats(heat(3, "PreliminaryHeat", 2, HeatStatus.Finished), null));
+
+        assertThat(finished.describe(new LiveHeats(heat(3, "Final", 2, HeatStatus.Finished), null))).isPresent();
     }
 
     @Test

@@ -41,6 +41,13 @@ class HeatRowsTest {
     }
 
     @Test
+    void theHeatNamesItsRound() {
+        HeatDto heat = new HeatDto(3, "Final", 2, HeatStatus.Started, 0, null, TEN, null, TEN, null, List.of());
+
+        assertThat(HeatRows.from(List.of(heat), 0)).containsExactly(new HeatRows.Row("10:00:00", "", "03-002 Final"));
+    }
+
+    @Test
     void anUnfinishedHeatHasNoFinish() {
         assertThat(HeatRows.from(List.of(heat(3, 2, TEN, null)), 0)).containsExactly(new HeatRows.Row("10:00:00", "", "03-002"));
     }
