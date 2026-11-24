@@ -47,6 +47,12 @@ not be redistributed.
     - Lanes with results → `UsedLanesMessage`.
     - Places are computed by the heat model; reaction times are left out ([Reaction times](reaction-times.md)).
   - Results of athletes and relays are both read.
+  - Lanes keep the numbers the source gives them (a pool numbered 0–7 keeps lanes 0–7). `UsedLanesMessage` carries the
+    used lanes as lane numbers and a `LaneNumbering`: `ZeroBased` (lanes start at 0), `OneBased` (start at 1, known),
+    `AssumedOneBased` (no lane 0 seen and nothing says otherwise; may become `ZeroBased` later). ARES is always
+    `OneBased`. LENEX: `POOL lanemin` 0 → `ZeroBased`, ≥ 1 → `OneBased`; without `lanemin` `ZeroBased` once a lane 0
+    occurs in the file, else `AssumedOneBased`. The heat model keeps the newest numbering for the project next to its
+    used lanes; each client decides how to show the numbers. The width of the pool (`lanemax`) is not carried.
   - A heat is identified by event, round and heat: a meet may use one event number for several rounds (prelims, swim-off,
     semifinals, finals), each with heats 1, 2, …. The round is text in the refined messages and the heat model. An enum
     of the known rounds gives the consolidated texts; each source converts its own values to them, keeps unknown values
