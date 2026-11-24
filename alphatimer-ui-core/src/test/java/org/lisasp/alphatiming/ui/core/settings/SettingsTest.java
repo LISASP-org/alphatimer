@@ -51,9 +51,9 @@ class SettingsTest {
     }
 
     @Test
-    void theLenexIntervalIsOneSecondUnlessSet() {
-        assertThat(valid().lenexIntervalSeconds()).isEqualTo(1);
-        assertThat(valid().withLenex("/data/meet.lef", 0).lenexIntervalSeconds()).isEqualTo(1);
+    void theLenexIntervalIsFiveSecondsUnlessSet() {
+        assertThat(valid().lenexIntervalSeconds()).isEqualTo(5);
+        assertThat(valid().withLenex("/data/meet.lef", 0).lenexIntervalSeconds()).isEqualTo(5);
     }
 
     @Test

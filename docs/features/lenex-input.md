@@ -82,7 +82,7 @@ not be redistributed.
   - A project has one input: ARES (TCP, serial, replay file) or LENEX. The settings form shows the settings of the opened
     project; once the project holds recorded data, the other input cannot be chosen there (switching between TCP, serial
     and replay file stays possible). Projects of earlier versions are ARES projects.
-  - The check interval is chosen from 1, 5, 15, 30 and 60 s (1 s by default).
+  - The check interval is chosen from 1, 5, 15, 30 and 60 s (5 s by default).
   - A file that disappears or cannot be read stops nothing: the sign of life goes silent after 5 s, and the recording
     goes on once the file is back.
   - The message list and the command line show one line per recorded version (how many changes, how many heats), not

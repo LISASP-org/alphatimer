@@ -28,7 +28,7 @@ public record Settings(ConnectionType connectionType,
     public static final int DEFAULT_REST_PORT = 1999;
     public static final int MAX_TIMEKEEPING_OFFSET_HOURS = 23;
     public static final List<Integer> LENEX_INTERVALS_SECONDS = List.of(1, 5, 15, 30, 60);
-    public static final int DEFAULT_LENEX_INTERVAL_SECONDS = 1;
+    public static final int DEFAULT_LENEX_INTERVAL_SECONDS = 5;
 
     public Settings {
         connectionType = connectionType == null ? ConnectionType.TCP : connectionType;
