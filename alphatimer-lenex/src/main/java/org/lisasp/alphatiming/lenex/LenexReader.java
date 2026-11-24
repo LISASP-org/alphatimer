@@ -98,7 +98,7 @@ public final class LenexReader {
             heats.add(new LenexHeat(heatNumber.getAsInt(), attribute(heat, "status"), results));
         }
         int relayCount = number(style.get(), "relaycount").orElse(1);
-        return Optional.of(new LenexEvent(number.getAsInt(), course, distance.getAsInt(), relayCount, heats));
+        return Optional.of(new LenexEvent(number.getAsInt(), attribute(event, "round"), course, distance.getAsInt(), relayCount, heats));
     }
 
     /**

@@ -59,7 +59,7 @@ class LenexReaderTest {
                 """);
 
         assertThat(meet.events()).containsExactly(
-                new LenexEvent(3, "LCM", 100, 1, List.of(
+                new LenexEvent(3, "", "LCM", 100, 1, List.of(
                         new LenexHeat(2, "OFFICIAL", List.of(
                                 new LenexResult(4, OptionalInt.of(62340), "", List.of(new LenexSplit(50, 30120))))))));
     }
@@ -80,6 +80,13 @@ class LenexReaderTest {
 
         assertThat(onlyHeat(meet).results()).extracting(LenexResult::lane, LenexResult::swimTimeInMillis)
                                             .containsExactly(tuple(5, OptionalInt.of(241000)));
+    }
+
+    @Test
+    void readsTheRoundOfAnEvent() throws IOException {
+        LenexMeet meet = read(meetWith("").replace("<EVENT eventid=\"7\" number=\"3\">", "<EVENT eventid=\"7\" number=\"3\" round=\"FIN\">"));
+
+        assertThat(meet.events()).extracting(LenexEvent::round).containsExactly("FIN");
     }
 
     @Test
