@@ -5,12 +5,20 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatiming.heats.HeatDto;
+import org.lisasp.alphatiming.legacy.api.Heat;
+import org.lisasp.alphatiming.legacy.api.LaneStatus;
+import org.lisasp.alphatiming.legacy.api.LegacySerialization;
 import org.lisasp.alphatiming.project.db.LenexVersionStore;
 import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
 import org.lisasp.alphatiming.ui.core.settings.Input;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 
+import java.net.ServerSocket;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -68,7 +76,8 @@ class LenexRecordingSessionTest {
         await().atMost(Duration.ofSeconds(5)).until(() -> !recorded.isEmpty());
         assertThat(session.liveHeats().known()).extracting(HeatDto::event, HeatDto::heat).containsExactly(org.assertj.core.groups.Tuple.tuple(3, 2));
         assertThat(session.isConnected()).isTrue();
-        assertThat(session.refinedLegacyHeats()).isEmpty();
+        assertLegacyHeatOfTheMeet(session.refinedLegacyHeats());
+        assertThat(LegacySerialization.toXML(session.legacyHeats())).isEqualTo(LegacySerialization.toXML(session.refinedLegacyHeats()));
         session.stop();
         assertThat(session.state()).isEqualTo(RecordingState.STOPPED);
         assertThat(session.isConnected()).isFalse();
@@ -80,8 +89,40 @@ class LenexRecordingSessionTest {
 
         try (RecordingSession opened = new RecordingSession(db, RecordingSession.standard(), LocalDateTime::now)) {
             assertThat(opened.liveHeats().known()).hasSize(1);
-            assertThat(opened.refinedLegacyHeats()).isEmpty();
+            assertLegacyHeatOfTheMeet(opened.refinedLegacyHeats());
         }
+    }
+
+    @Test
+    void anOpenedLenexProjectServesTheNewHeatsAtAllLegacyPaths() throws Exception {
+        new LenexVersionStore(db).record(LocalDateTime.of(2026, 1, 10, 10, 0), MEET.getBytes(StandardCharsets.UTF_8), true);
+        int port;
+        try (ServerSocket probe = new ServerSocket(0)) {
+            port = probe.getLocalPort();
+        }
+
+        try (RecordingSession opened = new RecordingSession(db, RecordingSession.standard(), LocalDateTime::now);
+             HttpClient client = HttpClient.newHttpClient()) {
+            opened.serve(true, port);
+            String expected = LegacySerialization.toXML(opened.refinedLegacyHeats());
+
+            assertThat(fetch(client, port, "/legacy/heats.xml")).isEqualTo(expected);
+            assertThat(fetch(client, port, "/legacy/heats-new.xml")).isEqualTo(expected);
+            assertThat(fetch(client, port, "/legacy/heats.json")).contains("\"event\":3").contains("\"heat\":2").contains("62340");
+        }
+    }
+
+    private static String fetch(HttpClient client, int port, String path) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).build(), HttpResponse.BodyHandlers.ofString()).body();
+    }
+
+    private static void assertLegacyHeatOfTheMeet(Heat[] heats) {
+        assertThat(heats).singleElement().satisfies(heat -> {
+            assertThat(heat.getEvent()).isEqualTo(3);
+            assertThat(heat.getHeat()).isEqualTo(2);
+            assertThat(heat.getLanes().get(3).getTimes()).containsExactly(62_340);
+            assertThat(heat.getLanes().get(3).getStati()).containsExactly(LaneStatus.ResultsOfTheRace);
+        });
     }
 
     @Test

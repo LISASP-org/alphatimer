@@ -26,6 +26,7 @@ import org.lisasp.alphatiming.legacy.server.InMemoryLaneTimeRepository;
 import org.lisasp.alphatiming.legacy.server.LegacyHttpServer;
 import org.lisasp.alphatiming.legacy.server.LegacyService;
 import org.lisasp.alphatiming.legacy.server.refined.RefinedLegacyService;
+import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessageListener;
 import org.lisasp.alphatiming.legacy.api.Heat;
 import org.lisasp.alphatiming.project.db.replay.FileReplayReader;
@@ -98,7 +99,7 @@ public final class RecordingSession implements AutoCloseable {
         List<DataHandlingMessage> messages = new MessageStore(db).findAll();
         List<LenexVersion> versions = new LenexVersionStore(db).findAll();
         MessageReplay.replay(messages, legacy, refinedLegacy, heatService);
-        LenexRecording.replay(versions, heatService::accept);
+        LenexRecording.replay(versions, this::lenexMessage);
         if (!versions.isEmpty()) {
             recorded = Input.LENEX;
         } else if (!messages.isEmpty() || RawDataRecorder.hasData(db)) {
@@ -157,7 +158,7 @@ public final class RecordingSession implements AutoCloseable {
         }
         closeServer();
         if (enabled) {
-            restServer = new LegacyHttpServer(port, legacy::getHeats, refinedLegacy::getHeats);
+            restServer = new LegacyHttpServer(port, this::legacyHeats, refinedLegacy::getHeats);
             log.info("Server started on port {}", port);
         }
     }
@@ -192,7 +193,7 @@ public final class RecordingSession implements AutoCloseable {
     }
 
     private void startLenex(Settings s) {
-        LenexRecording recording = new LenexRecording(Path.of(s.lenexFile()), new LenexVersionStore(db), heatService::accept, time,
+        LenexRecording recording = new LenexRecording(Path.of(s.lenexFile()), new LenexVersionStore(db), this::lenexMessage, time,
                                                       new LenexRecording.Listener() {
                                                           @Override
                                                           public void signOfLife() {
@@ -270,6 +271,11 @@ public final class RecordingSession implements AutoCloseable {
                 reportError(ex);
             }
         };
+    }
+
+    private void lenexMessage(RefinedMessage message) {
+        isolatedRefined(refinedLegacy).accept(message);
+        heatService.accept(message);
     }
 
     private RefinedMessageListener isolatedRefined(RefinedMessageListener delegate) {
@@ -470,8 +476,9 @@ public final class RecordingSession implements AutoCloseable {
         return heatService.liveHeats();
     }
 
+    /** LENEX has no ARES messages, so a LENEX project serves the legacy heats built from the refined messages. */
     public Heat[] legacyHeats() {
-        return legacy.getHeats();
+        return recorded == Input.LENEX ? refinedLegacy.getHeats() : legacy.getHeats();
     }
 
     public Heat[] refinedLegacyHeats() {

@@ -2,7 +2,10 @@ package org.lisasp.alphatiming.legacy.server.refined;
 
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeOrigin;
 import org.junit.jupiter.api.Test;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.HeatRemovedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.LaneNumbering;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedKindOfTime;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
@@ -12,6 +15,7 @@ import org.lisasp.alphatiming.legacy.api.LaneStatus;
 import org.lisasp.alphatiming.legacy.server.InMemoryLaneTimeRepository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -97,6 +101,37 @@ class RefinedLegacyServiceTest {
 
         service.accept(finish(1, 1, 2, RefinedMessageType.Live, 27_000));
         assertThat(times(1)).containsExactly(27_000);
+    }
+
+    @Test
+    void aDeletedFinishIsWithdrawnWhateverItsLap() {
+        service.accept(time(1, 1, 2, RefinedKindOfTime.Finish, RefinedMessageType.CurrentRaceResult, 1, RefinedTimeType.Normal, 25_000));
+
+        service.accept(time(1, 1, 2, RefinedKindOfTime.Finish, RefinedMessageType.CurrentRaceResult, 1, RefinedTimeType.DeletedTime, 25_000));
+
+        assertThat(service.getHeats()).isEmpty();
+    }
+
+    @Test
+    void aPoolNumberedFromZeroStartsAtLaneIndex0() {
+        service.accept(new UsedLanesMessage(LocalDateTime.of(2021, 6, 21, 14, 52), "WK", (short) 1, (byte) 1, "", List.of(0, 1), LaneNumbering.ZeroBased));
+        service.accept(finish(1, 1, 0, RefinedMessageType.CurrentRaceResult, 25_000));
+        service.accept(finish(1, 1, 1, RefinedMessageType.CurrentRaceResult, 26_000));
+
+        assertThat(service.getHeats()[0].getLanes()).containsOnlyKeys(0, 1);
+        assertThat(times(0)).containsExactly(25_000);
+        assertThat(times(1)).containsExactly(26_000);
+    }
+
+    @Test
+    void aRemovedHeatLosesItsTimes() {
+        service.accept(finish(1, 1, 2, RefinedMessageType.CurrentRaceResult, 25_000));
+        service.accept(finish(1, 2, 2, RefinedMessageType.CurrentRaceResult, 26_000));
+
+        service.accept(new HeatRemovedMessage(LocalDateTime.of(2021, 6, 21, 14, 55), "WK", (short) 1, (byte) 1, ""));
+
+        assertThat(service.getHeats()).extracting(Heat::getHeat).containsExactly(2);
+        assertThat(times(1)).containsExactly(26_000);
     }
 
     @Test

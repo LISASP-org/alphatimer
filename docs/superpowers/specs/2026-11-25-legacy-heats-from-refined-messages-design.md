@@ -17,12 +17,12 @@ compared on real competitions before the refined path replaces the old one
 - It serves `GET /legacy/heats-new.xml` in the unchanged legacy format (`Heat`, `Lane`, `LaneStatus`,
   `LegacySerialization` of `alphatimer-legacy-api`).
 - For Omega (ARES) input its data equals that of `/legacy/heats.xml`, apart from the accepted differences below.
+- LENEX projects get legacy heats through the new instance; for them all legacy paths serve its heats.
 
 ## Non-goals
 
 - Replacing or removing `LegacyService` (`docs/features/legacy-heats-from-heat-model.md`).
 - A JSON variant of the new heats.
-- Legacy heats for LENEX projects.
 - Deciding when a backup time becomes official (`docs/issues/backup-times-not-interpreted.md`).
 
 ## Constraints
@@ -32,9 +32,9 @@ compared on real competitions before the refined path replaces the old one
   modify them.
 - The one exception is `LegacyHttpServer`: it serves the new path on the same port, so it gets a second source of
   heats. `/legacy/heats.xml` and `/legacy/heats.json` stay byte-identical.
-- LENEX is blocked: the new instance hears only refined messages that come from ARES messages, live and when a
-  project is opened. A LENEX recording and the replay of LENEX versions do not reach it, so for a LENEX project both
-  `heats.xml` and `heats-new.xml` are empty.
+- LENEX (changed 2026-11-25; first blocked): a LENEX recording and the replay of LENEX versions feed the new instance
+  too. For a project whose data comes from LENEX, `/legacy/heats.xml`, `/legacy/heats.json` and `/legacy/heats-new.xml`
+  all serve the heats of the new instance; Omega projects keep `LegacyService` on the old paths.
 - The legacy REST format stays unchanged.
 
 ## Approaches considered
@@ -69,10 +69,16 @@ of `LegacyService.getHeats()`. It maps the refined messages the way `LegacyServi
 | --- | --- |
 | `TimeMessage` with origin `Backup` | ignored, as `LegacyService` ignores message type 7 |
 | event ≤ 0 or heat ≤ 0 | ignored |
-| `TimeType` `DeletedTime`, current lap = lap count | deletes the stored time of lane − 1 with that value |
-| `TimeType` `DeletedTime`, earlier lap | ignored |
-| kind of time `Finish` | stored for lane − 1 with the message's competition, event, heat, time and arrival |
-| anything else (splits, starts, penalties, used lanes, official end, …) | ignored |
+| `TimeType` `DeletedTime`, kind of time `Finish` (LENEX) or current lap = lap count (ARES) | deletes the stored time of the lane with that value |
+| `TimeType` `DeletedTime`, a split of an earlier lap | ignored |
+| kind of time `Finish` | stored for the lane with the message's competition, event, heat, time and arrival |
+| `UsedLanesMessage` | its `LaneNumbering` becomes the numbering of the project |
+| `HeatRemovedMessage` | deletes every stored time of that event and heat |
+| anything else (splits, starts, penalties, official end, …) | ignored |
+
+The lane is stored as the source numbers it; `getHeats()` turns it into the legacy index with the newest numbering
+(`ZeroBased`: lane, otherwise lane − 1), so a pool numbered from 0 starts at index 0 and times stored before the source
+renumbered still line up.
 
 Lane status of a stored finish: `Live` → `RaceTimes`, `CurrentRaceResult` → `ResultsOfTheRace`,
 `PreviousRaceResult` → `ResultsOfThePreviousRace`.
@@ -93,7 +99,11 @@ handling as `/legacy/heats.xml` (500 on a failure of the source, 405 for other m
 - Live: the refiner of an ARES recording feeds it, isolated like the other listeners (a failure never reaches the
   reader thread nor the other consumers).
 - Opening: `MessageReplay` feeds it the refined messages of the stored ARES messages, each consumer isolated.
-- LENEX: `LenexRecording` and `LenexRecording.replay` keep feeding the heats only.
+- LENEX: `LenexRecording` and `LenexRecording.replay` feed the new instance (isolated) and the heats.
+- `legacyHeats()` and the old paths serve `RefinedLegacyService` when the project's data comes from LENEX
+  (`recordedInput()`), else `LegacyService`.
+- `LenexRefiner` sends deletions for the times and the penalty of a lane that disappeared from the file; before, only
+  lanes still in the file were compared, so a vanished lane kept its times (found in `Results_10` → `Results_11`).
 
 ## Differences to `/legacy/heats.xml`
 
@@ -111,6 +121,13 @@ to see what each path does.
 
 On all other 1,189 heats of the recordings both outputs are identical.
 
+### LENEX: the same heat number in several rounds (open)
+
+The legacy format knows event and heat, not the round. In `swimrankings-example-results` 93 event/heat numbers occur in
+several rounds (`PreliminaryHeat`, `Final`, `EXTRAHEATS`, `SwimOffAfterPrelim`); their times end up in one legacy heat,
+the lanes holding the times of every round. The other LENEX examples number their events per round, so this does not
+occur there. Undecided how such heats should be served.
+
 ## Verification
 
 - `RefinedLegacyServiceTest` (`alphatimer-legacy-server`): finishes per heat, the status per message type, deletions
@@ -119,7 +136,11 @@ On all other 1,189 heats of the recordings both outputs are identical.
 - `MessageReplayTest`: a failing consumer keeps neither of the others from the message.
 - `RecordingSessionTest`: after a recording and after reopening, `heats-new.xml` equals `heats.xml`; the server
   serves both.
-- `LenexRecordingSessionTest`: a LENEX recording and an opened LENEX project leave the new heats empty.
+- `LenexRecordingSessionTest`: a LENEX recording and an opened LENEX project give the new heats; an opened LENEX
+  project serves them at `/legacy/heats.xml`, `/legacy/heats.json` and `/legacy/heats-new.xml`.
+- Locally, not committed: every LENEX file in `data/lenex/` (and the versions `Results_8` … `Results_12` in sequence)
+  refined into the heat model and the new instance: on 3,968 heats the legacy times equal the finishes of the heat
+  model, lane by lane.
 - An equivalence test in `alphatimer-ui-core` replays ARES messages (live, result and previous-result finishes,
   splits, deletions of the last and an earlier lap, event 0) through both paths and compares the XML.
 - Locally, not committed: replaying the recordings in `data/` through both paths gives only the accepted minus-sign
