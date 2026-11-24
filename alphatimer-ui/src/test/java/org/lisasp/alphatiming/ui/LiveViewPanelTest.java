@@ -85,6 +85,22 @@ class LiveViewPanelTest {
     }
 
     @Test
+    void startAndFinishAreCenteredTheDurationRightAlignedAndTheHeatColumnWider() {
+        LiveViewPanel panel = new LiveViewPanel();
+        javax.swing.JTable table = panel.heatTable();
+
+        assertThat(alignment(table, 0)).isEqualTo(javax.swing.SwingConstants.CENTER);
+        assertThat(alignment(table, 1)).isEqualTo(javax.swing.SwingConstants.CENTER);
+        assertThat(alignment(table, 2)).isEqualTo(javax.swing.SwingConstants.RIGHT);
+        assertThat(table.getColumnModel().getColumn(3).getPreferredWidth()).isEqualTo(2 * table.getColumnModel().getColumn(0).getPreferredWidth());
+    }
+
+    private static int alignment(javax.swing.JTable table, int column) {
+        java.awt.Component cell = table.getCellRenderer(0, column).getTableCellRendererComponent(table, "1:05.43", false, false, 0, column);
+        return ((javax.swing.JLabel) cell).getHorizontalAlignment();
+    }
+
+    @Test
     void theTableFollowsTheTimekeepingOffset() {
         java.time.LocalDateTime start = java.time.LocalDateTime.of(2026, 5, 1, 10, 0, 0);
         HeatDto finished = new HeatDto(3, "", 1, HeatStatus.Finished, 0, null, start, start.plusSeconds(65), null, 7 * 3_600_000, List.of());
