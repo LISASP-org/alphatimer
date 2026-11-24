@@ -29,6 +29,12 @@ class LegacyHttpServerTest {
         return new Heat[]{heat};
     }
 
+    private static Heat[] refinedHeats() {
+        Heat heat = new Heat("1", 5, 6);
+        heat.store(2, 23_456, LaneStatus.ResultsOfTheRace);
+        return new Heat[]{heat};
+    }
+
     private static HttpResponse<String> send(HttpClient client, int port, String method, String path) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
                                          .method(method, HttpRequest.BodyPublishers.noBody())
@@ -39,7 +45,7 @@ class LegacyHttpServerTest {
     @Test
     void servesXmlAndJsonAndRejectsOthers() throws Exception {
         HttpClient client = HttpClient.newHttpClient();
-        try (LegacyHttpServer server = new LegacyHttpServer(0, LegacyHttpServerTest::heats)) {
+        try (LegacyHttpServer server = new LegacyHttpServer(0, LegacyHttpServerTest::heats, LegacyHttpServerTest::refinedHeats)) {
             int port = server.getPort();
             HttpResponse<String> xml = send(client, port, "GET", "/legacy/heats.xml");
             assertThat(xml.statusCode()).isEqualTo(200);
@@ -50,6 +56,13 @@ class LegacyHttpServerTest {
             assertThat(json.statusCode()).isEqualTo(200);
             assertThat(json.body()).contains("\"event\":3").contains("\"heat\":4");
 
+            HttpResponse<String> refined = send(client, port, "GET", "/legacy/heats-new.xml");
+            assertThat(refined.statusCode()).isEqualTo(200);
+            assertThat(refined.headers().firstValue("Content-Type")).hasValueSatisfying(v -> assertThat(v).startsWith("application/xml"));
+            assertThat(refined.body()).isEqualTo(LegacySerialization.toXML(refinedHeats()));
+            assertThat(send(client, port, "POST", "/legacy/heats-new.xml").statusCode()).isEqualTo(405);
+            assertThat(send(client, port, "GET", "/legacy/heats-new.json").statusCode()).isEqualTo(404);
+
             assertThat(send(client, port, "GET", "/nope").statusCode()).isEqualTo(404);
             assertThat(send(client, port, "POST", "/legacy/heats.xml").statusCode()).isEqualTo(405);
         }
@@ -58,17 +71,19 @@ class LegacyHttpServerTest {
     @Test
     void aFailureWhileCollectingTheHeatsAnswersWithStatus500() throws Exception {
         HttpClient client = HttpClient.newHttpClient();
-        try (LegacyHttpServer server = new LegacyHttpServer(0, () -> {
+        Supplier<Heat[]> failing = () -> {
             throw new IllegalStateException("database closed");
-        })) {
+        };
+        try (LegacyHttpServer server = new LegacyHttpServer(0, failing, failing)) {
             assertThat(send(client, server.getPort(), "GET", "/legacy/heats.xml").statusCode()).isEqualTo(500);
             assertThat(send(client, server.getPort(), "GET", "/legacy/heats.json").statusCode()).isEqualTo(500);
+            assertThat(send(client, server.getPort(), "GET", "/legacy/heats-new.xml").statusCode()).isEqualTo(500);
         }
     }
 
     @Test
     void aStalledClientIsDisconnectedAfterTheTimeLimitSoOthersAreServed() throws Exception {
-        try (LegacyHttpServer server = new LegacyHttpServer(0, LegacyHttpServerTest::heats,
+        try (LegacyHttpServer server = new LegacyHttpServer(0, LegacyHttpServerTest::heats, LegacyHttpServerTest::refinedHeats,
                                                             new HandlerPool(1, 1, Duration.ofMillis(300)));
              Socket stalled = new Socket("localhost", server.getPort())) {
             stalled.getOutputStream().write("GET /legacy/heats.xml HTTP/1.1\r\n".getBytes(StandardCharsets.US_ASCII));
@@ -93,7 +108,7 @@ class LegacyHttpServerTest {
             }
             return heats();
         };
-        try (LegacyHttpServer server = new LegacyHttpServer(0, blockingHeats,
+        try (LegacyHttpServer server = new LegacyHttpServer(0, blockingHeats, LegacyHttpServerTest::refinedHeats,
                                                             new HandlerPool(1, 1, Duration.ofMinutes(5)))) {
             CompletableFuture<String> first = readAll(request(server.getPort()));
             assertThat(running.await(10, TimeUnit.SECONDS)).isTrue();
@@ -135,10 +150,10 @@ class LegacyHttpServerTest {
     @Test
     void portIsReleasedOnCloseSoItCanBeReused() throws Exception {
         int port;
-        try (LegacyHttpServer first = new LegacyHttpServer(0, LegacyHttpServerTest::heats)) {
+        try (LegacyHttpServer first = new LegacyHttpServer(0, LegacyHttpServerTest::heats, LegacyHttpServerTest::refinedHeats)) {
             port = first.getPort();
         }
-        try (LegacyHttpServer second = new LegacyHttpServer(port, LegacyHttpServerTest::heats)) {
+        try (LegacyHttpServer second = new LegacyHttpServer(port, LegacyHttpServerTest::heats, LegacyHttpServerTest::refinedHeats)) {
             assertThat(second.getPort()).isEqualTo(port);
         }
     }

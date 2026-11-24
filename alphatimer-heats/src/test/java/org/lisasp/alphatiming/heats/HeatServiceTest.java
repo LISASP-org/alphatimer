@@ -1,9 +1,9 @@
 package org.lisasp.alphatiming.heats;
 
 import org.junit.jupiter.api.Test;
-import org.lisasp.alphatimer.api.refinedmessages.accepted.BackupTimeMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.LaneNumbering;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -474,9 +474,41 @@ class HeatServiceTest {
         service.accept(TestMessageCreator.start(1, 1, T0));
         HeatDto before = store.find(1, "", 1).orElseThrow();
 
-        service.accept(new BackupTimeMessage(T0.plusMinutes(5), "WK", (short) 1, (byte) 1, RefinedMessageType.PreviousRaceResult, (byte) 1, (byte) 2, 13_710));
+        service.accept(TestMessageCreator.backup(1, 1, 1, 2, 13_710, T0.plusMinutes(5), RefinedMessageType.PreviousRaceResult, RefinedTimeType.Normal));
 
         assertThat(store.find(1, "", 1).orElseThrow()).isEqualTo(before);
+    }
+
+    @Test
+    void aDeletedBackupTimeWithdrawsTheBackupTimeAndKeepsTheFinishOfTheSameValue() {
+        InMemoryHeatRepository store = new InMemoryHeatRepository();
+        HeatService service = new HeatService(store);
+        service.accept(TestMessageCreator.used(1, 1, "1100000000"));
+        service.accept(TestMessageCreator.start(1, 1, T0));
+        service.accept(TestMessageCreator.fin(1, 1, 1, 0, 13_710));
+        service.accept(TestMessageCreator.backup(1, 1, 1, 2, 13_710, T0.plusMinutes(5)));
+
+        service.accept(TestMessageCreator.deletedBackup(1, 1, 1, 2, 13_710, T0.plusMinutes(6)));
+
+        LaneDto lane = store.find(1, "", 1).orElseThrow().lanes().get(0);
+        assertThat(lane.backups()).singleElement().extracting(LaneTime::deleted).isEqualTo(true);
+        assertThat(lane.finish()).hasValueSatisfying(finish -> assertThat(finish.timeInMillis()).isEqualTo(13_710));
+    }
+
+    @Test
+    void aDeletedFinishKeepsTheBackupTimeOfTheSameValue() {
+        InMemoryHeatRepository store = new InMemoryHeatRepository();
+        HeatService service = new HeatService(store);
+        service.accept(TestMessageCreator.used(1, 1, "1100000000"));
+        service.accept(TestMessageCreator.start(1, 1, T0));
+        service.accept(TestMessageCreator.fin(1, 1, 1, 0, 13_710));
+        service.accept(TestMessageCreator.backup(1, 1, 1, 2, 13_710, T0.plusMinutes(5)));
+
+        service.accept(TestMessageCreator.deletedAt(1, 1, 1, 2, 13_710, T0.plusMinutes(6)));
+
+        LaneDto lane = store.find(1, "", 1).orElseThrow().lanes().get(0);
+        assertThat(lane.finish()).isEmpty();
+        assertThat(lane.backups()).singleElement().extracting(LaneTime::deleted).isEqualTo(false);
     }
 
     @Test

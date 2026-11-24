@@ -3,7 +3,7 @@
 ARES marks a time from the backup buttons with time info `B` (`TimeInfo.Backup`), in the results it sends "With
 backup" (ARES manual §9, message types 4 and 6) and when the operator takes the backup time for a lane (§5.3.10 "Take
 Backup time"). The refiner now keeps them: `BackupTimeParser` refines message type 7 (`MessageType.BackupTime`) and
-times with time info `B` into `BackupTimeMessage` (`KindOfTime.Backup`), and the heat stores them as `TimeKind.Backup`
+times with time info `B` into a `TimeMessage` with the origin `RefinedTimeOrigin.Backup`, and the heat stores them as `TimeKind.Backup`
 beside the finish of the lane (`LaneDto.backups()`), where they never count; no reader shows them yet.
 
 The recordings in `data/` contain message type 7 with kind of time `B` and time type `1`, rank 0, for single lanes on

@@ -4,13 +4,14 @@ ARES withdraws a time by sending it again with time type `E` (`DeletedTime`), wi
 finish arrives as a split time of the last lap. The heat model (`alphatimer-heats`) handles this with two rules that
 are inferred, not confirmed by the ARES manual or by recordings:
 
-- A deletion marks every entry of the lane with the same lap and time value as `deleted` (any kind but backup). The
+- A deletion marks every entry of the lane with the same origin (`RefinedTimeOrigin`), lap and time value as
+  `deleted`, whatever its time info. The
   entry stays in the history; `finish()` and `current()` skip it, so the lane falls back to its previous valid time.
 - A time adds an entry unless it equals the newest valid entry of its lap and kind. So a deleted time that is sent
   again counts again, and so does a value that returns after a correction.
 
-Related behavior elsewhere: `LegacyService` deletes every stored finish of the lane with that value, regardless of
-lap; `BackupTimeParser` drops a backup line marked as deleted; deletions in the results of the previous race are
+Related behavior elsewhere: `LegacyService` and `RefinedLegacyService` delete every stored finish of the lane with that
+value, regardless of lap (a deleted backup time does not reach `RefinedLegacyService`); deletions in the results of the previous race are
 ignored with those results.
 
 - **Effect:** if ARES means something else by these messages, a lane shows a withdrawn time or loses a valid one, and

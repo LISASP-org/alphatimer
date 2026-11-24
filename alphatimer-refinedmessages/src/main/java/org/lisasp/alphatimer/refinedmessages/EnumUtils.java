@@ -34,6 +34,9 @@ class EnumUtils {
     }
 
     RefinedTimeType convertTimeType(TimeInfo timeInfo, TimeType timeType) {
+        if (timeType == TimeType.DeletedTime) {
+            return RefinedTimeType.DeletedTime;
+        }
         if (timeInfo == TimeInfo.Manual) {
             return RefinedTimeType.ManualTime;
         }

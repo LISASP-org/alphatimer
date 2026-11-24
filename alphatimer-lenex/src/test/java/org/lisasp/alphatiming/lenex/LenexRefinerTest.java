@@ -1,5 +1,6 @@
 package org.lisasp.alphatiming.lenex;
 
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeOrigin;
 import org.lisasp.alphatiming.lenex.api.LenexMeet;
 import org.lisasp.alphatiming.lenex.api.LenexEvent;
 import org.lisasp.alphatiming.lenex.api.LenexHeat;
@@ -69,6 +70,18 @@ class LenexRefinerTest {
 
         assertThat(refiner.refine(before, after, AT)).containsExactly(
                 time(2, 4, RefinedKindOfTime.SplitTime, 1, 30120, RefinedTimeType.DeletedTime));
+    }
+
+    @Test
+    void aLaneThatDisappearedLosesItsTimesAndPenalty() {
+        LenexMeet before = meet(heat(2, "", result(4, 62340, ""), result(5, 63000, "DSQ", split(50, 30500))));
+        LenexMeet after = meet(heat(2, "", result(4, 62340, "")));
+
+        assertThat(refiner.refine(before, after, AT)).containsExactly(
+                used(2, LaneNumbering.AssumedOneBased, 4),
+                time(2, 5, RefinedKindOfTime.SplitTime, 1, 30500, RefinedTimeType.DeletedTime),
+                time(2, 5, RefinedKindOfTime.Finish, 2, 63000, RefinedTimeType.DeletedTime),
+                new DisqualifiedMessage(AT, "WK", (short) 3, (byte) 2, "TimedFinal", (byte) 5, true));
     }
 
     @Test
@@ -176,6 +189,6 @@ class LenexRefinerTest {
 
     private static TimeMessage time(int heat, int lane, RefinedKindOfTime kind, int lap, int millis, RefinedTimeType type) {
         return new TimeMessage(AT, "WK", (short) 3, (byte) heat, "TimedFinal", RefinedMessageType.CurrentRaceResult, kind, (byte) lane,
-                               (byte) lap, (byte) 2, (byte) 0, millis, type);
+                               (byte) lap, (byte) 2, (byte) 0, millis, type, RefinedTimeOrigin.Primary);
     }
 }

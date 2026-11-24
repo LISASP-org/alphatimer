@@ -4,6 +4,7 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.*;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeOrigin;
 import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedTimeMessage;
 
 import java.util.function.Consumer;
@@ -29,7 +30,8 @@ public class TimeParser implements Parser {
                         message.getLapCount(),
                         message.getRank(),
                         message.getTimeInMillis(),
-                        utils.convertTimeType(message.getTimeInfo(), message.getTimeType())));
+                        utils.convertTimeType(message.getTimeInfo(), message.getTimeType()),
+                        RefinedTimeOrigin.Primary));
             } else {
                 resultCollector.accept(new DroppedTimeMessage(message));
             }
@@ -45,6 +47,9 @@ public class TimeParser implements Parser {
 
     /** ARES marks a manual time in the time type, the time info or both; a time edited from the keyboard in the time info. */
     private static boolean isAcceptedTime(TimeInfo timeInfo, TimeType timeType) {
+        if (timeType == TimeType.DeletedTime) {
+            return true;
+        }
         return switch (timeInfo) {
             case Normal -> timeType == TimeType.Empty || timeType == TimeType.DeletedTime || timeType == TimeType.CorrectedTime
                     || timeType == TimeType.ManualTime;

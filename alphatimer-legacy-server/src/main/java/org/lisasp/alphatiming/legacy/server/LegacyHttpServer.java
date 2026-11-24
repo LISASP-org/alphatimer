@@ -23,15 +23,17 @@ public final class LegacyHttpServer implements AutoCloseable {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final Supplier<Heat[]> heats;
+    private final Supplier<Heat[]> refinedHeats;
     private final HttpServer server;
     private final HandlerPool pool;
 
-    public LegacyHttpServer(int port, Supplier<Heat[]> heats) throws IOException {
-        this(port, heats, new HandlerPool(THREADS, QUEUE_CAPACITY, REQUEST_TIME_LIMIT));
+    public LegacyHttpServer(int port, Supplier<Heat[]> heats, Supplier<Heat[]> refinedHeats) throws IOException {
+        this(port, heats, refinedHeats, new HandlerPool(THREADS, QUEUE_CAPACITY, REQUEST_TIME_LIMIT));
     }
 
-    LegacyHttpServer(int port, Supplier<Heat[]> heats, HandlerPool pool) throws IOException {
+    LegacyHttpServer(int port, Supplier<Heat[]> heats, Supplier<Heat[]> refinedHeats, HandlerPool pool) throws IOException {
         this.heats = heats;
+        this.refinedHeats = refinedHeats;
         this.pool = pool;
         try {
             this.server = HttpServer.create(new InetSocketAddress(port), 0);
@@ -53,26 +55,35 @@ public final class LegacyHttpServer implements AutoCloseable {
             String path = exchange.getRequestURI().getPath();
             boolean xml = path.equals("/legacy/heats.xml");
             boolean json = path.equals("/legacy/heats.json");
-            if (!xml && !json) {
+            boolean refinedXml = path.equals("/legacy/heats-new.xml");
+            if (!xml && !json && !refinedXml) {
                 respond(exchange, 404, "text/plain; charset=UTF-8", "Not found");
             } else if (!exchange.getRequestMethod().equals("GET")) {
                 respond(exchange, 405, "text/plain; charset=UTF-8", "Method not allowed");
+            } else if (refinedXml) {
+                serve(exchange, () -> LegacySerialization.toXML(refinedHeats.get()), "application/xml; charset=UTF-8");
+            } else if (xml) {
+                serve(exchange, () -> LegacySerialization.toXML(heats.get()), "application/xml; charset=UTF-8");
             } else {
-                serveHeats(exchange, xml);
+                serve(exchange, () -> mapper.writeValueAsString(heats.get()), "application/json");
             }
         }
     }
 
-    private void serveHeats(HttpExchange exchange, boolean xml) throws IOException {
-        String body;
+    private interface Body {
+        String render() throws IOException;
+    }
+
+    private static void serve(HttpExchange exchange, Body body, String contentType) throws IOException {
+        String rendered;
         try {
-            body = xml ? LegacySerialization.toXML(heats.get()) : mapper.writeValueAsString(heats.get());
+            rendered = body.render();
         } catch (RuntimeException ex) {
             log.warn("Could not serve request", ex);
             respond(exchange, 500, "text/plain; charset=UTF-8", "Internal error");
             return;
         }
-        respond(exchange, 200, xml ? "application/xml; charset=UTF-8" : "application/json", body);
+        respond(exchange, 200, contentType, rendered);
     }
 
     private static void respond(HttpExchange exchange, int status, String contentType, String body) throws IOException {

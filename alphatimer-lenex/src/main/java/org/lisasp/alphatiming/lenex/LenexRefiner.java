@@ -1,5 +1,6 @@
 package org.lisasp.alphatiming.lenex;
 
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeOrigin;
 import org.lisasp.alphatiming.lenex.api.LenexMeet;
 import org.lisasp.alphatiming.lenex.api.LenexEvent;
 import org.lisasp.alphatiming.lenex.api.LenexHeat;
@@ -53,6 +54,8 @@ public final class LenexRefiner {
     private record Lane(Map<TimeKey, Integer> times, Optional<Penalty> penalty) {
     }
 
+    private static final Lane NO_RESULT = new Lane(Map.of(), Optional.empty());
+
     private record Heat(HeatKey key, String status, int lapCount, SortedMap<Integer, Lane> lanes) {
     }
 
@@ -96,6 +99,13 @@ public final class LenexRefiner {
             Lane before = old == null ? null : old.lanes().get(entry.getKey());
             refineLane(key, heat.lapCount(), entry.getKey(), before, entry.getValue(), at, messages);
         }
+        if (old != null) {
+            old.lanes().forEach((lane, before) -> {
+                if (!heat.lanes().containsKey(lane)) {
+                    refineLane(key, heat.lapCount(), lane, before, NO_RESULT, at, messages);
+                }
+            });
+        }
         if ("OFFICIAL".equals(heat.status()) && (old == null || !"OFFICIAL".equals(old.status()))) {
             messages.add(new OfficialEndMessage(at, competition, event, number, key.round(), (byte) heat.lapCount()));
         }
@@ -122,7 +132,7 @@ public final class LenexRefiner {
 
     private TimeMessage time(HeatKey key, int lapCount, int lane, TimeKey time, int millis, RefinedTimeType type, LocalDateTime at) {
         return new TimeMessage(at, competition, (short) key.event(), (byte) key.heat(), key.round(), RefinedMessageType.CurrentRaceResult, time.kind(),
-                               (byte) lane, (byte) time.lap(), (byte) lapCount, (byte) 0, millis, type);
+                               (byte) lane, (byte) time.lap(), (byte) lapCount, (byte) 0, millis, type, RefinedTimeOrigin.Primary);
     }
 
     private RefinedMessage penalty(HeatKey key, int lane, Penalty penalty, boolean removed, LocalDateTime at) {

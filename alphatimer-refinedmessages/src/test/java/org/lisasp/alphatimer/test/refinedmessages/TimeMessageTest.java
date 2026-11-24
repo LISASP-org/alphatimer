@@ -1,5 +1,6 @@
 package org.lisasp.alphatimer.test.refinedmessages;
 
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeOrigin;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -76,7 +77,7 @@ class TimeMessageTest {
                                  lapCount,
                                  (byte) 0,
                                  0,
-                                 RefinedTimeType.Normal),
+                                 RefinedTimeType.Normal, RefinedTimeOrigin.Primary),
                 new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
     }
 
@@ -187,7 +188,7 @@ class TimeMessageTest {
 
     private static TimeMessage refined(RefinedMessageType messageType, RefinedTimeType timeType) {
         return new TimeMessage(TIMESTAMP, "TestWK", EVENT, HEAT, messageType, RefinedKindOfTime.Finish, (byte) 2, (byte) 2, LAP_COUNT, (byte) 1,
-                               65_430, timeType);
+                               65_430, timeType, RefinedTimeOrigin.Primary);
     }
 
     @ParameterizedTest
@@ -205,6 +206,14 @@ class TimeMessageTest {
         refiner.accept(time(MessageType.CurrentRaceResults, timeType, (byte) 2, TimeInfo.Normal));
 
         assertEquals(List.of(refined(RefinedMessageType.CurrentRaceResult, refinedTimeType)), listener.received);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"Manual", "Edited", "UnknownAsterisk"})
+    void aDeletionIsRefinedAsDeletionWhateverItsTimeInfo(TimeInfo timeInfo) {
+        refiner.accept(time(MessageType.CurrentRaceResults, TimeType.DeletedTime, (byte) 2, timeInfo));
+
+        assertEquals(List.of(refined(RefinedMessageType.CurrentRaceResult, RefinedTimeType.DeletedTime)), listener.received);
     }
 
     /** ARES manual 5.3.6 and 7: a manually generated time is a valid time ([V]M); the recordings mark it in the time type only. */

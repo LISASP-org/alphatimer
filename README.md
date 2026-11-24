@@ -161,7 +161,9 @@ are older than 30 days, but always keeps its 10 newest ones.
 ## REST endpoints
 
 While the server toggle is on, whether or not a recording runs: `GET /legacy/heats.xml` and `GET /legacy/heats.json` —
-the same data as alphatimer (finish times per heat and lane recorded so far in the open project). A port that cannot be
+the same data as alphatimer (finish times per heat and lane recorded so far in the open project). `GET /legacy/heats-new.xml`
+serves the same heats built from the refined messages, to compare both before the refined path replaces the old one; it
+leaves out backup times and minus-sign times. A LENEX project serves these heats at all three paths. A port that cannot be
 opened is shown as a warning in the status bar and does not keep a recording from starting. The server answers up to 4 requests at a time and keeps up to 16 more waiting.
 Further connections are closed at once, as is a connection whose request and response take longer than 10 seconds.
 

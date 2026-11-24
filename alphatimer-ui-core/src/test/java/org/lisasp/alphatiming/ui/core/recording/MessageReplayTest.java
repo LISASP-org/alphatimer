@@ -31,12 +31,15 @@ class MessageReplayTest {
         List<Integer> legacy = new ArrayList<>();
         Set<Integer> heats = new TreeSet<>();
 
+        Set<Integer> refinedLegacy = new TreeSet<>();
+
         MessageReplay.replay(List.of(startOf(1), startOf(2)), m -> {
             legacy.add((int) m.getHeat());
             throw new IllegalStateException("rejected");
-        }, m -> heats.add((int) m.getHeat()));
+        }, m -> refinedLegacy.add((int) m.getHeat()), m -> heats.add((int) m.getHeat()));
 
         assertThat(legacy).containsExactly(1, 2);
+        assertThat(refinedLegacy).containsExactly(1, 2);
         assertThat(heats).containsExactly(1, 2);
     }
 
@@ -45,12 +48,31 @@ class MessageReplayTest {
         List<Integer> legacy = new ArrayList<>();
         Set<Integer> heats = new TreeSet<>();
 
-        MessageReplay.replay(List.of(startOf(1), startOf(2)), m -> legacy.add((int) m.getHeat()), m -> {
+        Set<Integer> refinedLegacy = new TreeSet<>();
+
+        MessageReplay.replay(List.of(startOf(1), startOf(2)), m -> legacy.add((int) m.getHeat()), m -> refinedLegacy.add((int) m.getHeat()), m -> {
             heats.add((int) m.getHeat());
             throw new IllegalStateException("rejected");
         });
 
         assertThat(legacy).containsExactly(1, 2);
+        assertThat(refinedLegacy).containsExactly(1, 2);
+        assertThat(heats).containsExactly(1, 2);
+    }
+
+    @Test
+    void aMessageTheRefinedLegacySideRejectsStillReachesTheHeats() {
+        List<Integer> legacy = new ArrayList<>();
+        Set<Integer> refinedLegacy = new TreeSet<>();
+        Set<Integer> heats = new TreeSet<>();
+
+        MessageReplay.replay(List.of(startOf(1), startOf(2)), m -> legacy.add((int) m.getHeat()), m -> {
+            refinedLegacy.add((int) m.getHeat());
+            throw new IllegalStateException("rejected");
+        }, m -> heats.add((int) m.getHeat()));
+
+        assertThat(legacy).containsExactly(1, 2);
+        assertThat(refinedLegacy).containsExactly(1, 2);
         assertThat(heats).containsExactly(1, 2);
     }
 }
