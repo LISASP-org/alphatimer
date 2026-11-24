@@ -1,5 +1,7 @@
 package org.lisasp.alphatiming.ui.core.recording;
 
+import org.lisasp.alphatiming.project.db.LenexVersion;
+import org.lisasp.alphatiming.project.db.LenexVersionStore;
 import org.lisasp.alphatiming.project.db.MessageStore;
 import org.lisasp.alphatiming.project.db.RawDataRecorder;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +30,7 @@ import org.lisasp.alphatiming.project.db.replay.FileReplayReader;
 import org.lisasp.alphatiming.project.db.replay.ReplayFileException;
 import org.lisasp.alphatimer.serial.com.NrSerialReader;
 import org.lisasp.alphatiming.ui.core.settings.ConnectionType;
+import org.lisasp.alphatiming.ui.core.settings.Input;
 import org.lisasp.alphatimer.serial.com.SerialConnectionException;
 import org.lisasp.alphatiming.ui.core.settings.Settings;
 import org.lisasp.alphatiming.ui.core.settings.SettingsProblem;
@@ -35,6 +38,7 @@ import org.lisasp.alphatiming.ui.core.settings.SettingsProblem;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
@@ -70,6 +74,9 @@ public final class RecordingSession implements AutoCloseable {
     private volatile RecordingError error;
 
     private volatile SerialPortReader reader;
+    private volatile LenexRecording lenex;
+    private volatile Input recorded;
+    private final List<Consumer<LenexChanges>> lenexListeners = new CopyOnWriteArrayList<>();
     private RawDataRecorder rawRecorder;
     private LegacyHttpServer restServer;
     private final LegacyService legacy = new LegacyService(new InMemoryLaneTimeRepository());
@@ -85,7 +92,15 @@ public final class RecordingSession implements AutoCloseable {
         this.db = db;
         this.readers = readers;
         this.time = time;
-        MessageReplay.replay(new MessageStore(db).findAll(), legacy, heatService);
+        List<DataHandlingMessage> messages = new MessageStore(db).findAll();
+        List<LenexVersion> versions = new LenexVersionStore(db).findAll();
+        MessageReplay.replay(messages, legacy, heatService);
+        LenexRecording.replay(versions, heatService::accept);
+        if (!versions.isEmpty()) {
+            recorded = Input.LENEX;
+        } else if (!messages.isEmpty() || RawDataRecorder.hasData(db)) {
+            recorded = Input.ARES;
+        }
     }
 
     /** TCP or serial reader, depending on the connection type of the settings. */
@@ -94,6 +109,7 @@ public final class RecordingSession implements AutoCloseable {
             case SERIAL -> new NrSerialReader(s.serialPort(), s.serialMode().configuration());
             case FILE -> new FileReplayReader(Path.of(s.replayFile()), REPLAY_BAUD_RATE);
             case TCP -> new TcpReader(s.tcpHost(), s.tcpPort());
+            case LENEX -> throw new IllegalArgumentException("LENEX is recorded from its file, not read as a stream");
         };
     }
 
@@ -111,6 +127,12 @@ public final class RecordingSession implements AutoCloseable {
             return;
         }
         try {
+            if (snapshot.connectionType() == ConnectionType.LENEX) {
+                startLenex(snapshot);
+                log.info("Recording started ({})", snapshot.connectionType());
+                setState(RecordingState.RUNNING, null);
+                return;
+            }
             build(snapshot);
             reader.start();
             log.info("Recording started ({})", snapshot.connectionType());
@@ -166,9 +188,30 @@ public final class RecordingSession implements AutoCloseable {
         return new RecordingError(RecordingError.Kind.UNEXPECTED, ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
     }
 
+    private void startLenex(Settings s) {
+        LenexRecording recording = new LenexRecording(Path.of(s.lenexFile()), new LenexVersionStore(db), heatService::accept, time,
+                                                      new LenexRecording.Listener() {
+                                                          @Override
+                                                          public void signOfLife() {
+                                                              announcePing();
+                                                          }
+
+                                                          @Override
+                                                          public void recorded(LenexChanges changes) {
+                                                              recorded = Input.LENEX;
+                                                              announce(changes);
+                                                          }
+                                                      }, writes);
+        lenex = recording;
+        recording.start(s.lenexIntervalSeconds());
+    }
+
     private void build(Settings s) {
         MessageStore messageStore = new MessageStore(db);
-        rawRecorder = new RawDataRecorder(db, time, 512, 250, ex -> writes.failed(RecordedData.RAW_DATA, ex), () -> writes.stored(RecordedData.RAW_DATA),
+        rawRecorder = new RawDataRecorder(db, time, 512, 250, ex -> writes.failed(RecordedData.RAW_DATA, ex), () -> {
+                                              recorded = Input.ARES;
+                                              writes.stored(RecordedData.RAW_DATA);
+                                          },
                                           bytes -> writes.dropped(RecordedData.RAW_DATA, bytes));
 
         InputCollector collector = new InputCollector(COMPETITION, time);
@@ -177,7 +220,10 @@ public final class RecordingSession implements AutoCloseable {
         DataHandlingMessageRefiner refiner = new DataHandlingMessageRefiner();
 
         aggregator.register(isolated(legacy));
-        aggregator.register(isolated(m -> writes.write(RecordedData.MESSAGES, () -> messageStore.put(m))));
+        aggregator.register(isolated(m -> {
+            writes.write(RecordedData.MESSAGES, () -> messageStore.put(m));
+            recorded = Input.ARES;
+        }));
         aggregator.register(refiner);
         aggregator.register(this::announce);
         refiner.register(heatService::accept);
@@ -247,6 +293,16 @@ public final class RecordingSession implements AutoCloseable {
         }
     }
 
+    private void announce(LenexChanges changes) {
+        for (Consumer<LenexChanges> listener : lenexListeners) {
+            try {
+                listener.accept(changes);
+            } catch (RuntimeException ex) {
+                log.warn("LENEX listener failed", ex);
+            }
+        }
+    }
+
     private void announcePing() {
         for (Runnable listener : pingListeners) {
             try {
@@ -271,6 +327,7 @@ public final class RecordingSession implements AutoCloseable {
             case SERIAL -> s.serialPort();
             case TCP -> s.tcpHost() + ":" + s.tcpPort();
             case FILE -> s.replayFile();
+            case LENEX -> s.lenexFile();
         };
     }
 
@@ -289,6 +346,14 @@ public final class RecordingSession implements AutoCloseable {
     }
 
     private void teardown() {
+        try {
+            if (lenex != null) {
+                lenex.close();
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Could not stop the LENEX recording", ex);
+        }
+        lenex = null;
         try {
             if (reader != null) {
                 reader.close();
@@ -341,6 +406,10 @@ public final class RecordingSession implements AutoCloseable {
     }
 
     public boolean isConnected() {
+        LenexRecording l = lenex;
+        if (l != null) {
+            return state == RecordingState.RUNNING && l.isConnected();
+        }
         SerialPortReader r = reader;
         return state == RecordingState.RUNNING && r != null && r.isConnected();
     }
@@ -356,6 +425,21 @@ public final class RecordingSession implements AutoCloseable {
     /** Called with every interpreted message (the two raw lines of the device combined); pings are not messages. */
     public void addMessageListener(Consumer<DataHandlingMessage> listener) {
         messageListeners.add(listener);
+    }
+
+    /** The input of the data the project holds; empty while it holds none. A project holds the data of one input only. */
+    public Optional<Input> recordedInput() {
+        return Optional.ofNullable(recorded);
+    }
+
+    /** Called with every recorded version of the LENEX file. */
+    public void addLenexListener(Consumer<LenexChanges> listener) {
+        lenexListeners.add(listener);
+    }
+
+    /** For TCP, serial and the replay file: the timekeeping system sends while the race runs; LENEX holds results only. */
+    public static boolean isLive(Settings settings) {
+        return settings.connectionType() != ConnectionType.LENEX;
     }
 
     public void addPingListener(Runnable listener) {

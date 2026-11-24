@@ -1,5 +1,8 @@
 package org.lisasp.alphatiming.ui.common;
 
+import org.lisasp.alphatiming.ui.core.settings.Input;
+import java.util.Optional;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +48,26 @@ class SettingsFormRulesTest {
         assertThat(rules.recordText()).isEqualTo("Start recording");
         assertThat(rules.recordEnabled()).isTrue();
         assertThat(rules.recordHint()).isEmpty();
+    }
+
+    @Test
+    void onceDataIsRecordedOnlyTheInputOfTheDataIsOffered() {
+        assertThat(SettingsFormRules.of(TCP, false, true, Optional.empty()).connectionTypes())
+                .containsExactly(ConnectionType.TCP, ConnectionType.SERIAL, ConnectionType.FILE, ConnectionType.LENEX);
+        assertThat(SettingsFormRules.of(TCP, false, true, Optional.of(Input.ARES)).connectionTypes())
+                .containsExactly(ConnectionType.TCP, ConnectionType.SERIAL, ConnectionType.FILE);
+        assertThat(SettingsFormRules.of(TCP.withConnectionType(ConnectionType.LENEX), false, true, Optional.of(Input.LENEX)).connectionTypes())
+                .containsExactly(ConnectionType.LENEX);
+    }
+
+    @Test
+    void aLenexInputRequiresItsFile() {
+        SettingsFormRules rules = SettingsFormRules.of(TCP.withConnectionType(ConnectionType.LENEX).withLenex("meet.lef", 1), false, true);
+
+        assertThat(rules.lenexFileRequired()).isTrue();
+        assertThat(rules.hostRequired()).isFalse();
+        assertThat(rules.replayFileRequired()).isFalse();
+        assertThat(rules.recordEnabled()).isTrue();
     }
 
     @Test

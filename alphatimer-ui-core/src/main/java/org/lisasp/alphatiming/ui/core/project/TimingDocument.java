@@ -182,6 +182,8 @@ public final class TimingDocument implements AutoCloseable {
             e.setReplayFile(s.replayFile());
             e.setCompetitionKey(s.competitionKey());
             e.setTimekeepingOffsetHours(s.timekeepingOffsetHours());
+            e.setLenexFile(s.lenexFile());
+            e.setLenexIntervalSeconds(s.lenexIntervalSeconds());
             return toSettings(e);
         });
     }
@@ -192,7 +194,9 @@ public final class TimingDocument implements AutoCloseable {
                             s.getRestEnabled() == null ? s.getRestPort() != 0 : s.getRestEnabled(),
                             s.getReplayFile(),
                             s.getCompetitionKey(),
-                            s.getTimekeepingOffsetHours() == null ? 0 : s.getTimekeepingOffsetHours());
+                            s.getTimekeepingOffsetHours() == null ? 0 : s.getTimekeepingOffsetHours(),
+                            s.getLenexFile(),
+                            s.getLenexIntervalSeconds() == null ? 0 : s.getLenexIntervalSeconds());
     }
 
     private static <E extends Enum<E>> E parse(Class<E> type, String name) {

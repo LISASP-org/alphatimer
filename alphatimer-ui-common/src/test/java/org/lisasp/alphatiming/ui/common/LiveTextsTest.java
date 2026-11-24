@@ -53,9 +53,15 @@ class LiveTextsTest {
 
     @Test
     void theClockShowsTheRunningTimeOfTheHeat() {
-        assertThat(LiveTexts.clock(started(), START.plusSeconds(65).plusNanos(500_000_000), true)).isEqualTo("1:05.5");
-        assertThat(LiveTexts.clock(started(), START.plusSeconds(65), false)).isEqualTo("1:00.0");
-        assertThat(LiveTexts.clock(null, START, true)).isEqualTo("0:00.0");
+        assertThat(LiveTexts.clock(started(), START.plusSeconds(65).plusNanos(500_000_000), true, true)).isEqualTo("1:05.5");
+        assertThat(LiveTexts.clock(started(), START.plusSeconds(65), false, true)).isEqualTo("1:00.0");
+        assertThat(LiveTexts.clock(null, START, true, true)).isEqualTo("0:00.0");
+    }
+
+    @Test
+    void anInputThatIsNotLiveHasNoClock() {
+        assertThat(LiveTexts.clock(started(), START.plusSeconds(65), true, false)).isEmpty();
+        assertThat(LiveTexts.clock(started(), START.plusSeconds(65), true, true)).isEqualTo("1:05.0");
     }
 
     @Test

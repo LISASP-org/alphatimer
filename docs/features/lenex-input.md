@@ -9,7 +9,7 @@ not be redistributed.
 - **Goal:** a LENEX file on the local disk is an input source of AlphaTiming like TCP, serial and file replay; whatever
   software writes it, its results reach the heat model.
 - **Behavior:**
-  - A watcher checks the file at an interval of its settings (1 s by default) and reads it whenever it has changed; the
+  - A watcher checks the file at the interval of its settings and reads it whenever it has changed; the
     versions are recorded, so the project file keeps what arrived
     and the project can be rebuilt from it.
   - Versions are recorded compressed in a table of their own (not in `rawdata`, which holds the serial byte stream),
@@ -75,9 +75,14 @@ not be redistributed.
     successful check do, as for ARES.
   - LENEX produces no legacy heats: `LegacyService` reads ARES messages only, so a LENEX project serves empty legacy
     endpoints until [Legacy heats from the heat model](legacy-heats-from-heat-model.md) is done.
-  - A project has one input: ARES (TCP, serial, replay file) or LENEX. Once a project holds recorded data, the other
-    input cannot be chosen; switching between TCP, serial and replay file stays possible. Projects of earlier versions
-    are ARES projects.
+  - A project has one input: ARES (TCP, serial, replay file) or LENEX. The settings form shows the settings of the opened
+    project; once the project holds recorded data, the other input cannot be chosen there (switching between TCP, serial
+    and replay file stays possible). Projects of earlier versions are ARES projects.
+  - The check interval is chosen from 1, 5, 15, 30 and 60 s (1 s by default).
+  - A file that disappears or cannot be read stops nothing: the sign of life goes silent after 5 s, and the recording
+    goes on once the file is back.
+  - The message list and the command line show one line per recorded version (how many changes, how many heats), not
+    one per refined message.
   - Opening a LENEX project replays its recorded versions in order through the parser and the LENEX refiner, starting
     from an empty snapshot; the refined messages of a version carry its recorded arrival time, live and on replay, and
     the next file that arrives is compared with the last recorded version.

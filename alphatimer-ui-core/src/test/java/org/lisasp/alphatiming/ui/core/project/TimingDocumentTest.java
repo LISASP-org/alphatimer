@@ -116,6 +116,19 @@ class TimingDocumentTest {
     }
 
     @Test
+    void theLenexSettingsAreKeptInTheProjectFile() throws Exception {
+        Path file = dir.resolve("x.timing");
+        Settings lenex = SETTINGS.withConnectionType(org.lisasp.alphatiming.ui.core.settings.ConnectionType.LENEX).withLenex("/data/meet.lef", 30);
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
+            doc.updateSettings(lenex);
+            doc.saveAs(file);
+        }
+        try (TimingDocument doc = TimingDocument.open(file, work())) {
+            assertThat(doc.settings()).isEqualTo(lenex);
+        }
+    }
+
+    @Test
     void saveWithoutFileIsRejected() throws Exception {
         try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
             assertThatThrownBy(doc::save).isInstanceOf(IllegalStateException.class);

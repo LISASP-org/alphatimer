@@ -33,10 +33,11 @@ final class TuiLiveViewPanel extends Panel {
     private LiveHeats heats;
     private int timekeepingOffsetHours;
     private boolean recording;
+    private boolean live = true;
 
     TuiLiveViewPanel() {
         super(new LinearLayout(Direction.VERTICAL));
-        heading.setTexts(LiveTexts.title(null), "", LiveTexts.clock(null, LocalDateTime.now(), false));
+        heading.setTexts(LiveTexts.title(null), "", LiveTexts.clock(null, LocalDateTime.now(), false, true));
         addComponent(heading, LinearLayout.createLayoutData(LinearLayout.Alignment.Fill));
         addComponent(liveRows);
 
@@ -53,7 +54,7 @@ final class TuiLiveViewPanel extends Panel {
         HeatDto previous = heats == null ? null : heats.previous();
         Set<Integer> usedLanes = heats == null ? Set.of() : heats.usedLanes();
         heat = current;
-        heading.setTexts(LiveTexts.title(current), LiveTexts.times(current, timekeepingOffsetHours), LiveTexts.clock(current, LocalDateTime.now(), recording));
+        heading.setTexts(LiveTexts.title(current), LiveTexts.times(current, timekeepingOffsetHours), LiveTexts.clock(current, LocalDateTime.now(), recording, live));
         fill(liveRows, LaneRows.from(current, usedLanes));
         fill(previousRows, LaneRows.from(previous, usedLanes));
         previousSection.setVisible(previous != null);
@@ -68,13 +69,17 @@ final class TuiLiveViewPanel extends Panel {
         }
     }
 
+    void setLive(boolean live) {
+        this.live = live;
+    }
+
     void setRecording(boolean recording) {
         this.recording = recording;
         updateClock();
     }
 
     void updateClock() {
-        heading.setRight(LiveTexts.clock(heat, LocalDateTime.now(), recording));
+        heading.setRight(LiveTexts.clock(heat, LocalDateTime.now(), recording, live));
     }
 
     private static void fill(Panel panel, List<LaneRows.Row> rows) {

@@ -23,8 +23,9 @@ public final class LiveTexts {
         return I18n.get("live.titleWithRound", String.valueOf(heat.event()), RoundTexts.label(heat.round()), String.valueOf(heat.heat()));
     }
 
-    public static String clock(HeatDto heat, LocalDateTime now, boolean recording) {
-        return TimeFormat.running(RunningClock.millis(heat, now, recording));
+    /** Empty for an input that is not live: its heats have no running time (see {@code RecordingSession.isLive}). */
+    public static String clock(HeatDto heat, LocalDateTime now, boolean recording, boolean live) {
+        return live ? TimeFormat.running(RunningClock.millis(heat, now, recording)) : "";
     }
 
     /**

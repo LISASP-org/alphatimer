@@ -234,6 +234,7 @@ final class TuiMainWindow extends BasicWindow {
             settingsPanel.refresh();
         }
         liveViewPanel.setTimekeepingOffset(controller.timekeepingOffsetHours());
+        liveViewPanel.setLive(controller.isLiveInput());
         liveViewPanel.setRecording(status.recording());
     }
 

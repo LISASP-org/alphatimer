@@ -258,6 +258,35 @@ class TuiMainWindowTest {
     }
 
     @Test
+    void theLenexFieldsFollowTheConnectionTypeAndKeepFileAndInterval() throws IOException {
+        TuiSettingsPanel settings = window.settingsPanel();
+        settings.connectionTypeCombo().setSelectedIndex(ConnectionType.LENEX.ordinal());
+        settings.lenexFileField().setText("/data/meet.lef");
+        settings.lenexIntervalCombo().setSelectedIndex(3);
+        settings.commit();
+        render();
+
+        assertThat(settings.lenexFields().isVisible()).isTrue();
+        assertThat(settings.tcpFields().isVisible()).isFalse();
+        assertThat(controller.document().settings().lenexFile()).isEqualTo("/data/meet.lef");
+        assertThat(controller.document().settings().lenexIntervalSeconds()).isEqualTo(30);
+        assertThat(screenText()).contains("LENEX file", "30 s");
+    }
+
+    @Test
+    void onceAresDataIsRecordedLenexIsNoLongerOffered() throws IOException {
+        assertThat(window.settingsPanel().connectionTypeCombo().getItemCount()).isEqualTo(4);
+        controller.applySettings(new org.lisasp.alphatiming.ui.core.settings.Settings("localhost", 8585, 60, 0).withCompetitionKey("WK"));
+        controller.startRecording();
+
+        receive("\u0001\u0002\u00082A ?< 400101   1\u0004\u0001\u0002\u0008\n3 4\u0002    1:05.43 \u0004");
+        controller.stopRecording();
+        window.settingsPanel().refresh();
+
+        assertThat(window.settingsPanel().connectionTypeCombo().getItemCount()).isEqualTo(3);
+    }
+
+    @Test
     void theLiveViewShowsTheHeatWithItsLanes() throws IOException {
         window.showLiveView();
         render();

@@ -53,6 +53,7 @@ public final class LiveViewPanel extends JPanel {
     private LiveHeats heats;
     private int timekeepingOffsetHours;
     private boolean recording;
+    private boolean liveInput = true;
     private List<LaneRows.Row> displayed = List.of();
     private List<LaneRows.Row> displayedPrevious = List.of();
 
@@ -128,6 +129,11 @@ public final class LiveViewPanel extends JPanel {
     /**
      * The clock only runs while a recording is running. Call on the EDT.
      */
+    /** Whether the input has a running time; without, the clock stays empty. Call on the EDT. */
+    public void setLive(boolean liveInput) {
+        this.liveInput = liveInput;
+    }
+
     public void setRecording(boolean recording) {
         this.recording = recording;
         updateClock();
@@ -181,7 +187,7 @@ public final class LiveViewPanel extends JPanel {
     }
 
     private void updateClock() {
-        clock.setText(LiveTexts.clock(heat, LocalDateTime.now(), recording));
+        clock.setText(LiveTexts.clock(heat, LocalDateTime.now(), recording, liveInput));
     }
 
     JTable heatTable() {

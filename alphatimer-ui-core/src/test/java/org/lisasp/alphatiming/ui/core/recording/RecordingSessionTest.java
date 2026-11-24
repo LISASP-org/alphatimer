@@ -139,6 +139,20 @@ class RecordingSessionTest {
         assertThat(heats).isNotEmpty();
     }
 
+    @Test
+    void anAresRecordingMarksTheProjectAsAresWhenItsDataArrives() {
+        assertThat(session.recordedInput()).isEmpty();
+        session.start(settings(0));
+        assertThat(session.recordedInput()).isEmpty();
+
+        reader().push(DataHandlingMessageTestData.message1);
+        reader().push(DataHandlingMessageTestData.message2);
+        session.stop();
+
+        assertThat(session.recordedInput()).contains(org.lisasp.alphatiming.ui.core.settings.Input.ARES);
+        assertThat(secondSession().recordedInput()).contains(org.lisasp.alphatiming.ui.core.settings.Input.ARES);
+    }
+
     private void recordHeatWithLane1Finished() {
         session.start(settings(0));
         reader().push(DataHandlingMessageTestData.message1);
