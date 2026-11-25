@@ -132,6 +132,10 @@ The code of an area is split into two modules, and new areas follow it:
   `update` sees the file; a new file is created with the current version and gets no step. To add a step, append it to
   `SchemaMigrations.STEPS` (never reorder or change a released step) and add the fixture test. SQLite cannot drop a
   constraint or a column with ALTER TABLE; such a step rebuilds the table with `TableRebuild`.
+- Time stamps are stored as epoch milliseconds and mapped to local times in the time zone of the project
+  (`ProjectTimeConverter`, `settings.timeZone`). The zone is stored with the first recorded message or LENEX version
+  (`TimingDatabase.writeRecorded`): a project without them takes the zone of the computer that opens it. Older files
+  with data and without a zone were recorded in Europe/Berlin.
 - Enum attributes are stored as their name through an `EnumNameConverter` (`EnumNameConverters`), never with
   `@Enumerated`: Hibernate writes a CHECK with the enum's values for `@Enumerated`, so a value added later could not be
   stored in existing files.

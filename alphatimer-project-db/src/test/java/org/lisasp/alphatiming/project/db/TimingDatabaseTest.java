@@ -11,6 +11,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -212,9 +213,16 @@ class TimingDatabaseTest {
     }
 
     @Test
-    void aFileWithoutTimeZoneIsReadInEuropeBerlinAndKeepsThatZone() throws Exception {
+    void aFileWithDataButWithoutTimeZoneIsReadInEuropeBerlinAndKeepsThatZone() throws Exception {
         long tenInBerlin = TEN_O_CLOCK.atZone(ZoneId.of("Europe/Berlin")).toInstant().toEpochMilli();
-        try (TimingDatabase db = TimingDatabase.openCopy(projectFile(null), Files.createDirectory(dir.resolve("work")))) {
+        Path older = dir.resolve("older.timing");
+        try (TimingDatabase db = TimingDatabase.openCopy(projectFile(null), Files.createDirectory(dir.resolve("first")))) {
+            new MessageStore(db).put(MessageStoreTest.message("TestWK", (short) 1, (byte) 1, TEN_O_CLOCK));
+            db.write(em -> em.createNativeQuery("update settings set timeZone = null").executeUpdate());
+            db.snapshotTo(older);
+            db.closeAndDelete();
+        }
+        try (TimingDatabase db = TimingDatabase.openCopy(older, Files.createDirectory(dir.resolve("work")))) {
             LenexVersionStore store = new LenexVersionStore(db);
             store.record(TEN_O_CLOCK.minusHours(3), "<LENEX />".getBytes(StandardCharsets.UTF_8), true);
             db.write(em -> em.createNativeQuery("update lenexversion set timestamp = " + tenInBerlin).executeUpdate());
@@ -224,6 +232,24 @@ class TimingDatabaseTest {
             Object stored = db.read(em -> em.createNativeQuery("select timeZone from settings").getSingleResult());
             assertThat(stored).isEqualTo("Europe/Berlin");
             db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void aFileWithoutDataTakesTheZoneOfThisComputerAndStoresItWithItsFirstData() throws Exception {
+        TimeZone before = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"));
+        try (TimingDatabase db = TimingDatabase.openCopy(projectFile(null), Files.createDirectory(dir.resolve("work")))) {
+            assertThat(db.timeZone()).isEqualTo(ZoneId.of("Asia/Tokyo"));
+            assertThat(db.<Object>read(em -> em.createNativeQuery("select timeZone from settings").getSingleResult())).isNull();
+
+            new MessageStore(db).put(MessageStoreTest.message("TestWK", (short) 1, (byte) 1, TEN_O_CLOCK));
+
+            assertThat(db.<Object>read(em -> em.createNativeQuery("select timeZone from settings").getSingleResult())).isEqualTo("Asia/Tokyo");
+            assertThat(storedMillis(db, "aresmessage")).isEqualTo(TEN_O_CLOCK.atZone(ZoneId.of("Asia/Tokyo")).toInstant().toEpochMilli());
+            db.closeAndDelete();
+        } finally {
+            TimeZone.setDefault(before);
         }
     }
 

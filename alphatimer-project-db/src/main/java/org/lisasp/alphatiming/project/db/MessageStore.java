@@ -33,7 +33,7 @@ public class MessageStore implements DataHandlingMessageRepository {
         e.setTimeInfo(m.getTimeInfo());
         e.setTimeMarker(m.getTimeMarker());
         e.setCompetitionKey(m.getCompetition());
-        db.write(em -> {
+        db.writeRecorded(em -> {
             em.persist(e);
             return null;
         });

@@ -40,49 +40,70 @@ public final class TimingDatabase implements AutoCloseable {
     private final SessionFactory factory;
 
     private LockFile workLock;
+    private volatile boolean timeZoneKept;
+
+    private record ZoneOnFile(Optional<ZoneId> zone, boolean holdsData) {
+    }
 
     /** Takes over the lock of the work file and releases it if opening fails. */
     private TimingDatabase(Path workFile, LockFile workLock, boolean isNew) throws IOException {
         this.workFile = workFile;
         this.workLock = workLock;
-        Optional<ZoneId> storedZone = Optional.empty();
+        ZoneOnFile onFile = new ZoneOnFile(Optional.empty(), false);
         try {
             if (isNew) {
                 SchemaMigrations.initialize(workFile);
             } else {
                 SchemaMigrations.migrate(workFile);
-                storedZone = storedTimeZone(workFile);
+                onFile = zoneOnFile(workFile);
             }
-            this.timeZone = isNew ? ZoneId.systemDefault() : storedZone.orElse(ZONE_OF_OLDER_FILES);
+            this.timeZone = onFile.zone().orElse(onFile.holdsData() ? ZONE_OF_OLDER_FILES : ZoneId.systemDefault());
             this.factory = buildFactory(workFile, timeZone);
         } catch (IOException | RuntimeException ex) {
             releaseLock();
             throw ex;
         }
-        if (!isNew && storedZone.isEmpty()) {
-            keepTimeZone();
+        if (onFile.zone().isEmpty() && onFile.holdsData()) {
+            keepTimeZoneOfOlderFile();
         }
+        timeZoneKept = onFile.zone().isPresent() || onFile.holdsData();
     }
 
-    private static Optional<ZoneId> storedTimeZone(Path file) throws IOException {
+    private static ZoneOnFile zoneOnFile(Path file) throws IOException {
         try (java.sql.Connection c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + file.toAbsolutePath());
              Statement st = c.createStatement()) {
-            try (java.sql.ResultSet rs = st.executeQuery("select count(*) from pragma_table_info('settings') where name = 'timeZone'")) {
-                if (!rs.next() || rs.getInt(1) == 0) {
-                    return Optional.empty();
-                }
-            }
-            try (java.sql.ResultSet rs = st.executeQuery("select timeZone from settings order by id limit 1")) {
-                String zone = rs.next() ? rs.getString(1) : null;
-                return zone == null || zone.isBlank() ? Optional.empty() : Optional.of(ZoneId.of(zone));
-            }
+            return new ZoneOnFile(storedTimeZone(st), holdsRows(st, "aresmessage") || holdsRows(st, "lenexversion"));
         } catch (java.sql.SQLException ex) {
             throw new IOException("Could not read the time zone of " + file, ex);
         }
     }
 
+    private static Optional<ZoneId> storedTimeZone(Statement st) throws java.sql.SQLException {
+        try (java.sql.ResultSet rs = st.executeQuery("select count(*) from pragma_table_info('settings') where name = 'timeZone'")) {
+            if (!rs.next() || rs.getInt(1) == 0) {
+                return Optional.empty();
+            }
+        }
+        try (java.sql.ResultSet rs = st.executeQuery("select timeZone from settings order by id limit 1")) {
+            String zone = rs.next() ? rs.getString(1) : null;
+            return zone == null || zone.isBlank() ? Optional.empty() : Optional.of(ZoneId.of(zone));
+        }
+    }
+
+    /** Older files have no {@code lenexversion} table. */
+    private static boolean holdsRows(Statement st, String table) throws java.sql.SQLException {
+        try (java.sql.ResultSet rs = st.executeQuery("select count(*) from sqlite_master where type = 'table' and name = '" + table + "'")) {
+            if (!rs.next() || rs.getInt(1) == 0) {
+                return false;
+            }
+        }
+        try (java.sql.ResultSet rs = st.executeQuery("select exists(select 1 from " + table + ")")) {
+            return rs.next() && rs.getInt(1) != 0;
+        }
+    }
+
     /** Not counted as a write: opening alone does not change the project, the zone is only kept for its next save. */
-    private void keepTimeZone() {
+    private void keepTimeZoneOfOlderFile() {
         try {
             factory.inTransaction(session -> session.createNativeMutationQuery("update settings set timeZone = :zone")
                                                     .setParameter("zone", timeZone.getId())
@@ -206,6 +227,22 @@ public final class TimingDatabase implements AutoCloseable {
         } finally {
             lock.unlock();
         }
+    }
+
+    /**
+     * Writes recorded messages or LENEX versions. The first such write stores the time zone with them: until a project
+     * holds times it takes the zone of the computer that opens it, from then on its times are read in the zone they were
+     * recorded in.
+     */
+    <T> T writeRecorded(Function<EntityManager, T> work) {
+        T result = write(em -> {
+            if (!timeZoneKept) {
+                em.createNativeQuery("update settings set timeZone = :zone").setParameter("zone", timeZone.getId()).executeUpdate();
+            }
+            return work.apply(em);
+        });
+        timeZoneKept = true;
+        return result;
     }
 
     /**

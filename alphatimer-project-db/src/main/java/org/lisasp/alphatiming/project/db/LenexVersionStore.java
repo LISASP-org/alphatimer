@@ -23,7 +23,7 @@ public class LenexVersionStore {
 
     public void record(LocalDateTime arrival, byte[] xml, boolean resultsChanged) {
         byte[] compressed = compress(xml);
-        db.write(em -> {
+        db.writeRecorded(em -> {
             List<LenexVersionEntity> last = em.createQuery("select v from LenexVersionEntity v order by v.id desc", LenexVersionEntity.class)
                                              .setMaxResults(1)
                                              .getResultList();
