@@ -12,8 +12,8 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Chore | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [LegacyServiceTest lives in the wrong module](legacy-service-test-placement.md) | Low | M | The test of `alphatimer-legacy-server` lives in `alphatimer-project-db` because of its test data; move it, possibly with the legacy code into a module of its own |
 | [Associate `.timing` files in the JAuswertung installer](associate-timing-files.md) | Low | S | Register `.timing` files with the AlphaTiming launcher in the install4j project; blocked by opening a project from the command line |
-| [Properties files use \uXXXX escapes](properties-utf-8.md) | Low | S | Convert `messages.properties` and `messages_de.properties` to plain UTF-8 |
-| [UsedLanesMessage parses the ARES flags inside an api module](used-lanes-parsing-in-api-module.md) | Low | S | Move the parsing of the ten ARES used-lane flags from the message in `alphatimer-refinedmessages-api` to the refiner |
-| [Check whether the api modules are real api modules](api-modules-audit.md) | Low | L | Find out per api module which types other areas use and which are the internal model of its implementation module |
+| [serial-api holds types nobody uses](serial-api-dead-types.md) | Low | S | `SerialConnectionBuilder`, `Storage`, `NotEnoughSerialPortsException` and what only they use look like AlphaServer leftovers |
+| [ares-serial-api holds the byte events of ares-serial](ares-serial-api-byte-events.md) | Low | M | The byte-level input events are only used by `alphatimer-ares-serial`; move them there |
+| [Why ui-core uses legacy-api and lenex-api](ui-core-api-usage.md) | Low | M | `RecordingSession` uses `Heat`, `LenexRecording` uses `LenexMeet`; check whether it only passes them between implementation modules |
+| [Is lenex-api an api module?](lenex-api-or-lenex.md) | Low | L | Only `ui-core` uses it, for `LenexMeet`; keep it or merge it into `alphatimer-lenex` |

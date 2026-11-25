@@ -135,15 +135,13 @@ class I18nTest {
     }
 
     @Test
-    void bothBundlesAreAsciiWithEscapesAndUseNoApostrophes() throws IOException {
+    void bothBundlesAreWrittenWithoutUnicodeEscapesAndUseNoApostrophes() throws IOException {
         for (String suffix : List.of("", "_de")) {
-            byte[] bytes;
+            String text;
             try (InputStream in = I18nTest.class.getClassLoader().getResourceAsStream(BASE + suffix + ".properties")) {
-                bytes = in.readAllBytes();
+                text = new String(in.readAllBytes(), StandardCharsets.UTF_8);
             }
-            for (byte b : bytes) {
-                assertThat(b).as("non-ASCII byte in messages" + suffix + ".properties").isGreaterThanOrEqualTo((byte) 0);
-            }
+            assertThat(text).as("unicode escape in messages" + suffix + ".properties").doesNotContain("\\u");
             Properties properties = load(suffix);
             for (String key : properties.stringPropertyNames()) {
                 assertThat(properties.getProperty(key)).as(key + " in messages" + suffix).doesNotContain("'");
@@ -157,6 +155,13 @@ class I18nTest {
         assertThat(I18n.get("menu.file")).isEqualTo("Datei");
         assertThat(I18n.get("status.lastMessage", "10:00:00")).isEqualTo("Letzte Nachricht 10:00:00");
         assertThat(I18n.describe(SettingsProblem.TCP_HOST_EMPTY)).isEqualTo("Der TCP-Host darf nicht leer sein");
+    }
+
+    @Test
+    void germanTextsKeepTheirUmlautsSharpSAndTypographicCharacters() {
+        Locale.setDefault(Locale.GERMAN);
+        assertThat(I18n.get("menu.open")).isEqualTo("Öffnen…");
+        assertThat(I18n.get("cli.analysis.kind.unframedData")).isEqualTo("Daten außerhalb einer Nachricht");
     }
 
     @Test
