@@ -35,7 +35,7 @@ Workflow: stop recording → change settings → start recording.
   settings, Start/Stop) and "Live View".
 - Current-heat display (see below).
 - The `/legacy/heats.xml` and `/legacy/heats.json` endpoints of alphatimer are kept through the JDK
-  `com.sun.net.httpserver.HttpServer` (started with the recording, port is a setting), so JAuswertung can still pull
+  `com.sun.net.httpserver.HttpServer` (port and on/off switch are settings; starting a recording switches the server on, stopping leaves it running), so JAuswertung can still pull
   the data. (Assumption — can be dropped.)
 - Artemis/JMS configuration of alphatimer is not carried over (unused by its Java code).
 
@@ -92,7 +92,8 @@ the **content on the right**; selecting a button switches the content panel (Car
 `PanelSelector`; the full jutils plugin framework is not used). Two panels:
 
 1. **Settings & Recording**: connection type (a combo box: TCP, a file replay of a binary file or another `.heat` file at 9600 baud, or a serial port with protocol ARES21 7E1 / Quantum 8N1 as in AlphaServer), TCP host, TCP port, auto-save interval, server port with on/off toggle (all locked while
-   recording), the **Start/Stop** button, state indicator (stopped / running / error with message) and connection
+   recording, except the server toggle, which works whenever a project is open; the port can be changed only while the
+   server is off; starting a recording switches the server on, stopping leaves it running), the **Start/Stop** button, state indicator (stopped / running / error with message) and connection
    state. Start and Stop therefore live on this panel, not in a global toolbar.
 2. **Live View** (current-heat display): header with event, heat, heat status (Open/Started/Finished) and the
    **running time**; below a lane table with one row per used lane: lane number, **one time** (the latest
