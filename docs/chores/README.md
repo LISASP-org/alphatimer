@@ -13,4 +13,7 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 | Chore | Severity | Size | Summary |
 | --- | --- | --- | --- |
 | [Associate `.timing` files in the JAuswertung installer](associate-timing-files.md) | Low | S | Register `.timing` files with the AlphaTiming launcher in the install4j project; blocked by opening a project from the command line |
-| [Check whether the api modules are real api modules](api-modules-audit.md) | Low | L | Find out per api module which types other areas use and which are the internal model of its implementation module |
+| [serial-api holds types nobody uses](serial-api-dead-types.md) | Low | S | `SerialConnectionBuilder`, `Storage`, `NotEnoughSerialPortsException` and what only they use look like AlphaServer leftovers |
+| [ares-serial-api holds the byte events of ares-serial](ares-serial-api-byte-events.md) | Low | M | The byte-level input events are only used by `alphatimer-ares-serial`; move them there |
+| [Why ui-core uses legacy-api and lenex-api](ui-core-api-usage.md) | Low | M | `RecordingSession` uses `Heat`, `LenexRecording` uses `LenexMeet`; check whether it only passes them between implementation modules |
+| [Is lenex-api an api module?](lenex-api-or-lenex.md) | Low | L | Only `ui-core` uses it, for `LenexMeet`; keep it or merge it into `alphatimer-lenex` |
