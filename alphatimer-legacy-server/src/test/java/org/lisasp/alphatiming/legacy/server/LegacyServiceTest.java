@@ -1,8 +1,6 @@
-package org.lisasp.alphatiming.project.db;
+package org.lisasp.alphatiming.legacy.server;
 
 import org.lisasp.alphatiming.legacy.api.LegacySerialization;
-import org.lisasp.alphatiming.legacy.server.InMemoryLaneTimeRepository;
-import org.lisasp.alphatiming.legacy.server.LegacyService;
 import org.junit.jupiter.api.Test;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.KindOfTime;
@@ -11,8 +9,8 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.RankInfo;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeInfo;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeMarker;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.TimeType;
+import org.lisasp.alphatimer.api.ares.serial.events.messages.values.UsedLanes;
 import org.lisasp.alphatiming.legacy.api.Heat;
-import org.lisasp.alphatiming.project.db.testdata.DataHandlingMessageTestData;
 
 import java.time.LocalDateTime;
 
@@ -28,7 +26,7 @@ class LegacyServiceTest {
                                        type,
                                        kind,
                                        TimeType.Empty,
-                                       DataHandlingMessageTestData.createUsedLanes(),
+                                       usedLanes(),
                                        (byte) 2,
                                        (short) event,
                                        (byte) heat,
@@ -49,7 +47,7 @@ class LegacyServiceTest {
                                        MessageType.OnLineTime,
                                        KindOfTime.SplitTime,
                                        TimeType.DeletedTime,
-                                       DataHandlingMessageTestData.createUsedLanes(),
+                                       usedLanes(),
                                        (byte) 2,
                                        (short) event,
                                        (byte) heat,
@@ -60,6 +58,10 @@ class LegacyServiceTest {
                                        millis,
                                        TimeInfo.Normal,
                                        TimeMarker.Empty);
+    }
+
+    private static UsedLanes usedLanes() {
+        return new UsedLanes(new boolean[]{true, true, true, true, true, true, true, true, false, false});
     }
 
     private static long[] times(LegacyService service, int laneIndex) {
