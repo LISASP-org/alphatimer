@@ -13,8 +13,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.Statement;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -25,6 +27,8 @@ public final class TimingDatabase implements AutoCloseable {
 
     private static final byte[] SQLITE_HEADER = "SQLite format 3\0".getBytes(StandardCharsets.US_ASCII);
 
+    private static final ZoneId ZONE_OF_OLDER_FILES = ZoneId.of("Europe/Berlin");
+
     private static final Class<?>[] ENTITIES = {SettingsEntity.class, RawDataChunkEntity.class, AresMessageEntity.class, LenexVersionEntity.class};
 
     private final ReentrantLock lock = new ReentrantLock();
@@ -32,6 +36,7 @@ public final class TimingDatabase implements AutoCloseable {
     private final List<Runnable> writeListeners = new CopyOnWriteArrayList<>();
 
     private final Path workFile;
+    private final ZoneId timeZone;
     private final SessionFactory factory;
 
     private LockFile workLock;
@@ -40,14 +45,50 @@ public final class TimingDatabase implements AutoCloseable {
     private TimingDatabase(Path workFile, LockFile workLock, boolean isNew) throws IOException {
         this.workFile = workFile;
         this.workLock = workLock;
+        Optional<ZoneId> storedZone = Optional.empty();
         try {
             if (isNew) {
                 SchemaMigrations.initialize(workFile);
             } else {
                 SchemaMigrations.migrate(workFile);
+                storedZone = storedTimeZone(workFile);
             }
-            this.factory = buildFactory(workFile);
+            this.timeZone = isNew ? ZoneId.systemDefault() : storedZone.orElse(ZONE_OF_OLDER_FILES);
+            this.factory = buildFactory(workFile, timeZone);
         } catch (IOException | RuntimeException ex) {
+            releaseLock();
+            throw ex;
+        }
+        if (!isNew && storedZone.isEmpty()) {
+            keepTimeZone();
+        }
+    }
+
+    private static Optional<ZoneId> storedTimeZone(Path file) throws IOException {
+        try (java.sql.Connection c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + file.toAbsolutePath());
+             Statement st = c.createStatement()) {
+            try (java.sql.ResultSet rs = st.executeQuery("select count(*) from pragma_table_info('settings') where name = 'timeZone'")) {
+                if (!rs.next() || rs.getInt(1) == 0) {
+                    return Optional.empty();
+                }
+            }
+            try (java.sql.ResultSet rs = st.executeQuery("select timeZone from settings order by id limit 1")) {
+                String zone = rs.next() ? rs.getString(1) : null;
+                return zone == null || zone.isBlank() ? Optional.empty() : Optional.of(ZoneId.of(zone));
+            }
+        } catch (java.sql.SQLException ex) {
+            throw new IOException("Could not read the time zone of " + file, ex);
+        }
+    }
+
+    /** Not counted as a write: opening alone does not change the project, the zone is only kept for its next save. */
+    private void keepTimeZone() {
+        try {
+            factory.inTransaction(session -> session.createNativeMutationQuery("update settings set timeZone = :zone")
+                                                    .setParameter("zone", timeZone.getId())
+                                                    .executeUpdate());
+        } catch (RuntimeException ex) {
+            factory.close();
             releaseLock();
             throw ex;
         }
@@ -120,7 +161,7 @@ public final class TimingDatabase implements AutoCloseable {
         }
     }
 
-    private static SessionFactory buildFactory(Path workFile) {
+    private static SessionFactory buildFactory(Path workFile, ZoneId timeZone) {
         Configuration c = new Configuration();
         c.setProperty("hibernate.connection.driver_class", "org.sqlite.JDBC");
         c.setProperty("hibernate.connection.url", "jdbc:sqlite:" + workFile.toAbsolutePath());
@@ -129,6 +170,7 @@ public final class TimingDatabase implements AutoCloseable {
         c.setProperty("hibernate.connection.pool_size", "1");
         c.setProperty("hibernate.connection.foreign_keys", "true");
         c.setProperty("hibernate.show_sql", "false");
+        c.addAttributeConverter(new ProjectTimeConverter(timeZone), true);
         for (Class<?> e : ENTITIES) {
             c.addAnnotatedClass(e);
         }
@@ -214,6 +256,10 @@ public final class TimingDatabase implements AutoCloseable {
     /** Called under the database lock after each committed {@link #write}. */
     public void addWriteListener(Runnable listener) {
         writeListeners.add(listener);
+    }
+
+    public ZoneId timeZone() {
+        return timeZone;
     }
 
     public Path workFile() {

@@ -22,7 +22,11 @@ class MessageStoreTest {
     Path dir;
 
     private static DataHandlingMessage message(String competition, short event, byte heat) {
-        return new DataHandlingMessage(LocalDateTime.of(2021, 6, 21, 14, 53),
+        return message(competition, event, heat, LocalDateTime.of(2021, 6, 21, 14, 53));
+    }
+
+    static DataHandlingMessage message(String competition, short event, byte heat, LocalDateTime timestamp) {
+        return new DataHandlingMessage(timestamp,
                                        competition,
                                        new String(DataHandlingMessageTestData.message1),
                                        new String(DataHandlingMessageTestData.message2),

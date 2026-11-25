@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [The version 1 fixture test depends on the time zone](version1-fixture-depends-on-time-zone.md) | Low | S | `Version1FixtureTest.theHeatsOfAVersion1FileAreShown` fails in a JVM outside Europe/Berlin: the announced heat is two hours off. |
 | [Times with a minus sign are dropped](minus-times-are-dropped.md) | Low | S | Finish and split times with `TimeMarker.Minus` are dropped; seen only before the start of a heat, meaning unknown. |
 | [Documentation still refers to the removed Spring Boot application](references-to-removed-spring-boot-app.md) | Low | M | `README.md`, a code comment and the first spec and plan describe the protocol and refiner modules as copies of the gone app in `../alphatimer`; PIT still skips them. |
 | [The rank value "D " is read as a disqualification](rank-d-is-not-a-disqualification.md) | Low | M | The parser maps rank `D `, sent with reaction and takeover times, to `RankInfo.Disqualified`; its meaning is unknown. |

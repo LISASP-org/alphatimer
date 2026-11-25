@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.sql.DriverManager;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +52,15 @@ class TimingDocumentTest {
     private long workFiles() throws IOException {
         try (var files = Files.list(work())) {
             return files.count();
+        }
+    }
+
+    @Test
+    void aNewProjectStoresTheTimeZoneOfThisComputer() throws Exception {
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
+            Object stored = doc.database().read(em -> em.createNativeQuery("select timeZone from settings").getSingleResult());
+
+            assertThat(stored).isEqualTo(ZoneId.systemDefault().getId());
         }
     }
 
@@ -252,7 +262,7 @@ class TimingDocumentTest {
         Path file = savedProject("x.timing");
         Path leftover = leftoverOf(file);
         corruptSettingsTable(leftover);
-        assertThatThrownBy(() -> TimingDocument.recover(leftover)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> TimingDocument.recover(leftover)).isInstanceOf(IOException.class);
         assertThat(TimingWorkFolder.findLeftovers(work())).singleElement()
                                                            .satisfies(l -> assertThat(l.workFile()).isEqualTo(leftover))
                                                            .satisfies(l -> assertThat(l.projectFile()).contains(file));

@@ -68,6 +68,12 @@ class LenexVersionStoreTest {
     void versionsSurviveSavingAndOpening() throws Exception {
         Path saved = dir.resolve("saved.timing");
         try (TimingDatabase db = TimingDatabase.createNew(dir.resolve("first"))) {
+            db.write(em -> {
+                SettingsEntity settings = new SettingsEntity("host", 1234, 60, 1999);
+                settings.setTimeZone(db.timeZone().getId());
+                em.persist(settings);
+                return null;
+            });
             new LenexVersionStore(db).record(T0, xml("A"), true);
             db.snapshotTo(saved);
         }

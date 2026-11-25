@@ -184,6 +184,7 @@ public final class TimingDocument implements AutoCloseable {
             e.setTimekeepingOffsetHours(s.timekeepingOffsetHours());
             e.setLenexFile(s.lenexFile());
             e.setLenexIntervalSeconds(s.lenexIntervalSeconds());
+            e.setTimeZone(database.timeZone().getId());
             return toSettings(e);
         });
     }

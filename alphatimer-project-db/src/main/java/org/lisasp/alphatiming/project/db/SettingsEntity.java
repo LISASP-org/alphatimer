@@ -40,6 +40,8 @@ public class SettingsEntity {
     private String lenexFile;
     /** Added with the LENEX input: null in older project files, which means the default interval. */
     private Integer lenexIntervalSeconds;
+    /** Added with the time zone of the project: null in older project files, which were all recorded in Europe/Berlin. */
+    private String timeZone;
 
     public SettingsEntity(String tcpHost, int tcpPort, int autoSaveSeconds, int restPort) {
         this.tcpHost = tcpHost;

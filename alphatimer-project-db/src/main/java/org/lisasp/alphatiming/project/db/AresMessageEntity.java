@@ -35,7 +35,7 @@ public class AresMessageEntity {
     private String originalText1;
     @Column(nullable = false)
     private String originalText2;
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "timestamp")
     private LocalDateTime timestamp;
     @Convert(converter = EnumNameConverters.MessageTypeConverter.class)
     @Column(nullable = false)
