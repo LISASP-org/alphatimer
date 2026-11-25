@@ -152,7 +152,7 @@ class RefinedLegacyServiceTest {
     }
 
     @Test
-    void onlyTheRoundWithTheNewestTimeIsServed() {
+    void onlyTheRoundThatBeganLastIsServedAlsoAfterACorrectionOfAnEarlierRound() {
         service.accept(finishOfRound("PreliminaryHeat", 1, 0, 25_000));
         service.accept(finishOfRound("PreliminaryHeat", 2, 0, 26_000));
         service.accept(finishOfRound("Final", 1, 1, 24_000));
@@ -162,8 +162,30 @@ class RefinedLegacyServiceTest {
 
         service.accept(finishOfRound("PreliminaryHeat", 1, 2, 25_500));
 
-        assertThat(times(0)).containsExactly(25_000, 25_500);
-        assertThat(times(1)).containsExactly(26_000);
+        assertThat(service.getHeats()[0].getLanes()).containsOnlyKeys(0);
+        assertThat(times(0)).containsExactly(24_000);
+    }
+
+    @Test
+    void aRemovedHeatKeepsTheOtherRoundsOfItsNumber() {
+        service.accept(finishOfRound("PreliminaryHeat", 1, 0, 25_000));
+        service.accept(finishOfRound("Final", 1, 1, 24_000));
+
+        service.accept(new HeatRemovedMessage(LocalDateTime.of(2021, 6, 21, 14, 55), "WK", (short) 1, (byte) 2, "Final"));
+
+        assertThat(times(0)).containsExactly(25_000);
+    }
+
+    @Test
+    void aDeletedFinishKeepsTheSameTimeOfAnotherRound() {
+        service.accept(finishOfRound("PreliminaryHeat", 1, 0, 25_000));
+        service.accept(finishOfRound("Final", 1, 1, 25_000));
+
+        service.accept(new TimeMessage(LocalDateTime.of(2021, 6, 21, 14, 55), "WK", (short) 1, (byte) 2, "Final", RefinedMessageType.CurrentRaceResult,
+                                       RefinedKindOfTime.Finish, (byte) 1, (byte) 2, (byte) 2, (byte) 0, 25_000, RefinedTimeType.DeletedTime,
+                                       RefinedTimeOrigin.Primary));
+
+        assertThat(times(0)).containsExactly(25_000);
     }
 
     @Test
@@ -175,7 +197,7 @@ class RefinedLegacyServiceTest {
     }
 
     @Test
-    void ofRoundsWithTheSameArrivalTheOneStoredLastIsServedWhenOneIsUnknown() {
+    void ofRoundsWithTheSameArrivalTheOneThatBeganLastIsServedWhenOneIsUnknown() {
         service.accept(finishOfRound("Final", 1, 0, 24_000));
         service.accept(finishOfRound("Extra", 1, 0, 25_000));
 
@@ -184,6 +206,6 @@ class RefinedLegacyServiceTest {
         service.accept(finishOfRound("Extra", 1, 1, 26_000));
         service.accept(finishOfRound("Final", 1, 1, 23_000));
 
-        assertThat(times(0)).containsExactly(24_000, 23_000);
+        assertThat(times(0)).containsExactly(25_000, 26_000);
     }
 }

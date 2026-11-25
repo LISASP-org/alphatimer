@@ -8,5 +8,5 @@ public interface LaneTimeRepository {
 
     List<LaneTime> findAll();
 
-    void delete(int event, int heatNumber, int laneIndex, long timeInMillis);
+    void delete(int event, int heatNumber, String round, int laneIndex, long timeInMillis);
 }
