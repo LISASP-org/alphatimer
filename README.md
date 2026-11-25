@@ -4,9 +4,8 @@ Desktop application that reads the data of a Quantum/Ares timekeeping system ove
 messages in one project file, rebuilds the heats from them and shows the current heat live (lanes with their current time, penalties, placing,
 running time).
 
-It reuses the core logic of the Spring Boot application *alphatimer* (protocol parsing, message refining, heat logic;
-copied, no dependency on it), but is a plain Swing app: settings that alphatimer reads from its `application.yaml` are
-edited in the UI and can be changed without restarting.
+Protocol parsing and message refining live in AlphaTiming's own protocol and refiner modules. It is a plain Swing app:
+all settings are edited in the UI and can be changed without restarting.
 
 ## Language
 

@@ -129,14 +129,12 @@ public final class LiveViewPanel extends JPanel {
         }
     }
 
-    /**
-     * The clock only runs while a recording is running. Call on the EDT.
-     */
     /** Whether the input has a running time; without, the clock stays empty. Call on the EDT. */
     public void setLive(boolean liveInput) {
         this.liveInput = liveInput;
     }
 
+    /** The clock only runs while a recording is running. Call on the EDT. */
     public void setRecording(boolean recording) {
         this.recording = recording;
         updateClock();
@@ -193,7 +191,6 @@ public final class LiveViewPanel extends JPanel {
         clock.setText(LiveTexts.clock(heat, LocalDateTime.now(), recording, liveInput));
     }
 
-    /** Start and finish centered, the duration right-aligned like a number; the heat column with its round is twice as wide. */
     private void alignHeatColumns() {
         TableColumnModel columns = heatTable.getColumnModel();
         columns.getColumn(0).setCellRenderer(aligned(SwingConstants.CENTER));

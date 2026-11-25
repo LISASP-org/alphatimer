@@ -27,7 +27,7 @@ Formats:
 - **Goal:** read the TM-SWIM Video-Out, and possibly the Timy3 RS-232, and refine them into the refined messages.
 - **Where:** a protocol module per device and a refiner into `alphatimer-refinedmessages-api`; the line settings next
   to `SerialMode`.
-- **Depends on:** [LENEX input](lenex-input.md) for the second input source beside ARES (recording, rebuilding a
-  project with the right refiner); [Reaction times](reaction-times.md) for the `M` lines.
+- **Depends on:** [Reaction times](reaction-times.md) for the `M` lines. LENEX is the model for an input source beside
+  ARES (recording, rebuilding a project with the right refiner).
 - **Open questions:** captures of real devices (firmware version matters); whether the Video-Out port is free at a pool
   (it is often used for TV graphics); whether the Timy3 is needed at all.

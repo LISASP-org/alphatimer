@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  */
 public final class SignOfLife {
 
-    static final Duration RECENT = Duration.ofSeconds(5);
+    static final Duration STREAM_SILENT_AFTER = Duration.ofSeconds(5);
     public static final Duration MESSAGE_SHOWN = Duration.ofMillis(100);
 
     private final DateTimeFacade time;
@@ -42,8 +42,8 @@ public final class SignOfLife {
         return at != null && !time.now().isAfter(at.plus(MESSAGE_SHOWN));
     }
 
-    public boolean isRecent() {
+    public boolean isRecent(Duration silentAfter) {
         LocalDateTime at = last;
-        return at != null && !time.now().isAfter(at.plus(RECENT));
+        return at != null && !time.now().isAfter(at.plus(silentAfter));
     }
 }

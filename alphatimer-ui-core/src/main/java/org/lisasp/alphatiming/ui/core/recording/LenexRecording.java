@@ -55,6 +55,8 @@ final class LenexRecording implements AutoCloseable {
 
     private ScheduledExecutorService scheduler;
     private volatile boolean connected;
+    /** Set while the file cannot be read, so the checks of one outage log it once. */
+    private boolean unreadable;
     private Seen seen;
     private byte[] lastVersion;
     private LenexMeet lastMeet = NO_MEET;
@@ -66,11 +68,10 @@ final class LenexRecording implements AutoCloseable {
         this.time = time;
         this.listener = listener;
         this.writes = writes;
-        List<LenexVersion> versions = store.findAll();
-        if (!versions.isEmpty()) {
-            lastVersion = versions.getLast().xml();
+        store.findLast().ifPresent(last -> {
+            lastVersion = last.xml();
             lastMeet = meetOf(lastVersion);
-        }
+        });
     }
 
     void start(int intervalSeconds) {
@@ -102,6 +103,10 @@ final class LenexRecording implements AutoCloseable {
             }
             content = Files.readAllBytes(file);
         } catch (IOException ex) {
+            if (!unreadable) {
+                log.warn("The LENEX file {} cannot be read", file, ex);
+                unreadable = true;
+            }
             connected = false;
             return;
         }
@@ -113,18 +118,23 @@ final class LenexRecording implements AutoCloseable {
             log.debug("The LENEX file {} is not complete yet", file);
             return;
         }
-        seen = now;
         try {
-            if (lastVersion != null && LenexDocuments.sameExceptExportTime(lastVersion, version)) {
-                return;
+            if (lastVersion == null || !LenexDocuments.sameExceptExportTime(lastVersion, version)) {
+                record(version, LenexReader.read(new ByteArrayInputStream(version)));
             }
-            record(version, LenexReader.read(new ByteArrayInputStream(version)));
         } catch (IOException ex) {
             log.warn("The LENEX file {} holds no meet", file);
+        } catch (RecordingWriteException ex) {
+            log.warn("Could not store the version of the LENEX file {}", file, ex);
+            writes.failed(ex.data(), (Exception) ex.getCause());
+            // Not marked as seen: the next check reads the file again and stores the version then.
+            return;
         }
+        seen = now;
     }
 
     private void alive() {
+        unreadable = false;
         connected = true;
         listener.signOfLife();
     }

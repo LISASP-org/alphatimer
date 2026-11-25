@@ -1,5 +1,9 @@
 # Heat-Timing Implementation Plan
 
+> **Note (2026-11-25):** This is the record of how the project started. The Spring Boot application *alphatimer* no
+> longer exists; the protocol and refiner modules described here as copied from `../alphatimer` are AlphaTiming's own
+> modules.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A Swing desktop app that records Quantum/Ares data over TCP into one SQLite project file (JPA/Hibernate), shows the live heat, and lets all former YAML settings be changed in the UI between recordings.

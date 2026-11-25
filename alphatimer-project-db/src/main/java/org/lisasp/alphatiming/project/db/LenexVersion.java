@@ -4,10 +4,6 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Objects;
 
-/**
- * @param arrival when the recording read the version
- * @param xml     the version as it was recorded
- */
 public record LenexVersion(LocalDateTime arrival, byte[] xml) {
 
     @Override

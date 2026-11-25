@@ -1,5 +1,6 @@
 package org.lisasp.alphatiming.lenex;
 
+import org.lisasp.alphatiming.lenex.api.XmlParserUnavailableException;
 import org.lisasp.alphatiming.lenex.api.LenexMeet;
 import org.lisasp.alphatiming.lenex.api.LenexEvent;
 import org.lisasp.alphatiming.lenex.api.LenexHeat;
@@ -169,7 +170,7 @@ public final class LenexReader {
             factory.setExpandEntityReferences(false);
             builder = factory.newDocumentBuilder();
         } catch (ParserConfigurationException e) {
-            throw new IllegalStateException("The JDK's XML parser lacks a required feature", e);
+            throw new XmlParserUnavailableException(e);
         }
         builder.setErrorHandler(new DefaultHandler());
         try {

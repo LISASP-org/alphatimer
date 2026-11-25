@@ -30,6 +30,19 @@ class LenexVersionStoreTest {
     }
 
     @Test
+    void theLastVersionIsTheNewestOne() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            LenexVersionStore store = new LenexVersionStore(db);
+            assertThat(store.findLast()).isEmpty();
+
+            store.record(T0, xml("A"), true);
+            store.record(T0.plusSeconds(1), xml("B"), true);
+
+            assertThat(store.findLast()).contains(new LenexVersion(T0.plusSeconds(1), xml("B")));
+        }
+    }
+
+    @Test
     void aVersionWithoutResultChangesReplacesThePreviousSuchVersion() throws Exception {
         try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             LenexVersionStore store = new LenexVersionStore(db);
@@ -68,6 +81,12 @@ class LenexVersionStoreTest {
     void versionsSurviveSavingAndOpening() throws Exception {
         Path saved = dir.resolve("saved.timing");
         try (TimingDatabase db = TimingDatabase.createNew(dir.resolve("first"))) {
+            db.write(em -> {
+                SettingsEntity settings = new SettingsEntity("host", 1234, 60, 1999);
+                settings.setTimeZone(db.timeZone().getId());
+                em.persist(settings);
+                return null;
+            });
             new LenexVersionStore(db).record(T0, xml("A"), true);
             db.snapshotTo(saved);
         }

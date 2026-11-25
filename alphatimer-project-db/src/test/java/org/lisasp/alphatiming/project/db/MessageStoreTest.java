@@ -22,7 +22,11 @@ class MessageStoreTest {
     Path dir;
 
     private static DataHandlingMessage message(String competition, short event, byte heat) {
-        return new DataHandlingMessage(LocalDateTime.of(2021, 6, 21, 14, 53),
+        return message(competition, event, heat, LocalDateTime.of(2021, 6, 21, 14, 53));
+    }
+
+    static DataHandlingMessage message(String competition, short event, byte heat, LocalDateTime timestamp) {
+        return new DataHandlingMessage(timestamp,
                                        competition,
                                        new String(DataHandlingMessageTestData.message1),
                                        new String(DataHandlingMessageTestData.message2),
@@ -96,6 +100,19 @@ class MessageStoreTest {
 
             assertThat(store.findBy("TestWK", (short) 1, (byte) 1)).extracting(DataHandlingMessage::getKindOfTime)
                                                                   .containsExactly(KindOfTime.Backup);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void theFormerNameOfTheStartingBlockRankInfoIsStillRead() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            MessageStore store = new MessageStore(db);
+            store.put(message("TestWK", (short) 1, (byte) 1));
+            db.write(em -> em.createNativeQuery("update aresmessage set rankInfo = 'Disqualified'").executeUpdate());
+
+            assertThat(store.findBy("TestWK", (short) 1, (byte) 1)).extracting(DataHandlingMessage::getRankInfo)
+                                                                  .containsExactly(RankInfo.StartingBlock);
             db.closeAndDelete();
         }
     }

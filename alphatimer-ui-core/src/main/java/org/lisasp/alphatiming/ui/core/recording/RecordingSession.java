@@ -57,7 +57,7 @@ public final class RecordingSession implements AutoCloseable {
         SerialPortReader create(Settings settings);
     }
 
-    /** The copied pipeline tags every message with a competition; a project holds exactly one, so the tag is constant. */
+    /** A project holds exactly one competition, so the competition tag of every message is constant. */
     private static final String COMPETITION = "";
     private static final int REPLAY_BAUD_RATE = 9600;
 
@@ -113,7 +113,7 @@ public final class RecordingSession implements AutoCloseable {
             case SERIAL -> new NrSerialReader(s.serialPort(), s.serialMode().configuration());
             case FILE -> new FileReplayReader(Path.of(s.replayFile()), REPLAY_BAUD_RATE);
             case TCP -> new TcpReader(s.tcpHost(), s.tcpPort());
-            case LENEX -> throw new IllegalArgumentException("LENEX is recorded from its file, not read as a stream");
+            case LENEX -> throw new NoReaderForInputException(s.connectionType());
         };
     }
 
@@ -128,6 +128,11 @@ public final class RecordingSession implements AutoCloseable {
         List<SettingsProblem> problems = snapshot.validate();
         if (!problems.isEmpty()) {
             fail(new RecordingError(RecordingError.Kind.INVALID_SETTINGS, "", problems));
+            return;
+        }
+        Input held = recorded;
+        if (held != null && held != snapshot.connectionType().input()) {
+            fail(new RecordingError(RecordingError.Kind.OTHER_INPUT_RECORDED, held.name()));
             return;
         }
         try {
@@ -453,7 +458,6 @@ public final class RecordingSession implements AutoCloseable {
         return Optional.ofNullable(recorded);
     }
 
-    /** Called with every recorded version of the LENEX file. */
     public void addLenexListener(Consumer<LenexChanges> listener) {
         lenexListeners.add(listener);
     }

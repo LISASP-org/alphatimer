@@ -4,6 +4,7 @@ import org.hibernate.Session;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.lisasp.alphatiming.project.db.InvalidProjectFileException;
+import org.lisasp.alphatiming.project.db.LenexVersionStore;
 import org.lisasp.alphatiming.project.db.ProjectFileInUseException;
 import org.lisasp.alphatiming.project.db.TimingDatabase;
 import org.lisasp.alphatiming.project.db.TimingFileWriter;
@@ -16,11 +17,14 @@ import org.lisasp.alphatiming.ui.core.settings.Settings;
 import org.sqlite.ProgressHandler;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.sql.DriverManager;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +56,26 @@ class TimingDocumentTest {
         try (var files = Files.list(work())) {
             return files.count();
         }
+    }
+
+    @Test
+    void aNewProjectStoresItsTimeZoneWithItsFirstRecordedData() throws Exception {
+        try (TimingDocument doc = TimingDocument.create(work(), SETTINGS)) {
+            assertThat(storedTimeZone(doc)).isNull();
+
+            doc.updateSettings(SETTINGS.withTcp("changed", 1));
+            assertThat(storedTimeZone(doc)).isNull();
+
+            new LenexVersionStore(doc.database()).record(LocalDateTime.of(2026, 1, 10, 10, 0), "<LENEX />".getBytes(StandardCharsets.UTF_8), true);
+            assertThat(storedTimeZone(doc)).isEqualTo(ZoneId.systemDefault().getId());
+
+            doc.updateSettings(SETTINGS.withTcp("again", 2));
+            assertThat(storedTimeZone(doc)).isEqualTo(ZoneId.systemDefault().getId());
+        }
+    }
+
+    private static Object storedTimeZone(TimingDocument doc) {
+        return doc.database().read(em -> em.createNativeQuery("select timeZone from settings").getSingleResult());
     }
 
     @Test
@@ -252,7 +276,7 @@ class TimingDocumentTest {
         Path file = savedProject("x.timing");
         Path leftover = leftoverOf(file);
         corruptSettingsTable(leftover);
-        assertThatThrownBy(() -> TimingDocument.recover(leftover)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> TimingDocument.recover(leftover)).isInstanceOf(IOException.class);
         assertThat(TimingWorkFolder.findLeftovers(work())).singleElement()
                                                            .satisfies(l -> assertThat(l.workFile()).isEqualTo(leftover))
                                                            .satisfies(l -> assertThat(l.projectFile()).contains(file));

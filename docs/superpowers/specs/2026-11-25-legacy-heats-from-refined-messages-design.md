@@ -23,7 +23,8 @@ compared on real competitions before the refined path replaces the old one
 
 - Replacing or removing `LegacyService` (`docs/features/legacy-heats-from-heat-model.md`).
 - A JSON variant of the new heats.
-- Deciding when a backup time becomes official (`docs/issues/backup-times-not-interpreted.md`).
+- Deciding when a backup time becomes official: decided on 2026-11-25, backup times never count; the accepted
+  difference below covers a taken backup time sent with time info `B`.
 
 ## Constraints
 

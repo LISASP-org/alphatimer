@@ -16,6 +16,7 @@ public record RecordingError(Kind kind, String detail, List<SettingsProblem> pro
         SERIAL_OPEN_FAILED,
         REPLAY_FILE_NOT_FOUND,
         REPLAY_FILE_UNREADABLE,
+        OTHER_INPUT_RECORDED,
         UNEXPECTED
     }
 

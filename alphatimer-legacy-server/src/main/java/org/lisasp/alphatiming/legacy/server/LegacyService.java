@@ -50,6 +50,7 @@ public final class LegacyService implements DataHandlingMessageListener {
         store.save(new LaneTime(message.getCompetition(),
                                 message.getEvent(),
                                 message.getHeat(),
+                                "",
                                 message.getLane() - 1,
                                 message.getTimeInMillis(),
                                 status,
@@ -61,7 +62,7 @@ public final class LegacyService implements DataHandlingMessageListener {
         if (message.getCurrentLap() != message.getLapCount()) {
             return;
         }
-        store.delete(message.getEvent(), message.getHeat(), message.getLane() - 1, message.getTimeInMillis());
+        store.delete(message.getEvent(), message.getHeat(), "", message.getLane() - 1, message.getTimeInMillis());
     }
 
     public Heat[] getHeats() {

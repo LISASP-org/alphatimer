@@ -796,6 +796,101 @@ class HeatTest {
     }
 
     @Test
+    void aFinishWithdrawnAsADeletedSplitOfTheLastLapIsReplacedByAFreshFinish() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 61_230, T0.plusSeconds(61)));
+        heat.touch(TestMessageCreator.finAt(1, 1, 2, 62_000, T0.plusSeconds(62)));
+
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 2, 61_230, T0.plusSeconds(70)));
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 62_400, T0.plusSeconds(75)));
+
+        assertThat(lane(heat, 1).finish().orElseThrow().timeInMillis()).isEqualTo(62_400);
+        assertThat(lane(heat, 1).place()).isEqualTo(2);
+        assertThat(lane(heat, 2).place()).isEqualTo(1);
+    }
+
+    @Test
+    void aChainOfDeletionsNewestFirstFallsBackToTheTimeBeforeIt() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.splitAt(1, 1, 1, 1, 30_000, T0.plusSeconds(30)));
+        heat.touch(TestMessageCreator.splitAt(1, 1, 1, 2, 45_000, T0.plusSeconds(45)));
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 61_230, T0.plusSeconds(61)));
+
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 2, 61_230, T0.plusSeconds(70)));
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 2, 45_000, T0.plusSeconds(71)));
+
+        assertThat(lane(heat, 1).finish()).isEmpty();
+        assertThat(lane(heat, 1).current().orElseThrow().timeInMillis()).isEqualTo(30_000);
+        assertThat(lane(heat, 1).times()).extracting(LaneTime::timeInMillis, LaneTime::deleted)
+                                         .containsExactly(tuple(30_000, false), tuple(45_000, true), tuple(61_230, true));
+    }
+
+    @Test
+    void aSplitDeletedWithoutReplacementIsFollowedByATimeOfTheNextLap() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.splitAt(1, 1, 1, 1, 30_000, T0.plusSeconds(30)));
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 1, 30_000, T0.plusSeconds(35)));
+        assertThat(lane(heat, 1).current()).isEmpty();
+
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 61_230, T0.plusSeconds(61)));
+
+        assertThat(lane(heat, 1).finish().orElseThrow().timeInMillis()).isEqualTo(61_230);
+        assertThat(lane(heat, 1).place()).isEqualTo(1);
+        assertThat(lane(heat, 1).times()).extracting(LaneTime::lap, LaneTime::deleted)
+                                         .containsExactly(tuple(1, true), tuple(2, false));
+    }
+
+    @Test
+    void aReplacementWithAnEarlierValueThanTheDeletedTimeCounts() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 61_230, T0.plusSeconds(61)));
+        heat.touch(TestMessageCreator.finAt(1, 1, 2, 61_000, T0.plusSeconds(62)));
+
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 2, 61_230, T0.plusSeconds(70)));
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 60_900, T0.plusSeconds(80)));
+
+        LaneTime finish = lane(heat, 1).finish().orElseThrow();
+        assertThat(finish.timeInMillis()).isEqualTo(60_900);
+        assertThat(finish.arrived()).isEqualTo(T0.plusSeconds(80));
+        assertThat(lane(heat, 1).place()).isEqualTo(1);
+        assertThat(lane(heat, 2).place()).isEqualTo(2);
+    }
+
+    @Test
+    void aBatchOfDeletionsAcrossSeveralLanesRecomputesThePlaces() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 25_000, T0.plusSeconds(25)));
+        heat.touch(TestMessageCreator.finAt(1, 1, 2, 26_000, T0.plusSeconds(26)));
+        heat.touch(TestMessageCreator.finAt(1, 1, 3, 27_000, T0.plusSeconds(27)));
+
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 1, 2, 25_000, T0.plusSeconds(40)));
+        heat.touch(TestMessageCreator.deletedAt(1, 1, 2, 2, 26_000, T0.plusSeconds(41)));
+
+        assertThat(List.of(lane(heat, 1).place(), lane(heat, 2).place(), lane(heat, 3).place())).containsExactly(0, 0, 1);
+        assertThat(heat.createDto().ended()).isNull();
+
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 28_000, T0.plusSeconds(50)));
+        heat.touch(TestMessageCreator.finAt(1, 1, 2, 24_000, T0.plusSeconds(51)));
+
+        assertThat(List.of(lane(heat, 1).place(), lane(heat, 2).place(), lane(heat, 3).place())).containsExactly(3, 1, 2);
+    }
+
+    @Test
+    void aSecondFinishOnTheSameLapWithoutDeletionReplacesTheFirst() {
+        Heat heat = prepared();
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 61_230, T0.plusSeconds(61)));
+        heat.touch(TestMessageCreator.finAt(1, 1, 2, 61_400, T0.plusSeconds(62)));
+
+        heat.touch(TestMessageCreator.finAt(1, 1, 1, 61_500, T0.plusSeconds(70)));
+
+        assertThat(lane(heat, 1).times()).extracting(LaneTime::timeInMillis, LaneTime::deleted)
+                                         .containsExactly(tuple(61_230, false), tuple(61_500, false));
+        assertThat(lane(heat, 1).finish().orElseThrow().timeInMillis()).isEqualTo(61_500);
+        assertThat(lane(heat, 1).place()).isEqualTo(2);
+        assertThat(lane(heat, 2).place()).isEqualTo(1);
+    }
+
+    @Test
     void aSplitAfterTheFinishDoesNotReplaceIt() {
         Heat heat = prepared();
         heat.touch(TestMessageCreator.fin(1, 1, 1, 0, 25_000));

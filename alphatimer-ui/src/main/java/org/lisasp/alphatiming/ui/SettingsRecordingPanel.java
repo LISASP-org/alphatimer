@@ -479,7 +479,6 @@ public final class SettingsRecordingPanel extends JPanel {
         recordToggle.setToolTipText(rules.recordHint().orElse(null));
     }
 
-    /** Offers exactly the given choices, keeping the selected one. */
     private <T> void offer(JComboBox<T> combo, List<T> choices) {
         List<T> offered = new ArrayList<>();
         for (int i = 0; i < combo.getItemCount(); i++) {
@@ -531,7 +530,7 @@ public final class SettingsRecordingPanel extends JPanel {
     }
 
     List<Component> lockableInputs() {
-        return List.of(system, connectionType, host, competitionKey, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, lenexFile, chooseLenexFile, lenexInterval, timekeepingOffset, autoSave, restPort, serverToggle);
+        return List.of(system, connectionType, host, competitionKey, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, lenexFile, chooseLenexFile, lenexInterval, timekeepingOffset, autoSave);
     }
 
     JComboBox<Input> systemCombo() {

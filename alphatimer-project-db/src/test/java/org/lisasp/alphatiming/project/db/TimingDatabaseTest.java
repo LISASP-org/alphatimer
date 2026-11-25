@@ -3,11 +3,15 @@ package org.lisasp.alphatiming.project.db;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -152,6 +156,107 @@ class TimingDatabaseTest {
             }
             pool.shutdown();
             assertThat(countSettings(db)).isEqualTo(40);
+            db.closeAndDelete();
+        }
+    }
+
+    private static final LocalDateTime TEN_O_CLOCK = LocalDateTime.of(2026, 5, 1, 10, 0);
+
+    private Path projectFile(String timeZone) throws Exception {
+        Path file = dir.resolve("zone.timing");
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            db.write(em -> {
+                SettingsEntity settings = new SettingsEntity("host", 1234, 60, 1999);
+                settings.setTimeZone(timeZone);
+                em.persist(settings);
+                return null;
+            });
+            db.snapshotTo(file);
+            db.closeAndDelete();
+        }
+        return file;
+    }
+
+    private static long storedMillis(TimingDatabase db, String table) {
+        return db.read(em -> ((Number) em.createNativeQuery("select cast(timestamp as integer) from " + table).getSingleResult()).longValue());
+    }
+
+    @Test
+    void timesAreStoredAsEpochMillisInTheZoneOfTheProject() throws Exception {
+        long tenInNewYork = TEN_O_CLOCK.atZone(ZoneId.of("America/New_York")).toInstant().toEpochMilli();
+        try (TimingDatabase db = TimingDatabase.openCopy(projectFile("America/New_York"), Files.createDirectory(dir.resolve("work")))) {
+            new MessageStore(db).put(MessageStoreTest.message("TestWK", (short) 1, (byte) 1, TEN_O_CLOCK));
+            new LenexVersionStore(db).record(TEN_O_CLOCK, "<LENEX />".getBytes(StandardCharsets.UTF_8), true);
+            db.write(em -> {
+                em.persist(new RawDataChunkEntity(TEN_O_CLOCK, new byte[] {1}));
+                return null;
+            });
+
+            assertThat(storedMillis(db, "aresmessage")).isEqualTo(tenInNewYork);
+            assertThat(storedMillis(db, "lenexversion")).isEqualTo(tenInNewYork);
+            assertThat(storedMillis(db, "rawdata")).isEqualTo(tenInNewYork);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void storedTimesAreReadInTheZoneOfTheProject() throws Exception {
+        long tenInNewYork = TEN_O_CLOCK.atZone(ZoneId.of("America/New_York")).toInstant().toEpochMilli();
+        try (TimingDatabase db = TimingDatabase.openCopy(projectFile("America/New_York"), Files.createDirectory(dir.resolve("work")))) {
+            LenexVersionStore store = new LenexVersionStore(db);
+            store.record(TEN_O_CLOCK.minusHours(3), "<LENEX />".getBytes(StandardCharsets.UTF_8), true);
+            db.write(em -> em.createNativeQuery("update lenexversion set timestamp = " + tenInNewYork).executeUpdate());
+
+            assertThat(store.findAll().getFirst().arrival()).isEqualTo(TEN_O_CLOCK);
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void aFileWithDataButWithoutTimeZoneIsReadInEuropeBerlinAndKeepsThatZone() throws Exception {
+        long tenInBerlin = TEN_O_CLOCK.atZone(ZoneId.of("Europe/Berlin")).toInstant().toEpochMilli();
+        Path older = dir.resolve("older.timing");
+        try (TimingDatabase db = TimingDatabase.openCopy(projectFile(null), Files.createDirectory(dir.resolve("first")))) {
+            new MessageStore(db).put(MessageStoreTest.message("TestWK", (short) 1, (byte) 1, TEN_O_CLOCK));
+            db.write(em -> em.createNativeQuery("update settings set timeZone = null").executeUpdate());
+            db.snapshotTo(older);
+            db.closeAndDelete();
+        }
+        try (TimingDatabase db = TimingDatabase.openCopy(older, Files.createDirectory(dir.resolve("work")))) {
+            LenexVersionStore store = new LenexVersionStore(db);
+            store.record(TEN_O_CLOCK.minusHours(3), "<LENEX />".getBytes(StandardCharsets.UTF_8), true);
+            db.write(em -> em.createNativeQuery("update lenexversion set timestamp = " + tenInBerlin).executeUpdate());
+
+            assertThat(store.findAll().getFirst().arrival()).isEqualTo(TEN_O_CLOCK);
+            assertThat(db.timeZone()).isEqualTo(ZoneId.of("Europe/Berlin"));
+            Object stored = db.read(em -> em.createNativeQuery("select timeZone from settings").getSingleResult());
+            assertThat(stored).isEqualTo("Europe/Berlin");
+            db.closeAndDelete();
+        }
+    }
+
+    @Test
+    void aFileWithoutDataTakesTheZoneOfThisComputerAndStoresItWithItsFirstData() throws Exception {
+        TimeZone before = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"));
+        try (TimingDatabase db = TimingDatabase.openCopy(projectFile(null), Files.createDirectory(dir.resolve("work")))) {
+            assertThat(db.timeZone()).isEqualTo(ZoneId.of("Asia/Tokyo"));
+            assertThat(db.<Object>read(em -> em.createNativeQuery("select timeZone from settings").getSingleResult())).isNull();
+
+            new MessageStore(db).put(MessageStoreTest.message("TestWK", (short) 1, (byte) 1, TEN_O_CLOCK));
+
+            assertThat(db.<Object>read(em -> em.createNativeQuery("select timeZone from settings").getSingleResult())).isEqualTo("Asia/Tokyo");
+            assertThat(storedMillis(db, "aresmessage")).isEqualTo(TEN_O_CLOCK.atZone(ZoneId.of("Asia/Tokyo")).toInstant().toEpochMilli());
+            db.closeAndDelete();
+        } finally {
+            TimeZone.setDefault(before);
+        }
+    }
+
+    @Test
+    void aNewProjectTakesTheZoneOfThisComputer() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            assertThat(db.timeZone()).isEqualTo(ZoneId.systemDefault());
             db.closeAndDelete();
         }
     }

@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
+import java.util.TimeZone;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -57,6 +58,17 @@ class Version1FixtureTest {
             LaneDto third = heat.lanes().get(2);
             assertThat(third.penalties()).containsExactly(Penalty.DidNotStart);
             assertThat(third.place()).isZero();
+        }
+    }
+
+    @Test
+    void theHeatsOfAVersion1FileAreShownAtTheirBerlinTimesInAnyDefaultTimeZone() throws Exception {
+        TimeZone before = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+        try {
+            theHeatsOfAVersion1FileAreShown();
+        } finally {
+            TimeZone.setDefault(before);
         }
     }
 

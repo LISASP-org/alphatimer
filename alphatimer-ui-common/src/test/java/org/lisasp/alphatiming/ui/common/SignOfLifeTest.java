@@ -2,6 +2,7 @@ package org.lisasp.alphatiming.ui.common;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -16,16 +17,16 @@ class SignOfLifeTest {
 
     @Test
     void withoutAnythingReceivedThereIsNoRecentSignOfLife() {
-        assertThat(signOfLife.isRecent()).isFalse();
+        assertThat(signOfLife.isRecent(SignOfLife.STREAM_SILENT_AFTER)).isFalse();
     }
 
     @Test
     void whatWasReceivedIsRecentForFiveSeconds() {
         signOfLife.received();
-        assertThat(signOfLife.isRecent()).isTrue();
+        assertThat(signOfLife.isRecent(SignOfLife.STREAM_SILENT_AFTER)).isTrue();
 
         now.set(T0.plusSeconds(5));
-        assertThat(signOfLife.isRecent()).isTrue();
+        assertThat(signOfLife.isRecent(SignOfLife.STREAM_SILENT_AFTER)).isTrue();
     }
 
     @Test
@@ -33,7 +34,18 @@ class SignOfLifeTest {
         signOfLife.received();
 
         now.set(T0.plusSeconds(5).plusNanos(1_000_000));
-        assertThat(signOfLife.isRecent()).isFalse();
+        assertThat(signOfLife.isRecent(SignOfLife.STREAM_SILENT_AFTER)).isFalse();
+    }
+
+    @Test
+    void howLongASignOfLifeIsRecentDependsOnTheInput() {
+        signOfLife.received();
+
+        now.set(T0.plusSeconds(15));
+        assertThat(signOfLife.isRecent(Duration.ofSeconds(15))).isTrue();
+
+        now.set(T0.plusSeconds(15).plusNanos(1_000_000));
+        assertThat(signOfLife.isRecent(Duration.ofSeconds(15))).isFalse();
     }
 
     @Test
@@ -42,7 +54,7 @@ class SignOfLifeTest {
 
         signOfLife.forget();
 
-        assertThat(signOfLife.isRecent()).isFalse();
+        assertThat(signOfLife.isRecent(SignOfLife.STREAM_SILENT_AFTER)).isFalse();
     }
 
     @Test
@@ -56,14 +68,14 @@ class SignOfLifeTest {
     void aMessageIsShownForOneHundredMillisecondsAndStaysASignOfLife() {
         signOfLife.messageReceived();
         assertThat(signOfLife.isShowingMessage()).isTrue();
-        assertThat(signOfLife.isRecent()).isTrue();
+        assertThat(signOfLife.isRecent(SignOfLife.STREAM_SILENT_AFTER)).isTrue();
 
         now.set(T0.plusNanos(100_000_000));
         assertThat(signOfLife.isShowingMessage()).isTrue();
 
         now.set(T0.plusNanos(101_000_000));
         assertThat(signOfLife.isShowingMessage()).isFalse();
-        assertThat(signOfLife.isRecent()).isTrue();
+        assertThat(signOfLife.isRecent(SignOfLife.STREAM_SILENT_AFTER)).isTrue();
     }
 
     @Test

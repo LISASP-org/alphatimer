@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -22,7 +23,7 @@ public class LenexVersionStore {
 
     public void record(LocalDateTime arrival, byte[] xml, boolean resultsChanged) {
         byte[] compressed = compress(xml);
-        db.write(em -> {
+        db.writeRecorded(em -> {
             List<LenexVersionEntity> last = em.createQuery("select v from LenexVersionEntity v order by v.id desc", LenexVersionEntity.class)
                                              .setMaxResults(1)
                                              .getResultList();
@@ -38,8 +39,20 @@ public class LenexVersionStore {
         return db.read(em -> em.createQuery("select v from LenexVersionEntity v order by v.id", LenexVersionEntity.class)
                                .getResultList()
                                .stream()
-                               .map(v -> new LenexVersion(v.getTimestamp(), decompress(v.getData())))
+                               .map(LenexVersionStore::toVersion)
                                .toList());
+    }
+
+    public Optional<LenexVersion> findLast() {
+        return db.read(em -> em.createQuery("select v from LenexVersionEntity v order by v.id desc", LenexVersionEntity.class)
+                               .setMaxResults(1)
+                               .getResultStream()
+                               .findFirst()
+                               .map(LenexVersionStore::toVersion));
+    }
+
+    private static LenexVersion toVersion(LenexVersionEntity entity) {
+        return new LenexVersion(entity.getTimestamp(), decompress(entity.getData()));
     }
 
     private static byte[] compress(byte[] data) {

@@ -38,10 +38,16 @@ public class TakeOverTimeParser implements Parser {
                 message.getLane() > 0 &&
                 message.getRank() == 0 &&
                 message.getTimeInfo() == TimeInfo.Normal &&
-                ((message.getRankInfo() == RankInfo.Normal) &&
-                        (message.getTimeMarker() == TimeMarker.Plus || message.getTimeMarker() == TimeMarker.Minus) &&
-                        (message.getTimeType() == TimeType.PlatformTimeAfterTouchpadTime || message.getTimeType() == TimeType.PlatformTimeBeforeTouchpadTime))
-                || (message.getRankInfo() == RankInfo.Disqualified && message.getTimeMarker() == TimeMarker.Empty && message.getTimeType() == TimeType.Empty)
-                ;
+                message.getRankInfo() == RankInfo.StartingBlock &&
+                (hasPlatformTime(message) || hasNoTimeMarker(message));
+    }
+
+    private static boolean hasPlatformTime(DataHandlingMessage message) {
+        return (message.getTimeMarker() == TimeMarker.Plus || message.getTimeMarker() == TimeMarker.Minus) &&
+                (message.getTimeType() == TimeType.PlatformTimeAfterTouchpadTime || message.getTimeType() == TimeType.PlatformTimeBeforeTouchpadTime);
+    }
+
+    private static boolean hasNoTimeMarker(DataHandlingMessage message) {
+        return message.getTimeMarker() == TimeMarker.Empty && message.getTimeType() == TimeType.Empty;
     }
 }

@@ -180,7 +180,7 @@ public final class LenexRefiner {
         for (LenexResult result : heat.results()) {
             Optional<Optional<Penalty>> penalty = penalty(result.status());
             if (penalty.isEmpty()) {
-                log.debug("Skipped the result in lane {} of heat {}/{} with status {}", result.lane(), event.number(), heat.number(), result.status());
+                log.warn("Skipped the result in lane {} of heat {}/{} with status {}", result.lane(), event.number(), heat.number(), result.status());
                 continue;
             }
             if (result.lane() < 0 || result.lane() > Byte.MAX_VALUE) {

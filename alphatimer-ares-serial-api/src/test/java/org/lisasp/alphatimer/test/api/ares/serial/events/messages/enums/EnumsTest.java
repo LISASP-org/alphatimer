@@ -19,7 +19,7 @@ class EnumsTest {
 
     @Test
     void rankInfo() {
-        Assertions.assertEquals('D', RankInfo.Disqualified.getValue());
+        Assertions.assertEquals('D', RankInfo.StartingBlock.getValue());
     }
 
     @Test

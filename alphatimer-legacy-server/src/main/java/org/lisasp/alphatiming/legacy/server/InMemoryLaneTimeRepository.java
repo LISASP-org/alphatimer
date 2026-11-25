@@ -18,7 +18,7 @@ public final class InMemoryLaneTimeRepository implements LaneTimeRepository {
     }
 
     @Override
-    public synchronized void delete(int event, int heatNumber, int laneIndex, long timeInMillis) {
-        laneTimes.removeIf(t -> t.event() == event && t.heatNumber() == heatNumber && t.laneIndex() == laneIndex && t.timeInMillis() == timeInMillis);
+    public synchronized void delete(int event, int heatNumber, String round, int laneIndex, long timeInMillis) {
+        laneTimes.removeIf(t -> t.event() == event && t.heatNumber() == heatNumber && t.round().equals(round) && t.laneIndex() == laneIndex && t.timeInMillis() == timeInMillis);
     }
 }
