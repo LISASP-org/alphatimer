@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class InMemoryLaneTimeRepositoryTest {
 
     private static LaneTime time(int lane, long millis) {
-        return new LaneTime("WK", 1, 1, lane, millis, null, LocalDateTime.of(2021, 6, 21, 14, 53));
+        return new LaneTime("WK", 1, 1, "", lane, millis, null, LocalDateTime.of(2021, 6, 21, 14, 53));
     }
 
     @Test

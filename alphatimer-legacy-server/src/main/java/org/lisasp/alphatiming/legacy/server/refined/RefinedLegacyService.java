@@ -9,13 +9,20 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.LaneNumbering;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedKindOfTime;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeOrigin;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
+import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.Round;
 import org.lisasp.alphatiming.legacy.api.Heat;
 import org.lisasp.alphatiming.legacy.api.LaneStatus;
 import org.lisasp.alphatiming.legacy.server.LaneTime;
 import org.lisasp.alphatiming.legacy.server.LaneTimeRepository;
 
+import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.SequencedSet;
+import java.util.stream.Collectors;
 
 /** The heats of {@code LegacyService}, built from the refined messages instead of the ARES messages. */
 public final class RefinedLegacyService implements RefinedMessageListener {
@@ -57,6 +64,7 @@ public final class RefinedLegacyService implements RefinedMessageListener {
         store.save(new LaneTime(time.getCompetition(),
                                 time.getEvent(),
                                 time.getHeat(),
+                                time.getRound(),
                                 time.getLane(),
                                 time.getTimeInMillis(),
                                 statusOf(time),
@@ -88,12 +96,49 @@ public final class RefinedLegacyService implements RefinedMessageListener {
     public Heat[] getHeats() {
         int firstLane = numbering == LaneNumbering.ZeroBased ? 0 : 1;
         HashMap<String, Heat> heats = new HashMap<>();
-        List<LaneTime> laneTimes = store.findAll().stream().sorted().toList();
+        List<LaneTime> stored = store.findAll();
+        Map<String, String> servedRounds = servedRounds(stored);
+        List<LaneTime> laneTimes = stored.stream().sorted().toList();
         for (LaneTime laneTime : laneTimes) {
+            if (!laneTime.round().equals(servedRounds.get(keyOf(laneTime)))) {
+                continue;
+            }
             Heat heat = heats.computeIfAbsent(Heat.computeKey(laneTime.event(), laneTime.heatNumber()),
                                               key -> new Heat("" + (heats.size() + 1), laneTime.event(), laneTime.heatNumber()));
             heat.store(laneTime.laneIndex() - firstLane, laneTime.timeInMillis(), laneTime.status());
         }
         return heats.values().stream().sorted().toArray(Heat[]::new);
+    }
+
+    private static String keyOf(LaneTime laneTime) {
+        return Heat.computeKey(laneTime.event(), laneTime.heatNumber());
+    }
+
+    /**
+     * The legacy format has no round, so of the rounds sharing an event and heat number only the one with the newest time
+     * is served. All times of one LENEX version share its arrival; such a tie goes to the later round of the competition,
+     * or to the round stored last when one of them is not a known {@link Round}.
+     */
+    private static Map<String, String> servedRounds(List<LaneTime> stored) {
+        Map<String, List<LaneTime>> byHeat = stored.stream().collect(Collectors.groupingBy(RefinedLegacyService::keyOf));
+        Map<String, String> rounds = new HashMap<>();
+        byHeat.forEach((key, times) -> rounds.put(key, newestRound(times)));
+        return rounds;
+    }
+
+    private static String newestRound(List<LaneTime> times) {
+        LocalDateTime newest = times.stream().map(LaneTime::timestamp).max(LocalDateTime::compareTo).orElseThrow();
+        SequencedSet<String> tied = times.stream()
+                                         .filter(t -> t.timestamp().equals(newest))
+                                         .map(LaneTime::round)
+                                         .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (!tied.stream().allMatch(RefinedLegacyService::isKnownRound)) {
+            return tied.getLast();
+        }
+        return tied.stream().max((a, b) -> Round.valueOf(a).compareTo(Round.valueOf(b))).orElseThrow();
+    }
+
+    private static boolean isKnownRound(String round) {
+        return Arrays.stream(Round.values()).anyMatch(r -> r.name().equals(round));
     }
 }

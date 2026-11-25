@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public record LaneTime(String competition,
                        int event,
                        int heatNumber,
+                       String round,
                        int laneIndex,
                        long timeInMillis,
                        LaneStatus status,

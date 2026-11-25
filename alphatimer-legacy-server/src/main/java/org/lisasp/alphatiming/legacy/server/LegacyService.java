@@ -50,6 +50,7 @@ public final class LegacyService implements DataHandlingMessageListener {
         store.save(new LaneTime(message.getCompetition(),
                                 message.getEvent(),
                                 message.getHeat(),
+                                "",
                                 message.getLane() - 1,
                                 message.getTimeInMillis(),
                                 status,
