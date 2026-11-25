@@ -179,9 +179,11 @@
                         <configuration>
                             <targetClasses>
                                 <param>org.lisasp.alphatiming.*</param>
+                                <param>org.lisasp.alphatimer.*</param>
                             </targetClasses>
                             <targetTests>
                                 <param>org.lisasp.alphatiming.*</param>
+                                <param>org.lisasp.alphatimer.*</param>
                             </targetTests>
                             <outputFormats>
                                 <param>HTML</param>

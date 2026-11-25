@@ -1,5 +1,9 @@
 # Heat-Timing — Design
 
+> **Note (2026-11-25):** This is the record of how the project started. The Spring Boot application *alphatimer* no
+> longer exists; the protocol and refiner modules described here as copied from `../alphatimer` are AlphaTiming's own
+> modules.
+
 ## Purpose
 
 Heat-Timing is a Swing desktop application that reads the data of a Quantum/Ares timekeeping system over TCP, stores

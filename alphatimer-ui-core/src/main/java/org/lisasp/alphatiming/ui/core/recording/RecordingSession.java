@@ -57,7 +57,7 @@ public final class RecordingSession implements AutoCloseable {
         SerialPortReader create(Settings settings);
     }
 
-    /** The copied pipeline tags every message with a competition; a project holds exactly one, so the tag is constant. */
+    /** A project holds exactly one competition, so the competition tag of every message is constant. */
     private static final String COMPETITION = "";
     private static final int REPLAY_BAUD_RATE = 9600;
 

@@ -218,8 +218,8 @@ untrusted input:
 - Single test class / method: `mvn -pl <module> -am test -Dtest=ClassName` / `-Dtest=ClassName#methodName` (add
   `-Dsurefire.failIfNoSpecifiedTests=false` when `-am` pulls in modules without that test)
 - Mutation testing (PIT, profile `mutation`): `mvn -Pmutation -pl <module> -am clean test-compile
-  org.pitest:pitest-maven:mutationCoverage`; the report is in `<module>/target/pit-reports/`. Only AlphaTiming's own
-  classes (`org.lisasp.alphatiming.*`) are mutated, not the protocol and refiner modules (`org.lisasp.alphatimer.*`). Narrow a run with
+  org.pitest:pitest-maven:mutationCoverage`; the report is in `<module>/target/pit-reports/`. All of AlphaTiming's
+  classes are mutated (`org.lisasp.alphatiming.*` and the protocol and refiner modules, `org.lisasp.alphatimer.*`). Narrow a run with
   `-DtargetClasses=<classes> -DtargetTests=<tests>`.
 - Run: `java -jar alphatimer-ui/target/alphatiming.jar` (after `mvn package`); state lives in `~/.alphatiming/`
   (`defaults.json`, `work/`). Main class `org.lisasp.alphatiming.ui.AlphaTimingLauncher`.
