@@ -130,6 +130,11 @@ public final class RecordingSession implements AutoCloseable {
             fail(new RecordingError(RecordingError.Kind.INVALID_SETTINGS, "", problems));
             return;
         }
+        Input held = recorded;
+        if (held != null && held != snapshot.connectionType().input()) {
+            fail(new RecordingError(RecordingError.Kind.OTHER_INPUT_RECORDED, held.name()));
+            return;
+        }
         try {
             if (snapshot.connectionType() == ConnectionType.LENEX) {
                 startLenex(snapshot);

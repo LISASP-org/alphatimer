@@ -140,6 +140,18 @@ class LenexRecordingSessionTest {
     }
 
     @Test
+    void aProjectWithLenexDataRecordsNoOtherInput() {
+        new LenexVersionStore(db).record(LocalDateTime.of(2026, 1, 10, 10, 0), MEET.getBytes(StandardCharsets.UTF_8), true);
+
+        try (RecordingSession opened = new RecordingSession(db, RecordingSession.standard(), LocalDateTime::now)) {
+            opened.start(new Settings("localhost", 8585, 60, 1999).withCompetitionKey("WK"));
+
+            assertThat(opened.state()).isEqualTo(RecordingState.ERROR);
+            assertThat(opened.error()).isEqualTo(new RecordingError(RecordingError.Kind.OTHER_INPUT_RECORDED, "LENEX"));
+        }
+    }
+
+    @Test
     void lenexIsNotLive() {
         assertThat(RecordingSession.isLive(lenex())).isFalse();
         assertThat(RecordingSession.isLive(lenex().withConnectionType(ConnectionType.TCP))).isTrue();

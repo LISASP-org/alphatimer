@@ -163,6 +163,8 @@ untrusted input:
 
 - Settings are validated by `Settings.validate()` (a list of `SettingsProblem`) before a recording starts; the UI surfaces the first problem at the
   fields and a failing start ends in the ERROR state, never in an exception dialog.
+- A project records one input only (ARES or LENEX): once it holds data, `RecordingSession.start` refuses the other
+  input (`RecordingError.Kind.OTHER_INPUT_RECORDED`), whatever the settings form offered.
 - A serial port that is missing or in use ends the start in the ERROR state (`SerialConnectionException`), never in a crash.
 - nrjavaserial aborts the whole JVM natively on a port name of 54 bytes or more. Every name passes
   `SerialPorts.fitsDriver` (`MAX_NAME_BYTES`) before nrjavaserial sees it: `Settings.validate()`, `NrSerialReader.start()`
