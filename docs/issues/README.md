@@ -13,6 +13,7 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
+| [The first time of a heat is lost when it opens the heat](first-time-of-a-heat-is-lost.md) | High | S | A heat first known through a time drops that time: its lane is still unused when the time arrives, the used lanes follow after it. |
 | [Backup times do not become official](backup-times-not-interpreted.md) | Medium | M | Backup times are kept beside the finish but never become official, not even when the operator takes one for a lane. |
 | [LENEX rounds with the same heat number merge into one legacy heat](lenex-rounds-merge-in-legacy-heats.md) | Medium | M | A LENEX event number used in several rounds puts the times of all rounds into one legacy heat; JAuswertung may preselect a time of another round. |
 | [How deleted times are handled is not settled](deleted-times-handling.md) | Medium | M | Deletions mark every entry with the same lap and value, and a re-sent time counts again; both rules are inferred, not confirmed by ARES or recordings. |
