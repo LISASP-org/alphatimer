@@ -8,7 +8,6 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.*;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.values.UsedLanes;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TakeOverTimeMessage;
-import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedTakeOverTimeMessage;
 import org.lisasp.alphatimer.refinedmessages.DataHandlingMessageRefiner;
@@ -16,6 +15,7 @@ import org.lisasp.alphatimer.refinedmessages.DataHandlingMessageRefiner;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.lisasp.alphatimer.test.refinedmessages.UsedLanesMessages.usedLanes;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class TakeOverTimeMessageTest {
@@ -59,7 +59,7 @@ class TakeOverTimeMessageTest {
                 TimeMarker.Plus));
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new TakeOverTimeMessage(TIMESTAMP,
                                          "TestWK",
                                          event,
@@ -100,7 +100,7 @@ class TakeOverTimeMessageTest {
         refiner.accept(message);
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new DroppedTakeOverTimeMessage(message)), listener.received);
     }
 
@@ -132,7 +132,7 @@ class TakeOverTimeMessageTest {
         refiner.accept(message);
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new DroppedTakeOverTimeMessage(message)), listener.received);
     }
 
@@ -163,7 +163,7 @@ class TakeOverTimeMessageTest {
         refiner.accept(message);
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new DroppedTakeOverTimeMessage(message)), listener.received);
     }
 
@@ -195,7 +195,7 @@ class TakeOverTimeMessageTest {
         refiner.accept(message);
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new DroppedTakeOverTimeMessage(message)), listener.received);
     }
 
@@ -227,7 +227,7 @@ class TakeOverTimeMessageTest {
         refiner.accept(message);
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new DroppedTakeOverTimeMessage(message)), listener.received);
     }
 

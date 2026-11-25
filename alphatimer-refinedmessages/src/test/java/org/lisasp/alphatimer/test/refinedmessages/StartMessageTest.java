@@ -8,7 +8,6 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.*;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.values.UsedLanes;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.StartMessage;
-import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedStartMessage;
@@ -17,6 +16,7 @@ import org.lisasp.alphatimer.refinedmessages.DataHandlingMessageRefiner;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.lisasp.alphatimer.test.refinedmessages.UsedLanesMessages.usedLanes;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class StartMessageTest {
@@ -59,7 +59,7 @@ class StartMessageTest {
                 TimeMarker.Empty));
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new StartMessage(
                         TIMESTAMP,
                         "TestWK",
@@ -98,7 +98,7 @@ class StartMessageTest {
                 TimeMarker.Empty));
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new DroppedStartMessage(new DataHandlingMessage(
                         TIMESTAMP,
                         "TestWK",
@@ -145,7 +145,7 @@ class StartMessageTest {
                 TimeMarker.Empty));
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new DroppedStartMessage(new DataHandlingMessage(
                         TIMESTAMP,
                         "TestWK",
@@ -192,7 +192,7 @@ class StartMessageTest {
                 TimeMarker.Empty));
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new DroppedStartMessage(new DataHandlingMessage(
                         TIMESTAMP,
                         "TestWK",
@@ -239,7 +239,7 @@ class StartMessageTest {
                 TimeMarker.Empty));
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new DroppedStartMessage(new DataHandlingMessage(
                         TIMESTAMP,
                         "TestWK",
@@ -286,7 +286,7 @@ class StartMessageTest {
                 TimeMarker.DidNotStart));
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new DroppedStartMessage(new DataHandlingMessage(
                         TIMESTAMP,
                         "TestWK",

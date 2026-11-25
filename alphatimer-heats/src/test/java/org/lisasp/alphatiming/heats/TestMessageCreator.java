@@ -17,6 +17,8 @@ import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageTy
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Test helper that builds refined messages for competition "WK". */
 public final class TestMessageCreator {
@@ -27,12 +29,21 @@ public final class TestMessageCreator {
     }
 
     public static UsedLanesMessage used(int event, int heat, String lanes) {
-        return new UsedLanesMessage(T0, "WK", (short) event, (byte) heat, lanes);
+        return usedAt(event, heat, lanes, T0);
     }
 
     public static UsedLanesMessage usedInRound(int event, String round, int heat, String lanes) {
-        return new UsedLanesMessage(T0, "WK", (short) event, (byte) heat, round, new UsedLanesMessage(T0, "WK", (short) event, (byte) heat, lanes).getLanes(),
-                                    LaneNumbering.OneBased);
+        return new UsedLanesMessage(T0, "WK", (short) event, (byte) heat, round, aresLanes(lanes), LaneNumbering.OneBased);
+    }
+
+    private static List<Integer> aresLanes(String flags) {
+        List<Integer> lanes = new ArrayList<>();
+        for (int flag = 0; flag < flags.length(); flag++) {
+            if (flags.charAt(flag) == '1') {
+                lanes.add(flag + 1);
+            }
+        }
+        return lanes;
     }
 
     public static UsedLanesMessage usedNumbered(int event, int heat, LaneNumbering numbering, Integer... lanes) {
@@ -50,7 +61,7 @@ public final class TestMessageCreator {
     }
 
     public static UsedLanesMessage usedAt(int event, int heat, String lanes, LocalDateTime at) {
-        return new UsedLanesMessage(at, "WK", (short) event, (byte) heat, lanes);
+        return new UsedLanesMessage(at, "WK", (short) event, (byte) heat, "", aresLanes(lanes), LaneNumbering.OneBased);
     }
 
     public static TimeMessage finInRound(int event, String round, int heat, int lane, int millis) {

@@ -7,13 +7,13 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.*;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.values.UsedLanes;
 import org.lisasp.alphatimer.api.refinedmessages.RefinedMessageListener;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.ReadyToStartMessage;
-import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
 import org.lisasp.alphatimer.api.refinedmessages.dropped.DroppedReadyToStartMessage;
 import org.lisasp.alphatimer.refinedmessages.DataHandlingMessageRefiner;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.lisasp.alphatimer.test.refinedmessages.UsedLanesMessages.usedLanes;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ReadyToStartMessageTest {
@@ -56,7 +56,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new ReadyToStartMessage(TIMESTAMP, "TestWK", event, heat, lapCount)), listener.received);
+        assertEquals(List.of(usedLanes(event, heat, "1100000000"), new ReadyToStartMessage(TIMESTAMP, "TestWK", event, heat, lapCount)), listener.received);
     }
 
     @Test
@@ -84,7 +84,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(usedLanes(event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -129,7 +129,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(usedLanes(event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -174,7 +174,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(usedLanes(event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -219,7 +219,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(usedLanes(event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -264,7 +264,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(usedLanes(event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -309,7 +309,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(usedLanes(event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -354,7 +354,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Backup,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(usedLanes(event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -399,7 +399,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Backup,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(usedLanes(event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -444,7 +444,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.DidNotStart));
 
-        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(usedLanes(event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",

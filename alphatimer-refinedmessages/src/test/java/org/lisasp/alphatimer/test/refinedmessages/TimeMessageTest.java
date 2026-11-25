@@ -10,7 +10,6 @@ import org.lisasp.alphatimer.api.ares.serial.events.messages.DataHandlingMessage
 import org.lisasp.alphatimer.api.ares.serial.events.messages.enums.*;
 import org.lisasp.alphatimer.api.ares.serial.events.messages.values.UsedLanes;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.TimeMessage;
-import org.lisasp.alphatimer.api.refinedmessages.accepted.UsedLanesMessage;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedKindOfTime;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedMessageType;
 import org.lisasp.alphatimer.api.refinedmessages.accepted.enums.RefinedTimeType;
@@ -20,6 +19,7 @@ import org.lisasp.alphatimer.refinedmessages.DataHandlingMessageRefiner;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.lisasp.alphatimer.test.refinedmessages.UsedLanesMessages.usedLanes;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class TimeMessageTest {
@@ -66,7 +66,7 @@ class TimeMessageTest {
                 TimeMarker.Empty));
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new TimeMessage(TIMESTAMP,
                                  "TestWK",
                                  event,
@@ -109,7 +109,7 @@ class TimeMessageTest {
         refiner.accept(message);
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new DroppedTimeMessage(message)), listener.received);
     }
 
@@ -140,7 +140,7 @@ class TimeMessageTest {
         refiner.accept(message);
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new DroppedTimeMessage(message)), listener.received);
     }
 
@@ -172,7 +172,7 @@ class TimeMessageTest {
         refiner.accept(message);
 
         assertEquals(List.of(
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                usedLanes(event, heat, "1100000000"),
                 new DroppedTimeMessage(message)), listener.received);
     }
 
@@ -195,7 +195,7 @@ class TimeMessageTest {
     void theUsedLanesComeBeforeTheTimeOfTheSameMessage() {
         refiner.accept(time(MessageType.OnLineTime, TimeType.Empty, (byte) 2, TimeInfo.Normal));
 
-        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", EVENT, HEAT, "1100000000"), refined(RefinedMessageType.Live, RefinedTimeType.Normal)),
+        assertEquals(List.of(usedLanes(EVENT, HEAT, "1100000000"), refined(RefinedMessageType.Live, RefinedTimeType.Normal)),
                      listener.received);
     }
 
