@@ -149,7 +149,7 @@ The code of an area is split into two modules, and new areas follow it:
 - A project holds exactly one competition. Its key is a setting (`Settings.competitionKey`, the `competitionKey` column of
   `settings`), stored once per project file and required to start a recording; changing it applies to all data of the
   project, including what was recorded before. Recorded data is therefore not tagged with the key: a heat is identified
-  by event and heat number only. The protocol pipeline still tags messages with a
+  by event, round and heat number only. The protocol pipeline still tags messages with a
   competition, which `RecordingSession` fills with a constant; heats ignore it, `aresmessage.competitionKey`
   stores it, and queries do not filter by it. Older project files keep their stored tags there;
   files written while the key was ignored have no key.
