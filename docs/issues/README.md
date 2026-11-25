@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [Backup times do not become official](backup-times-not-interpreted.md) | Medium | M | Backup times are kept beside the finish but never become official, not even when the operator takes one for a lane. |
 | [LENEX rounds with the same heat number merge into one legacy heat](lenex-rounds-merge-in-legacy-heats.md) | Medium | M | A LENEX event number used in several rounds puts the times of all rounds into one legacy heat; JAuswertung may preselect a time of another round. |
 | [How deleted times are handled is not settled](deleted-times-handling.md) | Medium | M | Deletions mark every entry with the same lap and value, and a re-sent time counts again; both rules are inferred, not confirmed by ARES or recordings. |
 | [The version 1 fixture test depends on the time zone](version1-fixture-depends-on-time-zone.md) | Low | S | `Version1FixtureTest.theHeatsOfAVersion1FileAreShown` fails in a JVM outside Europe/Berlin: the announced heat is two hours off. |
