@@ -531,7 +531,7 @@ public final class SettingsRecordingPanel extends JPanel {
     }
 
     List<Component> lockableInputs() {
-        return List.of(system, connectionType, host, competitionKey, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, lenexFile, chooseLenexFile, lenexInterval, timekeepingOffset, autoSave, restPort, serverToggle);
+        return List.of(system, connectionType, host, competitionKey, port, serialPort, refreshPorts, serialMode, replayFile, chooseFile, lenexFile, chooseLenexFile, lenexInterval, timekeepingOffset, autoSave);
     }
 
     JComboBox<Input> systemCombo() {

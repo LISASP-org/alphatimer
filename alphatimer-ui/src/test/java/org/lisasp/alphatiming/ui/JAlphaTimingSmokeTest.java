@@ -164,6 +164,7 @@ class JAlphaTimingSmokeTest {
                 assertThat(frame.settingsPanel().recordToggle().isSelected()).isTrue();
                 assertThat(frame.settingsPanel().recordToggle().getText()).isEqualTo(I18n.get("recording.stop"));
                 assertThat(frame.settingsPanel().lockableInputs()).isNotEmpty().allSatisfy(c -> assertThat(c.isEnabled()).as(c.getClass().getSimpleName()).isFalse());
+                assertThat(frame.settingsPanel().serverToggle().isEnabled()).isTrue();
             });
 
             HeatDto heat = new HeatDto(3, "", 2, HeatStatus.Started, 2, null, LocalDateTime.now().minusSeconds(5), null, null, null, List.of(
@@ -299,13 +300,15 @@ class JAlphaTimingSmokeTest {
             onEdt(() -> {
                 SettingsRecordingPanel panel = holder[0].settingsPanel();
                 assertThat(panel.serverToggle().isSelected()).isTrue();
-                assertThat(panel.serverPortSpinner().isEnabled()).isTrue();
-                panel.serverToggle().doClick();
-                assertThat(controller.document().settings().restEnabled()).isFalse();
                 assertThat(panel.serverPortSpinner().isEnabled()).isFalse();
                 panel.serverToggle().doClick();
-                assertThat(controller.document().settings().restEnabled()).isTrue();
+                panel.refresh();
+                assertThat(controller.document().settings().restEnabled()).isFalse();
                 assertThat(panel.serverPortSpinner().isEnabled()).isTrue();
+                panel.serverToggle().doClick();
+                panel.refresh();
+                assertThat(controller.document().settings().restEnabled()).isTrue();
+                assertThat(panel.serverPortSpinner().isEnabled()).isFalse();
             });
         } finally {
             shutDown(controller, holder[0]);
