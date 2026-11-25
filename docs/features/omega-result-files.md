@@ -22,9 +22,9 @@ that file; JAuswertung gets the times through the legacy endpoints as usual, so 
   `docs/ares`). Quantum writes `LSTRslt.txt` into the LST working folder (the folder it reads `LSTRACE.TXT`,
   `LSTSTART.TXT`, … from) when a race is made official, if *Save results on official* is on (off by default). With a
   session mask the folder is the `SessionN` subfolder. *Export all results* writes the whole file again.
-- **Format, as far as known:** text, windows-1252, separator `;` (`,` also accepted, as in `AresResultFile`), a header
-  line, one row per lane and lap. Known only from AlphaServer's `FileReader` (two sample rows) and the reader in
-  `AresResultFile`:
+- **Format:** text, windows-1252, CRLF line endings, separator `;` with one after the last column (17 fields per
+  line; `,` also accepted, as in `AresResultFile`), a header line; a file without results is the header alone. Checked
+  against 12 real files of two German championships (2014, 2016; `data/ares`, ignored by Git):
 
   ```
   event;round;heat;lap;lane;idStatus;rank;time ;result ;mod ;btime;bresult;bmod;dtime;dresult;dmod
@@ -32,30 +32,32 @@ that file; JAuswertung gets the times through the legacy endpoints as usual, so 
   1 ;0 ;0 ;50 ;7 ;0 ;1 ;33920 ;" 33.92" ;" " ;33920;" 33.92" ;" " ;0 ;"" ;"" ;
   ```
 
-  | Column | Meaning (assumed where not proven) |
+  | Column | Meaning |
   | --- | --- |
   | `event` | event number |
-  | `round` | `idRound` of `LSTROUND.TXT` |
+  | `round` | `idRound` of `LSTROUND.TXT`; `0` in every sample |
   | `heat` | heat, counted from 0 (as in `LSTSTART.TXT`) |
-  | `lap` | distance in metres at which the time was taken; `0` with lane `0` is the start row (time of day of the start) |
-  | `lane` | lane |
-  | `idStatus` | status, an index into `LstStat.txt` (e.g. DQ); `0` = none |
-  | `rank` | place |
-  | `time`, `result`, `mod` | time in ms, as text, modifier |
+  | `lap` | distance in metres (50, 100, 150, 200); `0` is the start: lane `0` holds the time of day of the start, every lane has a row with time `0` |
+  | `lane` | lane (1 to 8 in the samples) |
+  | `idStatus` | status, an index into `LstStat.txt`; `0` = none; only `64` seen, always on the lane's `lap` 0 row, on lanes without a time (meaning unknown, e.g. DNS or DSQ) |
+  | `rank` | place, on the rows with `lap` above 0 |
+  | `time`, `result`, `mod` | time in ms, as text, modifier: `B` = the time is the backup time (`time` equals `btime`), `E` = edited by hand |
   | `btime`, `bresult`, `bmod` | backup time in ms (`0` = none), as text, modifier |
-  | `dtime`, `dresult`, `dmod` | unknown |
+  | `dtime`, `dresult`, `dmod` | only in the 2016 files; on `lap` 0 about the reaction time (median 0.79 s), on other laps unknown; `dmod` `*` unknown |
 
 - **One folder per competition:** each competition gets its own LST working folder, so the file holds no data of
-  earlier competitions and a recording takes everything in it. Event and heat are unique in the file.
-- **No sample, no specification.** Neither Swiss Timing nor any public source documents the columns, and no real
-  `LSTRslt.txt` is available yet. Program and start lists of the same family are in `data/ares` (ignored by Git).
+  earlier competitions and a recording takes everything in it.
+- **Rows of a heat:** event, heat, lane and lap are unique, but the rows of one heat need not stand together: in the 2014
+  files the start row comes first and the lanes follow later, between the rows of other heats. A lane with only its
+  `lap` 0 row has no time. `time` 0 with `btime` set occurs once in all samples; Quantum normally writes the backup
+  time into `time` and marks it `B`.
 
 ## Stages
 
 1. **Final times (this feature).** Event, round, heat, lane, final time and backup time.
 2. **Everything the file shows (later, separate feature).** Splits from the `lap` rows, the status from `idStatus`
-   (DSQ, DNS, DNF), places. Starts only when a real `LSTRslt.txt` with splits, a disqualification and a heat written
-   twice is available.
+   (DSQ, DNS, DNF), places. Needs the meaning of `idStatus` (`LstStat.txt` of a real installation) and of the `d`
+   columns.
 
 ## Design (stage 1)
 
@@ -70,7 +72,9 @@ ARES messages (would invent protocol messages and bypass the refined path).
 - **Reading:** `LstResultsReader` reads one version of the file into the snapshot. Rows whose event, heat or lane
   cannot be read are skipped, as in `AresResultFile`; the start row (lane 0, lap 0) is skipped. Per lane the final time
   is the `time` of its row with the largest `lap`, the backup time its `btime` if not `0`. Event and heat identify a
-  heat. The file heat `0` is heat `1`.
+  heat; its rows are collected from the whole file, since they need not stand together. A lane with only its `lap` 0
+  row has no time. The file heat `0` is heat `1`. The modifier gives the time's kind: `B` makes the final time a backup
+  time (it is the backup button's time), `E` a corrected time (`CorrectedTime`, as an edited time of the line).
 - **Refining:** `LstResultsRefiner.refine(previous, next, arrival)` compares two snapshots, like `LenexRefiner`: a new
   heat gives `UsedLanesMessage` (its lanes, `OneBased`), its final times as `TimeMessage`
   (`RefinedMessageType.CurrentRaceResult`, kind `Finish`, origin `Primary`), the backup times with origin `Backup`, and
@@ -115,11 +119,12 @@ ARES messages (would invent protocol messages and bypass the refined path).
   ones.
 - Whether reading the file and comparing versions share code with `LenexRecording`; no change to the LENEX path in this
   feature.
-- Test data: hand-written files in the format above (as in `AresResultFileTest`), including a heat written twice and a
-  file being rewritten. Checking the reader against a real `LSTRslt.txt` before the first event.
+- Test data: hand-written files in the format above (as in `AresResultFileTest`), including a heat whose rows are spread
+  over the file, the modifiers `B` and `E`, a lane with only its `lap` 0 row and a file being rewritten. The real files in
+  `data/ares` contain personal data and are never committed; the builder may check the reader against them locally.
 
 ## Open questions
 
-- The meaning of `lap` (distance or lap number), `mod`, `dtime`/`dresult`/`dmod`; whether the start row is always lane
-  0, also in a pool numbered from 0 (Quantum's *Pool Config* allows lanes 0 to 9). Until a real file shows it, a lane 0
+- The meaning of `idStatus` and of `dtime`/`dresult`/`dmod` (stage 2).
+- A pool numbered from 0 (Quantum's *Pool Config* allows lanes 0 to 9): the samples only have lanes 1 to 8. A lane 0
   with a `lap` above 0 is read as a lane and makes the numbering `ZeroBased`.
