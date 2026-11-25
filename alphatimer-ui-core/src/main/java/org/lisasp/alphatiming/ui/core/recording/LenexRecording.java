@@ -66,9 +66,8 @@ final class LenexRecording implements AutoCloseable {
         this.time = time;
         this.listener = listener;
         this.writes = writes;
-        List<LenexVersion> versions = store.findAll();
-        if (!versions.isEmpty()) {
-            lastVersion = versions.getLast().xml();
+        store.findLast().ifPresent(last -> {
+            lastVersion = last.xml();
             lastMeet = meetOf(lastVersion);
         }
     }

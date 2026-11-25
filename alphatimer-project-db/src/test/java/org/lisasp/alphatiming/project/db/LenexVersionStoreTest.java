@@ -30,6 +30,19 @@ class LenexVersionStoreTest {
     }
 
     @Test
+    void theLastVersionIsTheNewestOne() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            LenexVersionStore store = new LenexVersionStore(db);
+            assertThat(store.findLast()).isEmpty();
+
+            store.record(T0, xml("A"), true);
+            store.record(T0.plusSeconds(1), xml("B"), true);
+
+            assertThat(store.findLast()).contains(new LenexVersion(T0.plusSeconds(1), xml("B")));
+        }
+    }
+
+    @Test
     void aVersionWithoutResultChangesReplacesThePreviousSuchVersion() throws Exception {
         try (TimingDatabase db = TimingDatabase.createNew(dir)) {
             LenexVersionStore store = new LenexVersionStore(db);
