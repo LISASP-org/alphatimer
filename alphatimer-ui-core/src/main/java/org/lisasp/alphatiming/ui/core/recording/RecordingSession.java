@@ -453,7 +453,6 @@ public final class RecordingSession implements AutoCloseable {
         return Optional.ofNullable(recorded);
     }
 
-    /** Called with every recorded version of the LENEX file. */
     public void addLenexListener(Consumer<LenexChanges> listener) {
         lenexListeners.add(listener);
     }
