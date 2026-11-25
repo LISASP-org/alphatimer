@@ -13,6 +13,7 @@ public class DataHandlingMessageRefiner implements DataHandlingMessageListener {
     private final Notifier<RefinedMessage> notifier = new Notifier<>();
 
     private final Parser[] parsers = new Parser[]{
+            new UsedLanesParser(),
             new ReadyToStartParser(),
             new OfficialEndParser(),
             new TimeParser(),
@@ -21,8 +22,7 @@ public class DataHandlingMessageRefiner implements DataHandlingMessageListener {
             new DidNotFinishParser(),
             new DisqualifiedParser(),
             new TakeOverTimeParser(),
-            new BackupTimeParser(),
-            new UsedLanesParser()
+            new BackupTimeParser()
     };
 
     @Override

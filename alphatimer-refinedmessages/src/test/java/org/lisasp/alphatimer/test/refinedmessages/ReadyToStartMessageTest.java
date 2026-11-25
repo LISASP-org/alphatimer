@@ -56,7 +56,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new ReadyToStartMessage(TIMESTAMP, "TestWK", event, heat, lapCount), new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new ReadyToStartMessage(TIMESTAMP, "TestWK", event, heat, lapCount)), listener.received);
     }
 
     @Test
@@ -84,7 +84,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -101,7 +101,7 @@ class ReadyToStartMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.Empty)), new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -129,7 +129,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -146,7 +146,7 @@ class ReadyToStartMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.Empty)), new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -174,7 +174,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -191,7 +191,7 @@ class ReadyToStartMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.Empty)), new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -219,7 +219,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -236,7 +236,7 @@ class ReadyToStartMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.Empty)), new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -264,7 +264,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -281,7 +281,7 @@ class ReadyToStartMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.Empty)), new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -309,7 +309,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -326,7 +326,7 @@ class ReadyToStartMessageTest {
                 (byte) 1,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.Empty)), new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -354,7 +354,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Backup,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -371,7 +371,7 @@ class ReadyToStartMessageTest {
                 (byte) 0,
                 12345,
                 TimeInfo.Backup,
-                TimeMarker.Empty)), new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -399,7 +399,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Backup,
                 TimeMarker.Empty));
 
-        assertEquals(List.of(new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -416,7 +416,7 @@ class ReadyToStartMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Backup,
-                TimeMarker.Empty)), new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+                TimeMarker.Empty))), listener.received);
     }
 
     @Test
@@ -444,7 +444,7 @@ class ReadyToStartMessageTest {
                 TimeInfo.Normal,
                 TimeMarker.DidNotStart));
 
-        assertEquals(List.of(new DroppedReadyToStartMessage(new DataHandlingMessage(
+        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"), new DroppedReadyToStartMessage(new DataHandlingMessage(
                 TIMESTAMP,
                 "TestWK",
                 "1", "2",
@@ -461,6 +461,6 @@ class ReadyToStartMessageTest {
                 (byte) 0,
                 0,
                 TimeInfo.Normal,
-                TimeMarker.DidNotStart)), new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+                TimeMarker.DidNotStart))), listener.received);
     }
 }

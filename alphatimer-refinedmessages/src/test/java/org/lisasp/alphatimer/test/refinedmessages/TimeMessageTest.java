@@ -66,6 +66,7 @@ class TimeMessageTest {
                 TimeMarker.Empty));
 
         assertEquals(List.of(
+                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
                 new TimeMessage(TIMESTAMP,
                                  "TestWK",
                                  event,
@@ -77,8 +78,7 @@ class TimeMessageTest {
                                  lapCount,
                                  (byte) 0,
                                  0,
-                                 RefinedTimeType.Normal, RefinedTimeOrigin.Primary),
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+                                 RefinedTimeType.Normal, RefinedTimeOrigin.Primary)), listener.received);
     }
 
     @Test
@@ -109,8 +109,8 @@ class TimeMessageTest {
         refiner.accept(message);
 
         assertEquals(List.of(
-                new DroppedTimeMessage(message),
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                new DroppedTimeMessage(message)), listener.received);
     }
 
     @Test
@@ -140,8 +140,8 @@ class TimeMessageTest {
         refiner.accept(message);
 
         assertEquals(List.of(
-                new DroppedTimeMessage(message),
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                new DroppedTimeMessage(message)), listener.received);
     }
 
     @Test
@@ -172,8 +172,8 @@ class TimeMessageTest {
         refiner.accept(message);
 
         assertEquals(List.of(
-                new DroppedTimeMessage(message),
-                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000")), listener.received);
+                new UsedLanesMessage(TIMESTAMP, "TestWK", event, heat, "1100000000"),
+                new DroppedTimeMessage(message)), listener.received);
     }
 
     private static final byte LAP_COUNT = 2;
@@ -189,6 +189,14 @@ class TimeMessageTest {
     private static TimeMessage refined(RefinedMessageType messageType, RefinedTimeType timeType) {
         return new TimeMessage(TIMESTAMP, "TestWK", EVENT, HEAT, messageType, RefinedKindOfTime.Finish, (byte) 2, (byte) 2, LAP_COUNT, (byte) 1,
                                65_430, timeType, RefinedTimeOrigin.Primary);
+    }
+
+    @Test
+    void theUsedLanesComeBeforeTheTimeOfTheSameMessage() {
+        refiner.accept(time(MessageType.OnLineTime, TimeType.Empty, (byte) 2, TimeInfo.Normal));
+
+        assertEquals(List.of(new UsedLanesMessage(TIMESTAMP, "TestWK", EVENT, HEAT, "1100000000"), refined(RefinedMessageType.Live, RefinedTimeType.Normal)),
+                     listener.received);
     }
 
     @ParameterizedTest
