@@ -13,7 +13,6 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
-| [How deleted times are handled is not settled](deleted-times-handling.md) | Medium | M | Deletions mark every entry with the same lap and value, and a re-sent time counts again; both rules are inferred, not confirmed by ARES or recordings. |
 | [The version 1 fixture test depends on the time zone](version1-fixture-depends-on-time-zone.md) | Low | S | `Version1FixtureTest.theHeatsOfAVersion1FileAreShown` fails in a JVM outside Europe/Berlin: the announced heat is two hours off. |
 | [Times with a minus sign are dropped](minus-times-are-dropped.md) | Low | S | Finish and split times with `TimeMarker.Minus` are dropped; seen only before the start of a heat, meaning unknown. |
 | [Documentation still refers to the removed Spring Boot application](references-to-removed-spring-boot-app.md) | Low | M | `README.md`, a code comment and the first spec and plan describe the protocol and refiner modules as copies of the gone app in `../alphatimer`; PIT still skips them. |
