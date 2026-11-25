@@ -2,11 +2,12 @@
 
 The legacy endpoints (`/legacy/heats.xml`, `/legacy/heats.json`) are served by `LegacyService`, which reads the ARES
 messages (`DataHandlingMessage`) below the refined layer. Inputs that are refined into the refined messages without ARES
-messages (LENEX, later ALGE) therefore produce no legacy heats; JAuswertung gets none of their times.
+messages (LENEX, later ALGE) are therefore not served by it.
 
-A first step serves the legacy heats built from the refined messages beside the old ones (`/legacy/heats-new.xml`,
-`RefinedLegacyService`; `docs/superpowers/specs/2026-11-25-legacy-heats-from-refined-messages-design.md`), so both can be
-compared on real competitions.
+A first step builds the legacy heats from the refined messages (`RefinedLegacyService`;
+`docs/superpowers/specs/2026-11-25-legacy-heats-from-refined-messages-design.md`). ARES projects serve them beside the
+old ones (`/legacy/heats-new.xml`), so both can be compared on real competitions; LENEX projects, which have no ARES
+messages, serve them on all legacy paths.
 
 - **Goal:** the legacy heats are built from the heat model (`HeatService`/`LiveHeats`), so every input that reaches the
   refined messages also reaches JAuswertung through the legacy endpoints; `LegacyService` and its `LaneTimeRepository`
@@ -17,7 +18,6 @@ compared on real competitions.
   - For ARES projects the output equals the current one: a lane holds its finish time, a deleted finish removes it, the
     lane status follows the kind of the time (`RaceTimes` live, `ResultsOfTheRace`, `ResultsWithBackupTimes`,
     `ResultsOfThePreviousRace`, `BackupOfThePreviousRace`).
-  - Until then LENEX projects serve no legacy heats (decided in [LENEX input](lenex-input.md)).
 - **Where:** an adapter from the heat DTOs to the legacy heats in `alphatimer-legacy-server`; `RecordingSession` and
   `MessageReplay` stop feeding `LegacyService`.
 - **Open questions:**

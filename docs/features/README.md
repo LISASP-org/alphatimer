@@ -11,7 +11,6 @@ Every row has a priority and a size; keep the table ordered by priority (High, M
 
 | Feature | Priority | Size | Summary |
 | --- | --- | --- | --- |
-| [LENEX input](lenex-input.md) | High | L | Read a local LENEX result file as an input source and refine its results into the refined messages |
 | [Legacy heats from the heat model](legacy-heats-from-heat-model.md) | Medium | M | Build the legacy heats from the heat model instead of the ARES messages, so every input reaches JAuswertung; removes `LegacyService` |
 | [REST endpoint for the heat model](timing-rest-endpoint.md) | Medium | M | `GET /timing` serves the heat model (split and backup times, penalty flags) to JAuswertung; replaces the legacy endpoints later |
 | [Open a project file from the command line](open-project-from-command-line.md) | Medium | S | Start the GUI and the TUI with the project file given as argument, so the installer can associate `.timing` files |
