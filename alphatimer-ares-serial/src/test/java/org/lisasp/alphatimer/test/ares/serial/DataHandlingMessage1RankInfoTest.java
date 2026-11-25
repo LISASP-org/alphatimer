@@ -103,6 +103,6 @@ class DataHandlingMessage1RankInfoTest {
                 (short) 1,
                 (byte) 1,
                 (byte) 0,
-                RankInfo.UnknownValueD)), listener.received);
+                RankInfo.StartingBlock)), listener.received);
     }
 }

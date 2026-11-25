@@ -253,16 +253,16 @@ class TakeOverTimeMessageTest {
     }
 
     @Test
-    void aTakeOverWithRankDWithoutMarkerAndTimeTypeIsRefined() {
-        refiner.accept(takeOver(MessageType.CurrentRaceResults, (byte) 2, (byte) 1, RankInfo.UnknownValueD, TimeMarker.Empty, TimeType.Empty));
+    void aStartingBlockTakeOverWithoutMarkerAndTimeTypeIsRefined() {
+        refiner.accept(takeOver(MessageType.CurrentRaceResults, (byte) 2, (byte) 1, RankInfo.StartingBlock, TimeMarker.Empty, TimeType.Empty));
 
         assertEquals(List.of(new TakeOverTimeMessage(TIMESTAMP, "TestWK", EVENT, HEAT, RefinedMessageType.CurrentRaceResult, (byte) 2, (byte) 1,
                                                      TimeMarker.Empty, TimeType.Empty, 120)), listener.received);
     }
 
     @Test
-    void aTakeOverWithRankDAndMarkerIsDropped() {
-        DataHandlingMessage message = takeOver(MessageType.CurrentRaceResults, (byte) 2, (byte) 1, RankInfo.UnknownValueD, TimeMarker.Plus,
+    void aStartingBlockTakeOverWithMarkerIsDropped() {
+        DataHandlingMessage message = takeOver(MessageType.CurrentRaceResults, (byte) 2, (byte) 1, RankInfo.StartingBlock, TimeMarker.Plus,
                                                TimeType.PlatformTimeAfterTouchpadTime);
 
         refiner.accept(message);
