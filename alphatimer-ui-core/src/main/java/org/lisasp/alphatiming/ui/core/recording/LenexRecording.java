@@ -55,6 +55,8 @@ final class LenexRecording implements AutoCloseable {
 
     private ScheduledExecutorService scheduler;
     private volatile boolean connected;
+    /** Set while the file cannot be read, so the checks of one outage log it once. */
+    private boolean unreadable;
     private Seen seen;
     private byte[] lastVersion;
     private LenexMeet lastMeet = NO_MEET;
@@ -101,6 +103,10 @@ final class LenexRecording implements AutoCloseable {
             }
             content = Files.readAllBytes(file);
         } catch (IOException ex) {
+            if (!unreadable) {
+                log.warn("The LENEX file {} cannot be read", file, ex);
+                unreadable = true;
+            }
             connected = false;
             return;
         }
@@ -128,6 +134,7 @@ final class LenexRecording implements AutoCloseable {
     }
 
     private void alive() {
+        unreadable = false;
         connected = true;
         listener.signOfLife();
     }
