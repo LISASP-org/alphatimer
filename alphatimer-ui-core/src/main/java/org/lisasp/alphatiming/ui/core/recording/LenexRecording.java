@@ -69,7 +69,7 @@ final class LenexRecording implements AutoCloseable {
         store.findLast().ifPresent(last -> {
             lastVersion = last.xml();
             lastMeet = meetOf(lastVersion);
-        }
+        });
     }
 
     void start(int intervalSeconds) {
@@ -112,15 +112,19 @@ final class LenexRecording implements AutoCloseable {
             log.debug("The LENEX file {} is not complete yet", file);
             return;
         }
-        seen = now;
         try {
-            if (lastVersion != null && LenexDocuments.sameExceptExportTime(lastVersion, version)) {
-                return;
+            if (lastVersion == null || !LenexDocuments.sameExceptExportTime(lastVersion, version)) {
+                record(version, LenexReader.read(new ByteArrayInputStream(version)));
             }
-            record(version, LenexReader.read(new ByteArrayInputStream(version)));
         } catch (IOException ex) {
             log.warn("The LENEX file {} holds no meet", file);
+        } catch (RecordingWriteException ex) {
+            log.warn("Could not store the version of the LENEX file {}", file, ex);
+            writes.failed(ex.data(), (Exception) ex.getCause());
+            // Not marked as seen: the next check reads the file again and stores the version then.
+            return;
         }
+        seen = now;
     }
 
     private void alive() {

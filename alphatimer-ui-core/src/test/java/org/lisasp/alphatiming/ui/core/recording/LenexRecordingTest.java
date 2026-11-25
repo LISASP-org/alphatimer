@@ -139,6 +139,42 @@ class LenexRecordingTest {
         assertThat(messages).filteredOn(TimeMessage.class::isInstance).hasSize(2);
     }
 
+    @Test
+    void aVersionThatCannotBeStoredIsReportedAndRecordedAtTheNextCheck() throws IOException {
+        List<String> writes = new ArrayList<>();
+        writeListeners.add(new WriteListener() {
+            @Override
+            public void writeFailed(RecordedData data, Exception cause) {
+                writes.add("failed " + data);
+            }
+
+            @Override
+            public void writeRecovered(RecordedData data) {
+                writes.add("recovered " + data);
+            }
+
+            @Override
+            public void dataDropped(RecordedData data, int bytes) {
+            }
+        });
+        write(meet("2026-01-10T10:00:00", 62340), 1);
+        LenexRecording recording = recording();
+        db.write(em -> em.createNativeQuery("CREATE TRIGGER block BEFORE INSERT ON lenexversion BEGIN SELECT RAISE(ABORT, 'disk full'); END").executeUpdate());
+
+        recording.check();
+
+        assertThat(writes).containsExactly("failed LENEX_VERSIONS");
+        assertThat(messages).isEmpty();
+        assertThat(store.findAll()).isEmpty();
+
+        db.write(em -> em.createNativeQuery("DROP TRIGGER block").executeUpdate());
+        recording.check();
+
+        assertThat(writes).containsExactly("failed LENEX_VERSIONS", "recovered LENEX_VERSIONS");
+        assertThat(messages).filteredOn(TimeMessage.class::isInstance).hasSize(1);
+        assertThat(store.findAll()).hasSize(1);
+    }
+
     private void write(String content, int second) throws IOException {
         Files.writeString(file, content);
         Files.setLastModifiedTime(file, FileTime.from(Instant.parse("2026-01-10T10:00:00Z").plusSeconds(second)));
