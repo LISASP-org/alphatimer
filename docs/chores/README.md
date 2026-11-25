@@ -13,6 +13,5 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 | Chore | Severity | Size | Summary |
 | --- | --- | --- | --- |
 | [Associate `.timing` files in the JAuswertung installer](associate-timing-files.md) | Low | S | Register `.timing` files with the AlphaTiming launcher in the install4j project; blocked by opening a project from the command line |
-| [Properties files use \uXXXX escapes](properties-utf-8.md) | Low | S | Convert `messages.properties` and `messages_de.properties` to plain UTF-8 |
 | [UsedLanesMessage parses the ARES flags inside an api module](used-lanes-parsing-in-api-module.md) | Low | S | Move the parsing of the ten ARES used-lane flags from the message in `alphatimer-refinedmessages-api` to the refiner |
 | [Check whether the api modules are real api modules](api-modules-audit.md) | Low | L | Find out per api module which types other areas use and which are the internal model of its implementation module |

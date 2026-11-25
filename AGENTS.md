@@ -183,8 +183,8 @@ untrusted input:
   `alphatimer-ui-common/src/main/resources/org/lisasp/alphatiming/ui/common/messages.properties` (English) and `messages_de.properties`
   and is looked up with `I18n.get(key, args…)` (`MessageFormat` placeholders `{0}`). The language follows the JVM's
   default locale (`-Duser.language=de` to force it); other languages fall back to English. Never hardcode UI text in Java.
-- Write non-ASCII characters in the properties files as `\uXXXX` escapes, until `docs/chores/properties-utf-8.md` moves
-  them to plain UTF-8. Both files must have identical keys and
+- The properties files are plain UTF-8: write non-ASCII characters as they are, never as `\uXXXX` escapes. Both files
+  must have identical keys and
   placeholders; `I18nTest` checks this, that every key used in code exists, and that no key is dead (it scans the sources
   of all front ends; add a new front end to its list). A key built
   dynamically (`"problem." + name`) needs its family enumerated in that test.
