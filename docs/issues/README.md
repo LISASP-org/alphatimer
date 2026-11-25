@@ -14,4 +14,3 @@ Every row has a severity and a size; keep the table ordered by severity (High, M
 | Issue | Severity | Size | Summary |
 | --- | --- | --- | --- |
 | [Times with a minus sign are dropped](minus-times-are-dropped.md) | Low | S | Finish and split times with `TimeMarker.Minus` are dropped; seen only before the start of a heat, meaning unknown. |
-| [A disqualified relay takeover skips the lane and lap checks](disqualified-takeover-skips-checks.md) | Low | S | `TakeOverTimeParser` accepts a disqualified takeover without lane or valid lap, because of missing parentheses. |

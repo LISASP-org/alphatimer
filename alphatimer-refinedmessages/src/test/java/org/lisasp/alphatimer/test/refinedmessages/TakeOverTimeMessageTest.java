@@ -51,7 +51,7 @@ class TakeOverTimeMessageTest {
                 event,
                 heat,
                 (byte) 0,
-                RankInfo.Normal,
+                RankInfo.StartingBlock,
                 (byte) 2,
                 (byte) 1,
                 0,
@@ -90,7 +90,7 @@ class TakeOverTimeMessageTest {
                 event,
                 heat,
                 (byte) 0,
-                RankInfo.Normal,
+                RankInfo.StartingBlock,
                 (byte) 2,
                 (byte) 1,
                 0,
@@ -122,7 +122,7 @@ class TakeOverTimeMessageTest {
                 event,
                 heat,
                 (byte) 15,
-                RankInfo.Normal,
+                RankInfo.StartingBlock,
                 (byte) 2,
                 (byte) 1,
                 0,
@@ -153,7 +153,7 @@ class TakeOverTimeMessageTest {
                 event,
                 heat,
                 (byte) 0,
-                RankInfo.Normal,
+                RankInfo.StartingBlock,
                 (byte) 2,
                 (byte) 1,
                 0,
@@ -185,7 +185,7 @@ class TakeOverTimeMessageTest {
                 event,
                 heat,
                 (byte) 0,
-                RankInfo.Normal,
+                RankInfo.StartingBlock,
                 (byte) 2,
                 (byte) 0,
                 0,
@@ -217,7 +217,7 @@ class TakeOverTimeMessageTest {
                 event,
                 heat,
                 (byte) 0,
-                RankInfo.Normal,
+                RankInfo.StartingBlock,
                 (byte) 2,
                 (byte) 1,
                 0,
@@ -246,7 +246,7 @@ class TakeOverTimeMessageTest {
     @CsvSource({"CurrentRaceResults, CurrentRaceResult", "PreviousRaceResults, PreviousRaceResult",
                 "CurrentRaceResultsWithBackupTimes, CurrentRaceResult", "PreviousRaceResultsWithBackupTimes, PreviousRaceResult"})
     void aResultMessageKeepsItsMessageTypeAndCarriesNoUsedLanes(MessageType messageType, RefinedMessageType refinedMessageType) {
-        refiner.accept(takeOver(messageType, (byte) 2, (byte) 1, RankInfo.Normal, TimeMarker.Minus, TimeType.PlatformTimeBeforeTouchpadTime));
+        refiner.accept(takeOver(messageType, (byte) 2, (byte) 1, RankInfo.StartingBlock, TimeMarker.Minus, TimeType.PlatformTimeBeforeTouchpadTime));
 
         assertEquals(List.of(new TakeOverTimeMessage(TIMESTAMP, "TestWK", EVENT, HEAT, refinedMessageType, (byte) 2, (byte) 1, TimeMarker.Minus,
                                                      TimeType.PlatformTimeBeforeTouchpadTime, 120)), listener.received);
@@ -260,10 +260,20 @@ class TakeOverTimeMessageTest {
                                                      TimeMarker.Empty, TimeType.Empty, 120)), listener.received);
     }
 
-    @Test
-    void aStartingBlockTakeOverWithMarkerIsDropped() {
-        DataHandlingMessage message = takeOver(MessageType.CurrentRaceResults, (byte) 2, (byte) 1, RankInfo.StartingBlock, TimeMarker.Plus,
-                                               TimeType.PlatformTimeAfterTouchpadTime);
+    @ParameterizedTest
+    @CsvSource({"Plus, PlatformTimeAfterTouchpadTime", "Minus, PlatformTimeBeforeTouchpadTime", "Plus, PlatformTimeBeforeTouchpadTime",
+                "Minus, PlatformTimeAfterTouchpadTime"})
+    void aStartingBlockTakeOverWithMarkerIsRefined(TimeMarker marker, TimeType timeType) {
+        refiner.accept(takeOver(MessageType.CurrentRaceResults, (byte) 2, (byte) 1, RankInfo.StartingBlock, marker, timeType));
+
+        assertEquals(List.of(new TakeOverTimeMessage(TIMESTAMP, "TestWK", EVENT, HEAT, RefinedMessageType.CurrentRaceResult, (byte) 2, (byte) 1,
+                                                     marker, timeType, 120)), listener.received);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"Plus, PlatformTimeAfterTouchpadTime", "Empty, Empty"})
+    void aTakeOverWithNormalRankInfoIsDropped(TimeMarker marker, TimeType timeType) {
+        DataHandlingMessage message = takeOver(MessageType.CurrentRaceResults, (byte) 2, (byte) 1, RankInfo.Normal, marker, timeType);
 
         refiner.accept(message);
 
@@ -271,10 +281,10 @@ class TakeOverTimeMessageTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"2, 4", "0, 1"})
-    void aTakeOverOnTheLastLapOrWithoutLaneIsDropped(byte lane, byte currentLap) {
-        DataHandlingMessage message = takeOver(MessageType.CurrentRaceResults, lane, currentLap, RankInfo.Normal, TimeMarker.Plus,
-                                               TimeType.PlatformTimeAfterTouchpadTime);
+    @CsvSource({"2, 4, Plus, PlatformTimeAfterTouchpadTime", "0, 1, Plus, PlatformTimeAfterTouchpadTime", "2, 0, Plus, PlatformTimeAfterTouchpadTime",
+                "2, 4, Empty, Empty", "0, 1, Empty, Empty", "2, 0, Empty, Empty"})
+    void aStartingBlockTakeOverOnLapZeroOrTheLastLapOrWithoutLaneIsDropped(byte lane, byte currentLap, TimeMarker marker, TimeType timeType) {
+        DataHandlingMessage message = takeOver(MessageType.CurrentRaceResults, lane, currentLap, RankInfo.StartingBlock, marker, timeType);
 
         refiner.accept(message);
 

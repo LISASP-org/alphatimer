@@ -25,8 +25,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeviceTimeTest {
 
     private static DataHandlingMessage message(MessageType type, KindOfTime kind, TimeType timeType, TimeMarker marker, int lap, int lapCount, int lane, int millis) {
+        return message(type, kind, timeType, marker, RankInfo.Normal, lap, lapCount, lane, millis);
+    }
+
+    private static DataHandlingMessage message(MessageType type, KindOfTime kind, TimeType timeType, TimeMarker marker, RankInfo rankInfo, int lap, int lapCount,
+                                               int lane, int millis) {
         return new DataHandlingMessage(LocalDateTime.of(2026, 1, 1, 10, 0), "", "raw1", "raw2", type, kind, timeType, new UsedLanes(),
-                                       (byte) lapCount, (short) 3, (byte) 2, (byte) 0, RankInfo.Normal, (byte) lane, (byte) lap, millis, TimeInfo.Normal, marker);
+                                       (byte) lapCount, (short) 3, (byte) 2, (byte) 0, rankInfo, (byte) lane, (byte) lap, millis, TimeInfo.Normal, marker);
     }
 
     private static List<RefinedMessage> refine(DataHandlingMessage message) {
@@ -63,11 +68,11 @@ class DeviceTimeTest {
 
     @Test
     void aTakeOverCarriesItsTimeWhenThereIsOne() {
-        List<RefinedMessage> withTime = refine(message(MessageType.OnLineTime, KindOfTime.TakeOverTime, TimeType.PlatformTimeAfterTouchpadTime, TimeMarker.Plus, 1, 3, 2, 1_500));
+        List<RefinedMessage> withTime = refine(message(MessageType.OnLineTime, KindOfTime.TakeOverTime, TimeType.PlatformTimeAfterTouchpadTime, TimeMarker.Plus, RankInfo.StartingBlock, 1, 3, 2, 1_500));
         assertThat(withTime).singleElement().isInstanceOf(TakeOverTimeMessage.class);
         assertThat(withTime.get(0).getDeviceTimeInMillis()).isEqualTo(OptionalInt.of(1_500));
 
-        List<RefinedMessage> withoutTime = refine(message(MessageType.OnLineTime, KindOfTime.TakeOverTime, TimeType.PlatformTimeAfterTouchpadTime, TimeMarker.Plus, 1, 3, 2, 0));
+        List<RefinedMessage> withoutTime = refine(message(MessageType.OnLineTime, KindOfTime.TakeOverTime, TimeType.PlatformTimeAfterTouchpadTime, TimeMarker.Plus, RankInfo.StartingBlock, 1, 3, 2, 0));
         assertThat(withoutTime.get(0).getDeviceTimeInMillis()).isEmpty();
     }
 
