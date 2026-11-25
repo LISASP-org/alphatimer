@@ -1,5 +1,6 @@
 package org.lisasp.alphatiming.lenex;
 
+import org.lisasp.alphatiming.lenex.api.XmlNotWritableException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -65,7 +66,7 @@ public final class LenexDocuments {
             transformer.transform(new DOMSource(document), new StreamResult(bytes));
             return bytes.toByteArray();
         } catch (TransformerException e) {
-            throw new IllegalStateException("The JDK cannot write the XML it has read", e);
+            throw new XmlNotWritableException(e);
         }
     }
 }

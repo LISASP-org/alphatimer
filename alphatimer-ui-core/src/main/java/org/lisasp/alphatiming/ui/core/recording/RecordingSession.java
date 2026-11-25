@@ -113,7 +113,7 @@ public final class RecordingSession implements AutoCloseable {
             case SERIAL -> new NrSerialReader(s.serialPort(), s.serialMode().configuration());
             case FILE -> new FileReplayReader(Path.of(s.replayFile()), REPLAY_BAUD_RATE);
             case TCP -> new TcpReader(s.tcpHost(), s.tcpPort());
-            case LENEX -> throw new IllegalArgumentException("LENEX is recorded from its file, not read as a stream");
+            case LENEX -> throw new NoReaderForInputException(s.connectionType());
         };
     }
 

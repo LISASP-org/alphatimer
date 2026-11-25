@@ -39,7 +39,7 @@ public class UsedLanesMessage implements RefinedMessage {
 
     private static SortedSet<Integer> aresLanes(String usedLanes) {
         if (!usedLanes.matches("[01]{10}")) {
-            throw new IllegalArgumentException("The used lanes of ARES are ten flags '0' or '1': " + usedLanes);
+            throw new InvalidUsedLanesException(usedLanes);
         }
         SortedSet<Integer> lanes = new TreeSet<>();
         for (int i = 0; i < usedLanes.length(); i++) {
