@@ -394,6 +394,23 @@ class AppControllerTest {
     }
 
     @Test
+    void aLenexFileIsSilentAfterThreeCheckIntervalsWithoutASignOfLife() throws Exception {
+        Path lenex = Files.writeString(dir.resolve("meet.lef"), "<LENEX />");
+        java.util.concurrent.atomic.AtomicReference<LocalDateTime> now = new java.util.concurrent.atomic.AtomicReference<>(LocalDateTime.of(2026, 11, 19, 10, 0));
+        AppController receiving = receivingController(new ArrayList<>(), now::get);
+        receiving.applySettings(S.withConnectionType(ConnectionType.LENEX).withLenex(lenex.toString(), 60));
+        receiving.startRecording();
+        await().atMost(5, TimeUnit.SECONDS).until(() -> receiving.pingIndicator() == PingIndicator.BRIGHT);
+
+        now.set(now.get().plusSeconds(180));
+        assertThat(receiving.pingIndicator()).isEqualTo(PingIndicator.BRIGHT);
+
+        now.set(now.get().plusSeconds(1));
+        assertThat(receiving.pingIndicator()).isEqualTo(PingIndicator.SILENT);
+        closeDiscarding(receiving);
+    }
+
+    @Test
     void aRecordingWithoutConnectionIsShownAsNotConnected() {
         List<ByteConsumer> consumers = new ArrayList<>();
         java.util.concurrent.atomic.AtomicBoolean connected = new java.util.concurrent.atomic.AtomicBoolean(false);

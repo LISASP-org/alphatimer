@@ -22,6 +22,7 @@ import org.lisasp.alphatiming.ui.core.settings.Settings;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -408,14 +409,23 @@ public final class AppController implements AutoCloseable {
 
     /** Not connected without a running, connected recording; silent without a recent ping or message; a new message briefly. */
     public PingIndicator pingIndicator() {
+        TimingDocument doc = document;
         RecordingSession s = session;
-        if (s == null || !s.isConnected()) {
+        if (doc == null || s == null || !s.isConnected()) {
             return PingIndicator.DISCONNECTED;
         }
-        if (!signOfLife.isRecent()) {
+        if (!signOfLife.isRecent(silentAfter(doc.settings()))) {
             return PingIndicator.SILENT;
         }
         return signOfLife.isShowingMessage() ? PingIndicator.MESSAGE : PingIndicator.BRIGHT;
+    }
+
+    /** A LENEX file only shows that it is there at each check, so it counts as silent after three check intervals. */
+    static Duration silentAfter(Settings settings) {
+        if (settings.connectionType() == ConnectionType.LENEX) {
+            return Duration.ofSeconds(3L * settings.lenexIntervalSeconds());
+        }
+        return SignOfLife.STREAM_SILENT_AFTER;
     }
 
     private void pingReceived() {
