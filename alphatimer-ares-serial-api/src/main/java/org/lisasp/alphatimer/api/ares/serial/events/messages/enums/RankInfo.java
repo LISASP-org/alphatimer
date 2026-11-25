@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 @Getter
 public enum RankInfo {
     Normal(' '),
-    Disqualified('D');
+    UnknownValueD('D');
 
     private final char value;
 }

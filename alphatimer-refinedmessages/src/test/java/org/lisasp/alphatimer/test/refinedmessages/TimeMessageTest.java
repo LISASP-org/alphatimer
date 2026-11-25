@@ -130,7 +130,7 @@ class TimeMessageTest {
                 event,
                 heat,
                 (byte) 0,
-                RankInfo.Disqualified,
+                RankInfo.UnknownValueD,
                 (byte) 2,
                 (byte) 1,
                 0,

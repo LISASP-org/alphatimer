@@ -117,7 +117,7 @@ class DataHandlingMessage1Parser implements MessageParser {
     // Field H (included): Index 17-18
     private RankInfo getRankInfo(byte[] data) {
         if (data[17] == 0x44 && data[18] == 0x20) {
-            return RankInfo.Disqualified;
+            return RankInfo.UnknownValueD;
         }
         return RankInfo.Normal;
     }

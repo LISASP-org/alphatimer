@@ -7,8 +7,8 @@ apply only to normal takeovers.
 
 - **Effect:** a disqualified takeover without a lane or on lap 0 is refined instead of dropped. `HeatService` ignores
   takeover messages so far, so nothing visible changes yet; it would once relay disqualifications are shown.
-- **Note:** the rank `D ` that marks such a takeover is probably not a disqualification at all, see
-  `rank-d-is-not-a-disqualification.md`; settle both together.
+- **Note:** the rank `D ` that marks such a takeover (`RankInfo.UnknownValueD`) is not a disqualification: the
+  recordings carry it on every reaction time and never on a disqualified lane.
 - **Where:** `alphatimer-refinedmessages/.../TakeOverTimeParser.isValid`.
 - **Idea:** put parentheses around the two alternatives so the common checks apply to both, with a test for a
   disqualified takeover without a lane.

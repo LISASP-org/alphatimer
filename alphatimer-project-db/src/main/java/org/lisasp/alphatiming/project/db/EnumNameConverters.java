@@ -49,8 +49,17 @@ final class EnumNameConverters {
     }
 
     public static final class RankInfoConverter extends EnumNameConverter<RankInfo> {
+
+        /** Project files written before rank D was found to be no disqualification store its former name. */
+        private static final String FORMER_UNKNOWN_VALUE_D = "Disqualified";
+
         public RankInfoConverter() {
             super(RankInfo.class);
+        }
+
+        @Override
+        public RankInfo convertToEntityAttribute(String name) {
+            return FORMER_UNKNOWN_VALUE_D.equals(name) ? RankInfo.UnknownValueD : super.convertToEntityAttribute(name);
         }
     }
 

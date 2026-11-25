@@ -103,4 +103,17 @@ class MessageStoreTest {
             db.closeAndDelete();
         }
     }
+
+    @Test
+    void theFormerNameOfTheRankInfoDIsStillRead() throws Exception {
+        try (TimingDatabase db = TimingDatabase.createNew(dir)) {
+            MessageStore store = new MessageStore(db);
+            store.put(message("TestWK", (short) 1, (byte) 1));
+            db.write(em -> em.createNativeQuery("update aresmessage set rankInfo = 'Disqualified'").executeUpdate());
+
+            assertThat(store.findBy("TestWK", (short) 1, (byte) 1)).extracting(DataHandlingMessage::getRankInfo)
+                                                                  .containsExactly(RankInfo.UnknownValueD);
+            db.closeAndDelete();
+        }
+    }
 }

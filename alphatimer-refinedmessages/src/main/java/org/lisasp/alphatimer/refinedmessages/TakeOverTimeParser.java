@@ -41,7 +41,7 @@ public class TakeOverTimeParser implements Parser {
                 ((message.getRankInfo() == RankInfo.Normal) &&
                         (message.getTimeMarker() == TimeMarker.Plus || message.getTimeMarker() == TimeMarker.Minus) &&
                         (message.getTimeType() == TimeType.PlatformTimeAfterTouchpadTime || message.getTimeType() == TimeType.PlatformTimeBeforeTouchpadTime))
-                || (message.getRankInfo() == RankInfo.Disqualified && message.getTimeMarker() == TimeMarker.Empty && message.getTimeType() == TimeType.Empty)
+                || (message.getRankInfo() == RankInfo.UnknownValueD && message.getTimeMarker() == TimeMarker.Empty && message.getTimeType() == TimeType.Empty)
                 ;
     }
 }
